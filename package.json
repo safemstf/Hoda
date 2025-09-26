@@ -1,0 +1,14 @@
+﻿{
+  "name": "unt-csce5430-tts",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p . || echo \"build placeholder: replace with your bundler/build command\"",
+    "test": "echo \"no tests\" && exit 0",
+    "lint": "eslint src || true"
+  },
+  "dependencies": {
+  },
+  "devDependencies": {}
+}

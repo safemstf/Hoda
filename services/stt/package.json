@@ -1,0 +1,8 @@
+﻿{
+  "name": "unt-csce5430-stt",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "echo "no tests" && exit 0"
+  }
+}
