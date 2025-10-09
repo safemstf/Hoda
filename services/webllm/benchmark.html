@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebLLM Performance Benchmark</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .pass { color: #28a745; font-weight: bold; }
+        .fail { color: #dc3545; font-weight: bold; }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .summary-label {
+            font-size: 14px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ WebLLM Performance Benchmark</h1>
+
+        <div id="status" class="status loading">
+            Initializing WebLLM engine...
+        </div>
+
+        <button id="startBenchmark" onclick="runBenchmark()" disabled>
+            Start Benchmark
+        </button>
+
+        <div class="summary" id="summary" style="display: none;">
+            <div class="summary-card">
+                <div class="summary-label">Avg Processing Time</div>
+                <div class="summary-value" id="avgTime">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Min Time</div>
+                <div class="summary-value" id="minTime">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Max Time</div>
+                <div class="summary-value" id="maxTime">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Target Met</div>
+                <div class="summary-value" id="targetMet">-</div>
+            </div>
+        </div>
+
+        <table id="results" style="display: none;">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Command</th>
+                    <th>Intent</th>
+                    <th>Confidence</th>
+                    <th>Time (ms)</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { createParser, analyzeAccessibilityUtterance } from './src/index.js';
+
+        let parser = null;
+
+        // Test commands
+        const testCommands = [
+            'scroll down',
+            'scroll up',
+            'go back',
+            'page down',
+            'read this page',
+            'read to me',
+            'what does this say',
+            'stop reading',
+            'find login button',
+            'where is sign in',
+            'locate login',
+            'make text bigger',
+            'zoom in',
+            'increase size',
+            'submit form',
+            'fill in username',
+            'list all links',
+            'help',
+            'what can you do',
+            'go to home page'
+        ];
+
+        // Update status message
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Initialize the parser
+        async function init() {
+            try {
+                updateStatus('Loading WebLLM model...', 'loading');
+
+                const startTime = Date.now();
+                parser = await createParser(
+                    { localOnly: true },
+                    {
+                        modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+                        temperature: 0.1,
+                        maxTokens: 200
+                    }
+                );
+
+                const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                updateStatus(`✅ Model loaded in ${loadTime}s. Ready to benchmark!`, 'success');
+
+                document.getElementById('startBenchmark').disabled = false;
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Run benchmark
+        window.runBenchmark = async function() {
+            if (!parser) {
+                alert('Parser not initialized');
+                return;
+            }
+
+            const button = document.getElementById('startBenchmark');
+            button.disabled = true;
+            button.textContent = 'Running Benchmark...';
+
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '';
+            document.getElementById('results').style.display = 'table';
+
+            const times = [];
+            const TARGET_TIME = 500; // ms
+
+            updateStatus('Running benchmark tests...', 'loading');
+
+            for (let i = 0; i < testCommands.length; i++) {
+                const command = testCommands[i];
+                const startTime = Date.now();
+
+                try {
+                    const result = await analyzeAccessibilityUtterance(command, null, parser);
+                    const processingTime = Date.now() - startTime;
+                    times.push(processingTime);
+
+                    const row = resultsBody.insertRow();
+                    row.innerHTML = `
+                        <td>${i + 1}</td>
+                        <td>${command}</td>
+                        <td>${result.intent.intent}</td>
+                        <td>${(result.intent.confidence * 100).toFixed(0)}%</td>
+                        <td>${processingTime}ms</td>
+                        <td class="${processingTime <= TARGET_TIME ? 'pass' : 'fail'}">
+                            ${processingTime <= TARGET_TIME ? '✓ PASS' : '✗ FAIL'}
+                        </td>
+                    `;
+
+                    updateStatus(`Testing ${i + 1}/${testCommands.length}...`, 'loading');
+
+                } catch (error) {
+                    console.error('Test error:', error);
+                    const row = resultsBody.insertRow();
+                    row.innerHTML = `
+                        <td>${i + 1}</td>
+                        <td>${command}</td>
+                        <td colspan="4" class="fail">ERROR: ${error.message}</td>
+                    `;
+                }
+            }
+
+            // Calculate statistics
+            const avgTime = (times.reduce((a, b) => a + b, 0) / times.length).toFixed(0);
+            const minTime = Math.min(...times);
+            const maxTime = Math.max(...times);
+            const passCount = times.filter(t => t <= TARGET_TIME).length;
+            const passRate = ((passCount / times.length) * 100).toFixed(0);
+
+            // Update summary
+            document.getElementById('summary').style.display = 'grid';
+            document.getElementById('avgTime').textContent = `${avgTime}ms`;
+            document.getElementById('minTime').textContent = `${minTime}ms`;
+            document.getElementById('maxTime').textContent = `${maxTime}ms`;
+            document.getElementById('targetMet').textContent = `${passRate}%`;
+
+            // Update status
+            const statusType = avgTime <= TARGET_TIME ? 'success' : 'error';
+            updateStatus(
+                `✅ Benchmark complete! Average: ${avgTime}ms (Target: ${TARGET_TIME}ms)`,
+                statusType
+            );
+
+            // Log summary
+            console.log('Benchmark Results:');
+            console.log('Average Time:', avgTime, 'ms');
+            console.log('Min Time:', minTime, 'ms');
+            console.log('Max Time:', maxTime, 'ms');
+            console.log('Pass Rate:', passRate, '%');
+
+            button.disabled = false;
+            button.textContent = 'Run Again';
+        };
+
+        // Start initialization
+        init();
+    </script>
+</body>
+</html>
