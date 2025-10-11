@@ -135,7 +135,6 @@ dist
 # Build directories
 build/
 dist/
-extension/
 
 # Packed extension files
 *.crx
@@ -155,11 +154,9 @@ store-assets/
 # ==================
 
 # Large model files
-*.bin
 *.safetensors
 *.onnx
 *.gguf
-models/
 *.model
 
 # Training data

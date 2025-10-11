@@ -1,0 +1,350 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #0f0f1e;
+    color: #fff;
+    min-height: 100vh;
+    padding: 40px 20px;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.header h1 {
+    font-size: 42px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+}
+
+.header .subtitle {
+    font-size: 16px;
+    color: #888;
+}
+
+/* Network Warning */
+.network-warning {
+    background: rgba(251, 191, 36, 0.1);
+    border: 2px solid rgba(251, 191, 36, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.network-warning .icon {
+    font-size: 24px;
+}
+
+.network-warning .text {
+    flex: 1;
+}
+
+.network-warning .title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fbbf24;
+    margin-bottom: 4px;
+}
+
+.network-warning .message {
+    font-size: 13px;
+    color: #aaa;
+}
+
+.voice-status {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border-radius: 24px;
+    padding: 32px;
+    margin-bottom: 32px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    text-align: center;
+}
+
+.voice-button {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    cursor: pointer;
+    margin: 0 auto 20px;
+    transition: all 0.3s ease;
+    box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+    font-size: 40px;
+    display: block;
+}
+
+.voice-button:hover {
+    transform: scale(1.05);
+}
+
+.voice-button.listening {
+    animation: pulse 2s infinite;
+}
+
+.voice-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+@keyframes pulse {
+    0%,
+    100% {
+        box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+    }
+
+    50% {
+        box-shadow: 0 8px 50px rgba(102, 126, 234, 0.6);
+    }
+}
+
+.status-text {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.status-subtext {
+    font-size: 14px;
+    color: #888;
+}
+
+.transcript-box {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 24px;
+    min-height: 100px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+}
+
+.transcript-label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 12px;
+}
+
+.transcript-text {
+    font-size: 18px;
+    color: #fff;
+    line-height: 1.6;
+    font-family: 'Courier New', monospace;
+    min-height: 30px;
+}
+
+.transcript-text.interim {
+    color: #888;
+    font-style: italic;
+}
+
+.recognition-feedback {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(74, 222, 128, 0.1);
+    border: 2px solid rgba(74, 222, 128, 0.3);
+    border-radius: 12px;
+    display: none;
+    animation: slideIn 0.3s ease;
+}
+
+.recognition-feedback.show {
+    display: block;
+}
+
+.recognition-feedback.error {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.3);
+}
+
+.recognition-feedback.warning {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.feedback-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4ade80;
+    margin-bottom: 8px;
+}
+
+.recognition-feedback.error .feedback-title {
+    color: #f87171;
+}
+
+.recognition-feedback.warning .feedback-title {
+    color: #fbbf24;
+}
+
+.feedback-details {
+    font-size: 13px;
+    color: #aaa;
+    font-family: 'Courier New', monospace;
+    white-space: pre-line;
+}
+
+.command-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin-bottom: 32px;
+}
+
+.command-category {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.category-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #667eea;
+    margin-bottom: 16px;
+}
+
+.command-list {
+    list-style: none;
+}
+
+.command-item {
+    padding: 8px 0;
+    font-size: 14px;
+    color: #aaa;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.command-item:last-child {
+    border-bottom: none;
+}
+
+.command-item code {
+    color: #667eea;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+}
+
+.stats-panel {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 20px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 4px;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: #fff;
+}
+
+.command-log-container {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    display: none;
+}
+
+.command-log-label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.command-log-list {
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    color: #aaa;
+}
+
+.command-log-entry {
+    margin-bottom: 8px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.command-log-time {
+    color: #667eea;
+    font-size: 11px;
+}
+
+.command-log-content {
+    margin-top: 4px;
+}
+
+.command-log-success {
+    color: #4ade80;
+}
+
+.command-log-error {
+    color: #f87171;
+}

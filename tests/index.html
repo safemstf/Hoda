@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Hoda — Test Launcher</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Modern Header -->
+        <div class="header">
+            <h1>🧪 Hoda Test Launcher</h1>
+            <p class="subtitle">Run interactive tests for voice commands and microphone functionality</p>
+        </div>
+
+        <!-- Main Cards Section -->
+        <div class="tests-section">
+            <h2 class="section-title">Available Tests</h2>
+            <div class="test-grid">
+                <!-- Voice Commands Test Card -->
+                <div class="test-card">
+                    <div class="test-header">
+                        <span class="test-title">Voice Commands Tests</span>
+                        <div class="status-dot pending"></div>
+                    </div>
+                    <p class="test-description">Run interactive voice-command scenarios to validate STT, normalization, and intent handling.</p>
+                    <div class="actions" style="display: flex; gap: 8px;">
+                        <button type="button" class="test-button success" data-file="voice-commands-tests.html">Open Test</button>
+                        <button type="button" class="test-button" data-preview="voice-commands-tests.html">Preview</button>
+                    </div>
+                </div>
+
+                <!-- Microphone Test Card -->
+                <div class="test-card">
+                    <div class="test-header">
+                        <span class="test-title">Microphone Tests</span>
+                        <div class="status-dot pending"></div>
+                    </div>
+                    <p class="test-description">Validate microphone access, audio levels, input devices and permissions.</p>
+                    <div class="actions" style="display: flex; gap: 8px;">
+                        <button type="button" class="test-button success" data-file="microphone-tests.html">Open Test</button>
+                        <button type="button" class="test-button" data-preview="microphone-tests.html">Preview</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls Section -->
+        <div class="status-panel">
+            <h2 class="section-title">Settings</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">Open Behavior</div>
+                    <div class="status-value">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 14px;">
+                            <input type="checkbox" id="openInNewTab" checked /> New Tab
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preview Section -->
+        <div class="status-panel">
+            <h2 class="section-title">Preview</h2>
+            <iframe id="preview" title="Test preview" sandbox="allow-scripts allow-same-origin" 
+                    style="width: 100%; height: 400px; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; background: rgba(0,0,0,0.2);"></iframe>
+        </div>
+
+        <!-- Status Section -->
+        <div class="status-panel" id="statusContainer" aria-live="polite" hidden>
+            <h2 class="section-title">Status</h2>
+            <div id="statusMsg" class="result"></div>
+        </div>
+
+        <!-- Note Section -->
+        <div class="test-card">
+            <div class="test-header">
+                <span class="test-title">Usage Notes</span>
+            </div>
+            <p class="test-description">
+                When this page runs inside the extension, the launcher will try to resolve file URLs using 
+                <code>chrome.runtime.getURL</code> or <code>browser.runtime.getURL</code>. If you open this page 
+                directly in the browser from the filesystem, use a simple local server (like <code>npx http-server .</code>) 
+                to avoid file:// restrictions.
+            </p>
+        </div>
+    </div>
+
+    <!-- LOAD EXTERNAL MODULE -->
+    <script type="module" src="index.js"></script>
+</body>
+
+</html>
