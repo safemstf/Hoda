@@ -177,19 +177,16 @@ export class SpeechRecognitionService {
     }
 
     // ---------- Message Handler (call this from popup) ----------
-    // This handles messages FROM content script (transcripts, confirmations, etc.)
     handleContentScriptMessage(message) {
         if (!message) return;
 
         // Handle transcript/command from content.js
         if (message.cmd === 'confirm') {
-            // Content script is confirming a command execution
             console.log('[SpeechService] Command confirmed:', message.text);
 
             // Treat this as a transcript
             this._onTranscription(message.text, this.opts.defaultConfidence);
         }
-        // You could add more message types here if content.js sends them
     }
 
     // ---------- Internal Handlers ----------
@@ -207,9 +204,7 @@ export class SpeechRecognitionService {
             confidence: conf,
             language: this.opts.language,
             timestamp: Date.now(),
-            context: {
-                engine: 'content_script'
-            }
+            context: { engine: 'content_script' }
         };
 
         // Update stats
@@ -217,7 +212,10 @@ export class SpeechRecognitionService {
         this.stats.recognizedCommands++;
         this._updateAverageConfidence(conf);
 
-        // Notify transcript callback (for UI display)
+        // Save transcript to storage as JSON
+        this._saveTranscript(sttInput);
+
+        // Notify transcript callback (UI)
         this._notifyTranscript({
             text: sttInput.text,
             confidence: sttInput.confidence,
@@ -229,81 +227,70 @@ export class SpeechRecognitionService {
         this._notifyCommand(sttInput);
     }
 
+    // ---------- Save Transcript ----------
+    _saveTranscript(sttInput) {
+        chrome.storage.local.get(['transcriptHistory'], (result) => {
+            let history = result.transcriptHistory || [];
+            history.push(sttInput);
+
+            chrome.storage.local.set({ transcriptHistory: history }, () => {
+                if (chrome.runtime.lastError) {
+                    console.error('[SpeechService] Error saving transcript:', chrome.runtime.lastError);
+                } else {
+                    console.log('[SpeechService] Transcript saved:', sttInput.text);
+                }
+            });
+        });
+    }
+
     // ---------- Callback Registration ----------
     onCommand(cb) {
-        if (typeof cb === 'function') {
-            this.onCommandCallbacks.push(cb);
-        }
+        if (typeof cb === 'function') this.onCommandCallbacks.push(cb);
     }
 
     onTranscript(cb) {
-        if (typeof cb === 'function') {
-            this.onTranscriptCallbacks.push(cb);
-        }
+        if (typeof cb === 'function') this.onTranscriptCallbacks.push(cb);
     }
 
     onError(cb) {
-        if (typeof cb === 'function') {
-            this.onErrorCallbacks.push(cb);
-        }
+        if (typeof cb === 'function') this.onErrorCallbacks.push(cb);
     }
 
     onStatus(cb) {
-        if (typeof cb === 'function') {
-            this.onStatusCallbacks.push(cb);
-        }
+        if (typeof cb === 'function') this.onStatusCallbacks.push(cb);
     }
 
     // ---------- Callback Notifications ----------
     _notifyCommand(sttInput) {
         this.onCommandCallbacks.forEach(cb => {
-            try {
-                cb(sttInput);
-            } catch (e) {
-                console.error('[SpeechService] Error in command callback:', e);
-            }
+            try { cb(sttInput); } catch (e) { console.error('[SpeechService] Error in command callback:', e); }
         });
     }
 
     _notifyTranscript(data) {
         this.onTranscriptCallbacks.forEach(cb => {
-            try {
-                cb(data);
-            } catch (e) {
-                console.error('[SpeechService] Error in transcript callback:', e);
-            }
+            try { cb(data); } catch (e) { console.error('[SpeechService] Error in transcript callback:', e); }
         });
     }
 
     _notifyError(err) {
         console.error('[SpeechService] Error:', err);
         this.onErrorCallbacks.forEach(cb => {
-            try {
-                cb(err);
-            } catch (e) {
-                console.error('[SpeechService] Error in error callback:', e);
-            }
+            try { cb(err); } catch (e) { console.error('[SpeechService] Error in error callback:', e); }
         });
     }
 
     _notifyStatus(status, data) {
         this.onStatusCallbacks.forEach(cb => {
-            try {
-                cb(status, data);
-            } catch (e) {
-                console.error('[SpeechService] Error in status callback:', e);
-            }
+            try { cb(status, data); } catch (e) { console.error('[SpeechService] Error in status callback:', e); }
         });
     }
 
     // ---------- Stats ----------
     _updateAverageConfidence(conf) {
         const n = this.stats.recognizedCommands;
-        if (n <= 1) {
-            this.stats.averageConfidence = conf;
-        } else {
-            this.stats.averageConfidence = ((this.stats.averageConfidence * (n - 1)) + conf) / n;
-        }
+        if (n <= 1) this.stats.averageConfidence = conf;
+        else this.stats.averageConfidence = ((this.stats.averageConfidence * (n - 1)) + conf) / n;
     }
 
     getStats() {
@@ -330,11 +317,7 @@ export class SpeechRecognitionService {
     destroy() {
         console.log('[SpeechService] Destroying');
 
-        try {
-            this.stop();
-        } catch (e) {
-            console.error('[SpeechService] Error during stop:', e);
-        }
+        try { this.stop(); } catch (e) { console.error('[SpeechService] Error during stop:', e); }
 
         this.onCommandCallbacks = [];
         this.onTranscriptCallbacks = [];
