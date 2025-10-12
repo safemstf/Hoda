@@ -1,5 +1,5 @@
 ﻿// popup.js - Voice command interface for Hoda extension
-// Refactored to use VoiceCommandCoordinator as single source of truth
+// Updated for main thread Whisper (no worker)
 
 import { VoiceCommandCoordinator } from './services/stt/src/voiceCommandCoordinator.js';
 
@@ -16,7 +16,7 @@ const UI = {
   commandResult: document.getElementById('commandResult'),
   statTotal: document.getElementById('statTotal'),
   statRecognized: document.getElementById('statRecognized'),
-
+  
   // Dynamic buttons (created at runtime)
   enableMicBtn: null,
   openSettingsBtn: null,
@@ -28,22 +28,22 @@ const UI = {
 // -----------------------------------------------------------------------------
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Popup] Initializing...');
-
+  
   // Create coordinator (singleton)
+  // Web Speech API - no workers, models, or WASM needed!
   coordinator = VoiceCommandCoordinator.getInstance({
-    modelSize: 'tiny-en-q5_1',
-    modelUrl: 'src/models/ggml-tiny.en.bin',
-    workerUrl: 'src/worker/speech-worker.js',
-    bundleUrl: 'src/vender/bin/libstream.js',
-    defaultConfidence: 0.92
+    language: 'en-US',
+    defaultConfidence: 0.92,
+    continuous: true,
+    interimResults: true
   });
-
+  
   // Setup callbacks
   setupCoordinatorCallbacks();
-
+  
   // Setup UI event listeners
   setupEventListeners();
-
+  
   // Check permissions and update UI
   await checkPermissionsAndUpdateUI();
 });
@@ -72,35 +72,40 @@ function setupCoordinatorCallbacks() {
   // Status changes
   coordinator.onStatus((status, data) => {
     console.log('[Popup] Status:', status, data);
-
+    
     switch (status) {
       case 'initializing':
       case 'initializing_mic':
       case 'initializing_speech':
         updateStatus(data.message || 'Initializing...');
         break;
-
+        
       case 'requesting_permission':
         updateStatus('Requesting microphone permission...');
         break;
-
+        
       case 'loading_model':
-        updateStatus('Loading speech model...');
+        updateStatus(data.message || 'Initializing speech recognition...');
         break;
-
+        
+      case 'loading_wasm':
+        // Not used with Web Speech API, but keep for compatibility
+        updateStatus(data.message || 'Initializing...');
+        break;
+        
       case 'ready':
         updateStatus('Ready! Click mic to start');
         UI.micBtn.disabled = false;
         removeDynamicButtons();
         break;
-
+        
       case 'listening':
         updateStatus('Listening... 🎤');
         UI.statusText.classList.add('active');
         UI.micBtn.classList.add('listening');
         UI.micBtn.textContent = '🔴';
         break;
-
+        
       case 'stopped':
         updateStatus('Stopped - Click to restart');
         UI.statusText.classList.remove('active');
@@ -117,25 +122,25 @@ function setupCoordinatorCallbacks() {
 async function checkPermissionsAndUpdateUI() {
   try {
     updateStatus('Checking microphone permission...');
-
+    
     const permState = await coordinator.getPermissionStatus();
-
+    
     removeDynamicButtons();
-
+    
     if (permState === 'granted') {
       updateStatus('Microphone granted. Click mic to initialize.');
       UI.micBtn.disabled = false;
-
+      
     } else if (permState === 'prompt' || permState === 'unknown') {
       updateStatus('Microphone permission required. Click "Enable Microphone" to allow.');
       UI.micBtn.disabled = true;
       showEnableMicButton();
-
+      
     } else if (permState === 'denied') {
       updateStatus('Microphone access is blocked. Please allow it in browser settings.');
       UI.micBtn.disabled = true;
       showSettingsButtons();
-
+      
     } else {
       updateStatus('Microphone permission status: ' + permState);
       UI.micBtn.disabled = true;
@@ -170,11 +175,11 @@ function showEnableMicButton() {
   UI.enableMicBtn.addEventListener('click', async () => {
     UI.enableMicBtn.disabled = true;
     updateStatus('Initializing...');
-
+    
     const success = await coordinator.initialize();
-
+    
     UI.enableMicBtn.disabled = false;
-
+    
     if (!success) {
       showGrantTabButton();
     }
@@ -193,13 +198,13 @@ function showSettingsButtons() {
     chrome.tabs.create({ url: 'chrome://settings/content/microphone' });
   });
   UI.statusText.parentNode.appendChild(UI.openSettingsBtn);
-
+  
   showGrantTabButton();
 }
 
 function showGrantTabButton() {
   if (UI.openGrantTabBtn) return;
-
+  
   UI.openGrantTabBtn = document.createElement('button');
   UI.openGrantTabBtn.textContent = 'Open Extension Page to Grant Mic';
   UI.openGrantTabBtn.className = 'quick-btn';
@@ -216,93 +221,36 @@ function showGrantTabButton() {
 // -----------------------------------------------------------------------------
 function handleCommand(commandData) {
   const { raw, normalized } = commandData;
-
+  
   console.log('[Popup] Command received:', {
     text: raw.text,
     intent: normalized.intent,
     confidence: raw.confidence
   });
-
+  
   updateStats();
-
+  
+  // NOTE: content.js handles command execution and sends back confirmations
+  // We just display the recognized command here
   if (normalized.intent === 'unknown') {
     const suggestions = coordinator.getSuggestions(raw.text);
     const suggestionText = suggestions.length > 0
       ? `Try: ${suggestions[0].example}`
       : 'Say "help" for commands';
-
+    
     showCommandResult(`❓ Unknown: "${raw.text}". ${suggestionText}`, true);
   } else {
-    executeCommand(normalized, raw.text);
-    showCommandResult(`✓ ${normalized.intent}: "${raw.text}"`, false);
+    showCommandResult(`🎤 Heard: "${raw.text}"`, false);
   }
 }
 
-async function executeCommand(normalized, originalText) {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) {
-      console.error('[Popup] No active tab');
-      return;
-    }
-
-    const intentMap = {
-      'navigate': () => {
-        if (originalText.includes('back')) {
-          return { cmd: 'go back' };
-        }
-        return { cmd: 'scroll', direction: normalized.slots.direction || 'down' };
-      },
-      'scroll': () => ({
-        cmd: originalText.includes('up') ? 'scroll up' : 'scroll down'
-      }),
-      'read': () => ({ cmd: 'read page' }),
-      'zoom': () => {
-        const action = normalized.slots.action || 'in';
-        return { cmd: `zoom ${action}` };
-      },
-      'link_action': () => {
-        if (originalText.includes('list')) {
-          return { cmd: 'list links' };
-        }
-        const linkNum = normalized.slots.linkNumber;
-        const target = normalized.slots.target;
-
-        if (linkNum) {
-          return { cmd: 'open link', arg: linkNum };
-        } else if (target) {
-          return { cmd: 'open link', text: target };
-        }
-        return { cmd: 'list links' };
-      },
-      'help': () => ({ cmd: 'help' })
-    };
-
-    const messageBuilder = intentMap[normalized.intent];
-    if (!messageBuilder) {
-      console.warn('[Popup] No handler for intent:', normalized.intent);
-      return;
-    }
-
-    const message = messageBuilder();
-
-    chrome.tabs.sendMessage(tab.id, message, (response) => {
-      if (chrome.runtime.lastError) {
-        console.error('[Popup] Message error:', chrome.runtime.lastError);
-        showCommandResult('❌ Failed to execute command', true);
-      } else {
-        console.log('[Popup] Command executed:', response);
-      }
-    });
-  } catch (err) {
-    console.error('[Popup] executeCommand error:', err);
-  }
-}
+// NOTE: executeCommand removed - content.js handles all command execution!
+// The content script executes commands and sends confirmations back
 
 function showCommandResult(message, isError) {
   UI.commandResult.textContent = message;
   UI.commandResult.className = 'command-result show' + (isError ? ' error' : '');
-
+  
   setTimeout(() => {
     UI.commandResult.classList.remove('show');
   }, 3000);
@@ -324,29 +272,29 @@ function setupEventListeners() {
     chrome.tabs.sendMessage(tab.id, { cmd: 'scroll down' });
     showCommandResult('✓ Scrolled down', false);
   });
-
+  
   document.getElementById('btnScrollUp')?.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     chrome.tabs.sendMessage(tab.id, { cmd: 'scroll up' });
     showCommandResult('✓ Scrolled up', false);
   });
-
+  
   document.getElementById('btnListLinks')?.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     chrome.tabs.sendMessage(tab.id, { cmd: 'list links' });
     showCommandResult('✓ Listing links', false);
   });
-
+  
   document.getElementById('btnHelp')?.addEventListener('click', async () => {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     chrome.tabs.sendMessage(tab.id, { cmd: 'help' });
   });
-
+  
   document.getElementById('openTests')?.addEventListener('click', (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: chrome.runtime.getURL('tests/index.html') });
   });
-
+  
   // MAIN MIC BUTTON - single handler
   UI.micBtn?.addEventListener('click', handleMicButtonClick);
 }
@@ -354,21 +302,21 @@ function setupEventListeners() {
 async function handleMicButtonClick() {
   try {
     const state = coordinator.getState();
-
+    
     // If not initialized, initialize first
     if (!state.isInitialized) {
       UI.micBtn.disabled = true;
       updateStatus('Initializing...');
-
+      
       const success = await coordinator.initialize();
-
+      
       UI.micBtn.disabled = false;
-
+      
       if (!success) {
         return;
       }
     }
-
+    
     // Toggle listening
     if (!state.isListening) {
       await coordinator.startListening();
@@ -392,10 +340,11 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-// Listen for messages from tests page
+// Listen for messages from tests page AND content script
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (!msg || !msg.type) return;
-
+  if (!msg || !msg.type && !msg.cmd) return;
+  
+  // Handle mic permission messages from tests page
   if (msg.type === 'mic-permission') {
     if (msg.granted) {
       console.log('[Popup] Received mic granted message');
@@ -404,6 +353,21 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
     } else {
       console.warn('[Popup] Received mic denied message:', msg.error);
       updateStatus('Permission denied: ' + (msg.error || ''));
+    }
+  }
+  
+  // Handle messages from content script (transcript confirmations, etc.)
+  if (msg.cmd) {
+    console.log('[Popup] Message from content script:', msg);
+    
+    // Pass to speech service to update stats
+    if (coordinator && coordinator.state && coordinator.state.speechRecognition) {
+      coordinator.state.speechRecognition.handleContentScriptMessage(msg);
+    }
+    
+    // Show in UI
+    if (msg.text) {
+      showCommandResult('✓ ' + msg.text, false);
     }
   }
 });

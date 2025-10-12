@@ -15,10 +15,11 @@
     "tabs"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://*/*",
+    "http://*/*"
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+    "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "background": {
     "service_worker": "background.js"
@@ -27,38 +28,8 @@
     "default_popup": "popup.html",
     "default_icon": "icons/icon48.png"
   },
-  "content_scripts": [
-    {
-      "matches": [
-        "<all_urls>"
-      ],
-      "js": [
-        "content.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": false
-  },
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "src/vender/**/*",
-        "src/models/*",
-        "src/worker/*",
-        "services/stt/src/*.js",
-        "tests/*.html",
-        "tests/*.css",
-        "tests/*.js",
-        "src/vender/bin/libstream.js",
-        "src/worker/speech-worker.js",
-        "src/models/*.bin"
-      ],
-      "matches": [
-        "<all_urls>"
-      ]
-    }
-  ]
+  }
 }

@@ -1,6 +1,6 @@
 // services/stt/src/voiceCommandCoordinator.js
 // Single source of truth for voice command system lifecycle
-// Manages initialization, state, and communication between components
+// Updated for main thread Whisper (no worker)
 
 import { MicrophoneManager } from './microphoneManager.js';
 import { SpeechRecognitionService } from './speechRecognitionService.js';
@@ -8,39 +8,28 @@ import { CommandNormalizer } from './commandNormalizer.js';
 
 export class VoiceCommandCoordinator {
     constructor(config = {}) {
-        // Singleton pattern - prevent multiple instances
+        // Singleton pattern
         if (VoiceCommandCoordinator.instance) {
             console.warn('[Coordinator] Returning existing instance');
             return VoiceCommandCoordinator.instance;
         }
         VoiceCommandCoordinator.instance = this;
 
-        // Configuration
+        // Configuration (Web Speech API - no workers needed!)
         this.config = {
-            modelSize: config.modelSize || 'tiny-en-q5_1',
-            modelUrl: config.modelUrl || 'src/models/ggml-tiny.en.bin',
-            workerUrl: config.workerUrl || 'src/worker/speech-worker.js',
-            bundleUrl: config.bundleUrl || 'src/vender/bin/libstream.js',
-            sampleRate: config.sampleRate || 16000,
             defaultConfidence: config.defaultConfidence || 0.92,
             language: config.language || 'en-US',
-            allowAutoLoad: config.allowAutoLoad !== false
+            continuous: config.continuous !== false,
+            interimResults: config.interimResults !== false
         };
 
-        // Core state - single source of truth
+        // Core state
         this.state = {
-            // Permission state
-            permissionStatus: 'unknown', // 'granted' | 'denied' | 'prompt' | 'unknown'
-            
-            // Initialization state
+            permissionStatus: 'unknown',
             isInitializing: false,
             isInitialized: false,
             modelLoaded: false,
-            
-            // Runtime state
             isListening: false,
-            
-            // Component instances (singletons managed by coordinator)
             micManager: null,
             speechRecognition: null,
             commandNormalizer: null
@@ -58,21 +47,15 @@ export class VoiceCommandCoordinator {
     }
 
     // -------------------------------------------------------------------------
-    // Public API - Main lifecycle methods
+    // Public API
     // -------------------------------------------------------------------------
 
-    /**
-     * Initialize the entire voice command system
-     * Single entry point - prevents duplicate initialization
-     */
     async initialize() {
-        // Guard: prevent concurrent initialization
         if (this.state.isInitializing) {
             console.log('[Coordinator] Already initializing, waiting...');
             return this._waitForInitialization();
         }
 
-        // Guard: already initialized
         if (this.state.isInitialized && this.state.speechRecognition) {
             console.log('[Coordinator] Already initialized');
             return true;
@@ -112,7 +95,7 @@ export class VoiceCommandCoordinator {
                 }
             }
 
-            // Step 5: Initialize speech recognition (ONLY ONCE)
+            // Step 5: Initialize speech recognition (Web Speech API - much simpler!)
             if (!this.state.speechRecognition) {
                 console.log('[Coordinator] Creating SpeechRecognitionService...');
                 this._notifyStatus('initializing_speech', { message: 'Initializing speech recognition...' });
@@ -120,18 +103,14 @@ export class VoiceCommandCoordinator {
                 this.state.speechRecognition = new SpeechRecognitionService(
                     this.state.micManager,
                     {
-                        modelSize: this.config.modelSize,
-                        modelUrl: this.config.modelUrl,
-                        workerUrl: this.config.workerUrl,
-                        bundleUrl: this.config.bundleUrl,
-                        sampleRate: this.config.sampleRate,
                         defaultConfidence: this.config.defaultConfidence,
                         language: this.config.language,
-                        allowAutoLoad: false
+                        continuous: this.config.continuous,
+                        interimResults: this.config.interimResults
                     }
                 );
 
-                // Hook up speech callbacks to coordinator callbacks
+                // Hook up callbacks
                 this._setupSpeechCallbacks();
             }
 
@@ -141,12 +120,11 @@ export class VoiceCommandCoordinator {
                 this.state.commandNormalizer = new CommandNormalizer();
             }
 
-            // Step 7: Load model
+            // Step 7: Load/initialize speech recognition (instant with Web Speech API!)
             if (!this.state.modelLoaded) {
-                console.log('[Coordinator] Loading speech model...');
+                console.log('[Coordinator] Initializing speech recognition...');
                 this._notifyStatus('loading_model', { 
-                    message: 'Loading speech model...',
-                    modelSize: this.config.modelSize 
+                    message: 'Initializing speech recognition...'
                 });
                 
                 await this.state.speechRecognition.loadModel();
@@ -173,11 +151,7 @@ export class VoiceCommandCoordinator {
         }
     }
 
-    /**
-     * Start listening for voice commands
-     */
     async startListening() {
-        // Ensure initialized
         if (!this.state.isInitialized) {
             console.log('[Coordinator] Not initialized, initializing first...');
             const success = await this.initialize();
@@ -186,7 +160,6 @@ export class VoiceCommandCoordinator {
             }
         }
 
-        // Guard: already listening
         if (this.state.isListening) {
             console.log('[Coordinator] Already listening');
             return;
@@ -208,9 +181,6 @@ export class VoiceCommandCoordinator {
         }
     }
 
-    /**
-     * Stop listening for voice commands
-     */
     stopListening() {
         if (!this.state.isListening) {
             console.log('[Coordinator] Not listening, nothing to stop');
@@ -232,19 +202,14 @@ export class VoiceCommandCoordinator {
         }
     }
 
-    /**
-     * Destroy all components and reset state
-     */
     destroy() {
         console.log('[Coordinator] Destroying...');
 
         try {
-            // Stop listening if active
             if (this.state.isListening) {
                 this.stopListening();
             }
 
-            // Destroy speech recognition
             if (this.state.speechRecognition) {
                 try {
                     this.state.speechRecognition.destroy();
@@ -254,7 +219,6 @@ export class VoiceCommandCoordinator {
                 this.state.speechRecognition = null;
             }
 
-            // Destroy microphone manager
             if (this.state.micManager) {
                 try {
                     this.state.micManager.destroy();
@@ -264,13 +228,11 @@ export class VoiceCommandCoordinator {
                 this.state.micManager = null;
             }
 
-            // Reset state
             this.state.isInitialized = false;
             this.state.modelLoaded = false;
             this.state.isListening = false;
             this.state.commandNormalizer = null;
 
-            // Clear callbacks
             this.callbacks = {
                 onTranscript: [],
                 onCommand: [],
@@ -315,7 +277,6 @@ export class VoiceCommandCoordinator {
             this._notifyStatus('requesting_permission', { message: 'Requesting microphone permission...' });
             
             try {
-                // Try to initialize mic which will trigger permission prompt
                 const success = await this.state.micManager.initialize();
                 if (success) {
                     await this._updatePermissionStatus();
@@ -368,7 +329,6 @@ export class VoiceCommandCoordinator {
     // -------------------------------------------------------------------------
 
     _setupSpeechCallbacks() {
-        // Forward transcript events
         this.state.speechRecognition.onTranscript((data) => {
             this.callbacks.onTranscript.forEach(cb => {
                 try {
@@ -379,12 +339,9 @@ export class VoiceCommandCoordinator {
             });
         });
 
-        // Forward command events with normalization
         this.state.speechRecognition.onCommand((sttInput) => {
-            // Normalize the command
             const normalized = this.state.commandNormalizer.normalize(sttInput.text);
             
-            // Notify callbacks with both raw and normalized data
             this.callbacks.onCommand.forEach(cb => {
                 try {
                     cb({
@@ -397,12 +354,10 @@ export class VoiceCommandCoordinator {
             });
         });
 
-        // Forward error events
         this.state.speechRecognition.onError((errorData) => {
             this._notifyError(errorData);
         });
 
-        // Forward status events
         this.state.speechRecognition.onStatus((status, data) => {
             this._notifyStatus(status, data);
         });
@@ -439,7 +394,6 @@ export class VoiceCommandCoordinator {
                 }
             }, 100);
 
-            // Timeout after 30 seconds
             setTimeout(() => {
                 clearInterval(checkInterval);
                 resolve(false);
@@ -448,7 +402,7 @@ export class VoiceCommandCoordinator {
     }
 
     // -------------------------------------------------------------------------
-    // Getters - Read-only access to state
+    // Getters
     // -------------------------------------------------------------------------
 
     getState() {
@@ -482,7 +436,7 @@ export class VoiceCommandCoordinator {
     }
 
     // -------------------------------------------------------------------------
-    // Static method to get/create singleton
+    // Static methods
     // -------------------------------------------------------------------------
 
     static getInstance(config) {

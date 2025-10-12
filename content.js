@@ -1,4 +1,6 @@
-﻿// extension/src/content.js
+﻿// content.js
+
+console.log('[hoda content.js] loaded on', location.href);
 // Plain JS content script: STT + command parsing + page actions
 (function () {
   /* ----------------- feedback ----------------- */
@@ -13,7 +15,7 @@
       g.gain.value = volume;
       o.connect(g); g.connect(ctx.destination);
       o.start();
-      setTimeout(function () { try { o.stop(); ctx.close(); } catch (e) {} }, duration);
+      setTimeout(function () { try { o.stop(); ctx.close(); } catch (e) { } }, duration);
     } catch (e) {
       // ignore
     }
@@ -25,12 +27,12 @@
     s = String(s).toLowerCase().replace(/-/g, ' ').trim();
     if (/^\d+$/.test(s)) return Number(s);
     var small = {
-      zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9,
-      ten:10, eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16,
-      seventeen:17, eighteen:18, nineteen:19
+      zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
+      ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
+      seventeen: 17, eighteen: 18, nineteen: 19
     };
     var tens = {
-      twenty:20, thirty:30, forty:40, fifty:50, sixty:60, seventy:70, eighty:80, ninety:90
+      twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90
     };
     var parts = s.split(/\s+/);
     var total = 0;
@@ -92,8 +94,8 @@
     options = options || {};
     this.lang = options.lang || 'en-US';
     this.wakeWord = (options.wakeWord === undefined) ? null : options.wakeWord;
-    this.onTranscript = options.onTranscript || function () {};
-    this.onCommand = options.onCommand || function () {};
+    this.onTranscript = options.onTranscript || function () { };
+    this.onCommand = options.onCommand || function () { };
     this.minConfidence = options.minConfidence || 0;
 
     var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -129,13 +131,13 @@
   ContentSTT.prototype.start = function () {
     if (!this._available) throw new Error('SpeechRecognition unavailable');
     this._shouldRestart = true;
-    try { this.rec.start(); } catch (e) {}
+    try { this.rec.start(); } catch (e) { }
     this._listening = true;
   };
 
   ContentSTT.prototype.stop = function () {
     this._shouldRestart = false;
-    try { this.rec.stop(); } catch (e) {}
+    try { this.rec.stop(); } catch (e) { }
     this._listening = false;
     clearTimeout(this._awaitTimeout);
     this._awaitingCommand = false;
@@ -151,7 +153,7 @@
     }
     var transcript = (final ? final : interim).trim();
     var isFinal = !!final;
-    try { this.onTranscript({ transcript: transcript, isFinal: isFinal, raw: ev }); } catch (e) {}
+    try { this.onTranscript({ transcript: transcript, isFinal: isFinal, raw: ev }); } catch (e) { }
 
     if (!isFinal) return;
 
@@ -192,7 +194,7 @@
         rawTranscript: finalText,
         meta: interpreted
       });
-    } catch (e) {}
+    } catch (e) { }
     playBeep(90, 880, 0.02);
   };
 
@@ -200,7 +202,7 @@
     console.warn('STT error', ev);
     if (this._shouldRestart) {
       var self = this;
-      setTimeout(function () { try { self.rec.start(); } catch (e) {} }, 500);
+      setTimeout(function () { try { self.rec.start(); } catch (e) { } }, 500);
     }
   };
 
@@ -208,7 +210,7 @@
     this._listening = false;
     if (this._shouldRestart) {
       var self = this;
-      setTimeout(function () { try { self.rec.start(); self._listening = true; } catch (e) {} }, 300);
+      setTimeout(function () { try { self.rec.start(); self._listening = true; } catch (e) { } }, 300);
     }
   };
 
@@ -303,6 +305,13 @@
   /* ----------------- message listener ----------------- */
   chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
     if (!msg || !msg.type) return;
+
+    if (msg.type === 'PING') {
+      // simple pong for health checks
+      sendResponse({ ok: true, msg: 'pong', url: location.href });
+      return true;
+    }
+
     if (msg.type === 'START_STT') {
       try {
         ensureSTT().start();

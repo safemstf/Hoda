@@ -1,74 +1,14 @@
 // speechRecognitionService.js
-// WASM-only SpeechRecognitionService wrapper for in-browser Whisper
-// Refactored for single worker instance and clear state management
+// Bridge to content.js - sends messages to content script which runs Web Speech API
 
 export class SpeechRecognitionService {
     constructor(micManager = null, options = {}) {
         this.micManager = micManager;
 
-        // Detect if running in extension context
-        const isExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL;
-
-        // Validate required options
-        if (!options.modelUrl) {
-            throw new Error('modelUrl is required - specify path to ggml-tiny.en.bin');
-        }
-        if (!options.workerUrl) {
-            throw new Error('workerUrl is required - specify path to speech-worker.js');
-        }
-        if (!options.bundleUrl) {
-            throw new Error('bundleUrl is required - specify path to libstream.js');
-        }
-
-        // Helper function to resolve URLs (ensures absolute URLs for workers)
-        const resolveUrl = (path) => {
-            if (!path) return path;
-
-            // Already absolute URL
-            if (path.startsWith('http://') ||
-                path.startsWith('https://') ||
-                path.startsWith('blob:') ||
-                path.startsWith('chrome-extension://') ||
-                path.startsWith('moz-extension://')) {
-                return path;
-            }
-
-            // In extension context, use chrome.runtime.getURL
-            if (isExtension) {
-                const resolved = chrome.runtime.getURL(path);
-                console.log('[SpeechService] Resolved URL:', path, '→', resolved);
-                return resolved;
-            }
-
-            // In standalone test pages, convert relative paths to absolute
-            if (typeof window !== 'undefined' && window.location) {
-                const url = new URL(path, window.location.href);
-                console.log('[SpeechService] Resolved URL:', path, '→', url.href);
-                return url.href;
-            }
-
-            return path;
-        };
-
-        // CRITICAL: Resolve URLs BEFORE creating opts object
-        const resolvedModelUrl = resolveUrl(options.modelUrl);
-        const resolvedWorkerUrl = resolveUrl(options.workerUrl);
-        const resolvedBundleUrl = resolveUrl(options.bundleUrl);
-        const resolvedWasmUrl = options.wasmUrl ? resolveUrl(options.wasmUrl) : null;
-
-        // Build opts object - spread options FIRST, then override with resolved URLs
+        // Configuration
         this.opts = {
             ...options,
-            modelSize: options.modelSize || 'tiny-en-q5_1',
-            sampleRate: options.sampleRate || 16000,
-            modelUrl: resolvedModelUrl,
-            workerUrl: resolvedWorkerUrl,
-            bundleUrl: resolvedBundleUrl,
-            wasmUrl: resolvedWasmUrl,
-            useWorker: options.useWorker !== false,
-            defaultConfidence: typeof options.defaultConfidence === 'number' ? options.defaultConfidence : 0.92,
-            allowAutoLoad: options.allowAutoLoad !== false,
-            isExtension: isExtension,
+            defaultConfidence: options.defaultConfidence || 0.92,
             language: options.language || 'en-US'
         };
 
@@ -78,16 +18,10 @@ export class SpeechRecognitionService {
         this.onErrorCallbacks = [];
         this.onStatusCallbacks = [];
 
-        // State management
-        this.worker = null;
-        this.modelLoaded = false;
+        // State
         this.isListening = false;
-        this.isLoadingModel = false; // Guard against concurrent loading
-
-        // Audio processing
-        this.audioContext = null;
-        this.audioSource = null;
-        this.audioProcessor = null;
+        this.isInitialized = false;
+        this.currentTabId = null;
 
         // Stats
         this.stats = {
@@ -97,368 +31,184 @@ export class SpeechRecognitionService {
             averageConfidence: 0
         };
 
-        console.log('[SpeechService] Initialized', {
-            context: this.opts.isExtension ? 'extension' : 'standalone',
-            modelUrl: this.opts.modelUrl,
-            workerUrl: this.opts.workerUrl,
-            bundleUrl: this.opts.bundleUrl
+        console.log('[SpeechService] Initialized (content script bridge)', {
+            language: this.opts.language
         });
     }
 
-    // ---------- Worker Management ----------
-    async _initWorker() {
-        // Guard: prevent multiple worker creation
-        if (this.worker) {
-            console.log('[SpeechService] Worker already exists');
-            return;
-        }
-
-        try {
-            console.log('[SpeechService] Creating worker from:', this.opts.workerUrl);
-            this.worker = new Worker(this.opts.workerUrl);
-
-            this.worker.onmessage = (e) => {
-                const { type, ...data } = e.data;
-                
-                switch (type) {
-                    case 'transcript':
-                        this._onLibraryTranscription(data.text, data.confidence, data.isFinal);
-                        break;
-                        
-                    case 'status':
-                        this._notifyStatus(data.status, data.data);
-                        break;
-                        
-                    case 'progress':
-                        this._notifyStatus('library_progress', { progress: data.progress });
-                        break;
-                        
-                    case 'ready':
-                        console.log('[SpeechService] Worker ready, model loaded');
-                        this.modelLoaded = true;
-                        this.isLoadingModel = false;
-                        this._notifyStatus('model_loaded', {
-                            modelSize: this.opts.modelSize,
-                            modelUrl: this.opts.modelUrl
-                        });
-                        break;
-                        
-                    case 'error':
-                        this._onLibraryError({ type: 'worker', message: data.message });
-                        break;
-                        
-                    default:
-                        // Ignore unknown messages (likely Emscripten internal)
-                        break;
-                }
-            };
-
-            this.worker.onerror = (err) => {
-                console.error('[SpeechService] Worker error:', err);
-                this._onLibraryError({
-                    type: 'worker_error',
-                    message: err.message || String(err)
-                });
-            };
-
-            console.log('[SpeechService] Sending init to worker:', {
-                bundleUrl: this.opts.bundleUrl,
-                modelUrl: this.opts.modelUrl,
-                modelSize: this.opts.modelSize
-            });
-
-            this.worker.postMessage({
-                type: 'init',
-                payload: {
-                    bundleUrl: this.opts.bundleUrl,
-                    modelUrl: this.opts.modelUrl,
-                    modelSize: this.opts.modelSize,
-                    sampleRate: this.opts.sampleRate
-                }
-            });
-            
-        } catch (err) {
-            console.error('[SpeechService] Worker init failed:', err);
-            this.isLoadingModel = false;
-            this._onLibraryError({
-                type: 'worker_init',
-                message: err.message || String(err)
-            });
-            throw err;
-        }
-    }
-
-    // ---------- Model Loading ----------
+    // ---------- Initialization ----------
     async loadModel() {
-        // Guard: already loaded
-        if (this.modelLoaded) {
-            console.log('[SpeechService] Model already loaded');
+        if (this.isInitialized) {
+            console.log('[SpeechService] Already initialized');
             return true;
         }
 
-        // Guard: already loading
-        if (this.isLoadingModel) {
-            console.log('[SpeechService] Model already loading, waiting...');
-            return this._waitForModelLoad();
-        }
-
-        this.isLoadingModel = true;
-
         try {
-            if (this.opts.useWorker) {
-                await this._initWorker();
-            } else {
-                throw new Error('Non-worker mode not implemented. Use worker mode in extension.');
+            const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            if (!tab) throw new Error('No active tab found');
+
+            // Only operate on http(s) pages
+            if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
+                throw new Error('Active tab is not a supported webpage (must be http(s) page)');
             }
 
-            return await this._waitForModelLoad();
-            
+            this.currentTabId = tab.id;
+            console.log('[SpeechService] Using tab:', this.currentTabId, 'url:', tab.url);
+
+            const tryPing = async () => {
+                try {
+                    const resp = await chrome.tabs.sendMessage(tab.id, { type: 'PING' });
+                    console.log('[SpeechService] Content script responded to PING:', resp);
+                    return true;
+                } catch (e) {
+                    console.warn('[SpeechService] PING failed:', e && e.message ? e.message : e);
+                    return false;
+                }
+            };
+
+            let hasReceiver = await tryPing();
+
+            if (!hasReceiver) {
+                console.log('[SpeechService] No content script found — injecting content.js');
+                try {
+                    await chrome.scripting.executeScript({
+                        target: { tabId: tab.id },
+                        files: ['content.js']
+                    });
+                    // small grace period for content script to register listeners
+                    await new Promise(r => setTimeout(r, 150));
+                    hasReceiver = await tryPing();
+                } catch (injectErr) {
+                    console.warn('[SpeechService] Injection attempt failed:', injectErr && injectErr.message ? injectErr.message : injectErr);
+                }
+            }
+
+            if (!hasReceiver) {
+                throw new Error('Content script not present or failed to register in the active tab');
+            }
+
+            this.isInitialized = true;
+            console.log('[SpeechService] Ready to communicate with content script');
+            this._notifyStatus('model_loaded', {
+                engine: 'content_script_bridge',
+                language: this.opts.language,
+                tabId: this.currentTabId
+            });
+
+            return true;
         } catch (err) {
-            this.isLoadingModel = false;
+            console.error('[SpeechService] Initialization failed:', err);
+            this._notifyError({ type: 'initialization_failed', message: err.message });
             throw err;
         }
-    }
-
-    _waitForModelLoad() {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                this.isLoadingModel = false;
-                reject(new Error('Model loading timeout after 30 seconds'));
-            }, 30000);
-
-            const checkReady = () => {
-                if (this.modelLoaded) {
-                    clearTimeout(timeout);
-                    return resolve(true);
-                }
-                setTimeout(checkReady, 100);
-            };
-            checkReady();
-        });
     }
 
     // ---------- Recording Control ----------
     async start() {
-        // Guard: must be loaded
-        if (!this.modelLoaded) {
-            if (this.opts.allowAutoLoad) {
-                console.log('[SpeechService] Auto-loading model...');
-                await this.loadModel();
-            } else {
-                throw new Error('Model not loaded. Call loadModel() first.');
-            }
+        if (!this.isInitialized) {
+            console.log('[SpeechService] Not initialized, initializing...');
+            await this.loadModel();
         }
 
-        // Guard: already listening
         if (this.isListening) {
             console.log('[SpeechService] Already listening');
             return;
         }
 
-        if (!this.worker) {
-            throw new Error('Worker not initialized');
-        }
-
-        // Guard: need microphone
-        if (!this.micManager || !this.micManager.stream) {
-            throw new Error('Microphone not available');
+        if (!this.currentTabId) {
+            throw new Error('No tab selected');
         }
 
         try {
-            console.log('[SpeechService] Starting recording and audio capture');
-            
-            // Start audio capture pipeline
-            await this._startAudioCapture();
-            
-            // Tell worker to start recording
-            this.worker.postMessage({ type: 'start' });
-            this.isListening = true;
-            this._notifyStatus('started', { message: 'Recording started' });
-            
+            console.log('[SpeechService] Sending START_STT to content script');
+
+            const response = await chrome.tabs.sendMessage(this.currentTabId, {
+                type: 'START_STT'
+            });
+
+            if (response && response.ok) {
+                this.isListening = true;
+                console.log('[SpeechService] Content script started successfully');
+                this._notifyStatus('started', { message: 'Listening...' });
+            } else {
+                throw new Error(response?.err || 'Failed to start content script STT');
+            }
+
         } catch (err) {
-            console.error('[SpeechService] Failed to start audio capture:', err);
-            this._stopAudioCapture();
+            console.error('[SpeechService] Failed to start:', err);
+            this._notifyError({
+                type: 'start_failed',
+                message: `Failed to start: ${err.message}. Make sure you're on a webpage (not chrome:// or edge://).`
+            });
             throw err;
         }
     }
 
     stop() {
         if (!this.isListening) {
-            console.log('[SpeechService] Not listening, nothing to stop');
+            console.log('[SpeechService] Not listening');
             return;
         }
 
-        if (this.worker) {
-            console.log('[SpeechService] Stopping recording and audio capture');
-            
-            // Stop audio capture first
-            this._stopAudioCapture();
-            
-            // Tell worker to stop and process
-            this.worker.postMessage({ type: 'stop' });
-            this.isListening = false;
-            this._notifyStatus('stopped', { message: 'Recording stopped' });
+        if (!this.currentTabId) {
+            console.warn('[SpeechService] No tab to send stop message to');
+            return;
         }
-    }
 
-    abort() {
-        console.log('[SpeechService] Aborting');
-        
-        // Stop audio capture
-        this._stopAudioCapture();
-        
-        if (this.worker) {
-            try {
-                this.worker.postMessage({ type: 'abort' });
-                this.worker.terminate();
-            } catch (e) {
-                console.error('[SpeechService] Error terminating worker:', e);
-            }
-            this.worker = null;
-        }
-        
-        this.isListening = false;
-        this.modelLoaded = false;
-        this.isLoadingModel = false;
-        this._notifyStatus('aborted', { message: 'Aborted' });
-    }
-
-    // ---------- Audio Capture Pipeline ----------
-    async _startAudioCapture() {
         try {
-            // Get microphone stream
-            const stream = this.micManager.stream;
-            if (!stream) {
-                throw new Error('No microphone stream available');
-            }
+            console.log('[SpeechService] Sending STOP_STT to content script');
 
-            console.log('[SpeechService] Setting up audio capture pipeline');
-
-            // Create audio context
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)({
-                sampleRate: this.opts.sampleRate
+            chrome.tabs.sendMessage(this.currentTabId, {
+                type: 'STOP_STT'
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.warn('[SpeechService] Stop message error:', chrome.runtime.lastError);
+                } else {
+                    console.log('[SpeechService] Content script stopped');
+                }
             });
 
-            // Create source from microphone stream
-            this.audioSource = this.audioContext.createMediaStreamSource(stream);
-
-            // Create script processor to capture audio samples
-            // Buffer size: 4096 samples (larger = more latency but more efficient)
-            const bufferSize = 4096;
-            this.audioProcessor = this.audioContext.createScriptProcessor(bufferSize, 1, 1);
-
-            // Process audio samples
-            this.audioProcessor.onaudioprocess = (e) => {
-                if (!this.isListening || !this.worker) {
-                    return;
-                }
-
-                // Get audio data from input
-                const inputData = e.inputBuffer.getChannelData(0);
-                
-                // Send to worker
-                // Note: We send a copy because the buffer gets reused
-                const audioCopy = new Float32Array(inputData);
-                
-                try {
-                    this.worker.postMessage({
-                        type: 'audioData',
-                        payload: audioCopy
-                    });
-                } catch (err) {
-                    console.error('[SpeechService] Error sending audio to worker:', err);
-                }
-            };
-
-            // Connect the audio pipeline
-            this.audioSource.connect(this.audioProcessor);
-            this.audioProcessor.connect(this.audioContext.destination);
-
-            console.log('[SpeechService] Audio capture pipeline active');
+            this.isListening = false;
+            this._notifyStatus('stopped', { message: 'Stopped' });
 
         } catch (err) {
-            console.error('[SpeechService] Failed to setup audio capture:', err);
-            this._stopAudioCapture();
-            throw err;
+            console.error('[SpeechService] Error stopping:', err);
         }
     }
 
-    _stopAudioCapture() {
-        try {
-            // Disconnect and cleanup audio nodes
-            if (this.audioProcessor) {
-                this.audioProcessor.onaudioprocess = null;
-                try {
-                    this.audioProcessor.disconnect();
-                } catch (e) {
-                    // Already disconnected
-                }
-                this.audioProcessor = null;
-            }
+    // ---------- Message Handler (call this from popup) ----------
+    // This handles messages FROM content script (transcripts, confirmations, etc.)
+    handleContentScriptMessage(message) {
+        if (!message) return;
 
-            if (this.audioSource) {
-                try {
-                    this.audioSource.disconnect();
-                } catch (e) {
-                    // Already disconnected
-                }
-                this.audioSource = null;
-            }
+        // Handle transcript/command from content.js
+        if (message.cmd === 'confirm') {
+            // Content script is confirming a command execution
+            console.log('[SpeechService] Command confirmed:', message.text);
 
-            if (this.audioContext) {
-                try {
-                    this.audioContext.close();
-                } catch (e) {
-                    console.warn('[SpeechService] Error closing audio context:', e);
-                }
-                this.audioContext = null;
-            }
-
-            console.log('[SpeechService] Audio capture stopped');
-        } catch (err) {
-            console.error('[SpeechService] Error stopping audio capture:', err);
+            // Treat this as a transcript
+            this._onTranscription(message.text, this.opts.defaultConfidence);
         }
-    }
-
-    destroy() {
-        console.log('[SpeechService] Destroying');
-        
-        try {
-            this.stop();
-        } catch (e) {
-            console.error('[SpeechService] Error stopping:', e);
-        }
-        
-        // Cleanup audio capture
-        this._stopAudioCapture();
-        
-        this.abort();
-        
-        // Clear callbacks
-        this.onCommandCallbacks = [];
-        this.onTranscriptCallbacks = [];
-        this.onErrorCallbacks = [];
-        this.onStatusCallbacks = [];
+        // You could add more message types here if content.js sends them
     }
 
     // ---------- Internal Handlers ----------
-    _onLibraryTranscription(text, confidence = undefined, isFinal = true) {
-        if (!text || !String(text).trim()) {
-            console.warn('[SpeechService] Empty transcription received');
+    _onTranscription(text, confidence) {
+        if (!text || !text.trim()) {
+            console.warn('[SpeechService] Empty transcription');
             return;
         }
-        
-        const normalizedText = String(text).trim();
-        const conf = typeof confidence === 'number' ? confidence : this.opts.defaultConfidence;
+
+        const normalizedText = text.trim().toLowerCase();
+        const conf = confidence || this.opts.defaultConfidence;
 
         const sttInput = {
-            text: normalizedText.toLowerCase(),
+            text: normalizedText,
             confidence: conf,
             language: this.opts.language,
             timestamp: Date.now(),
             context: {
-                engine: 'webwhisper',
-                modelSize: this.opts.modelSize
+                engine: 'content_script'
             }
         };
 
@@ -467,23 +217,16 @@ export class SpeechRecognitionService {
         this.stats.recognizedCommands++;
         this._updateAverageConfidence(conf);
 
-        // Notify callbacks
+        // Notify transcript callback (for UI display)
         this._notifyTranscript({
             text: sttInput.text,
             confidence: sttInput.confidence,
-            isFinal,
+            isFinal: true,
             timestamp: sttInput.timestamp
         });
-        
-        this._notifyCommand(sttInput);
-    }
 
-    _onLibraryError(err) {
-        const e = err || {};
-        this._notifyError({
-            type: e.type || 'library_error',
-            message: e.message || String(err)
-        });
+        // Notify command callback
+        this._notifyCommand(sttInput);
     }
 
     // ---------- Callback Registration ----------
@@ -576,10 +319,26 @@ export class SpeechRecognitionService {
     getState() {
         return {
             isListening: this.isListening,
-            modelLoaded: this.modelLoaded,
-            isLoadingModel: this.isLoadingModel,
-            engineType: 'webwhisper_worker',
-            context: this.opts.isExtension ? 'extension' : 'standalone'
+            modelLoaded: this.isInitialized,
+            isLoadingModel: false,
+            engineType: 'content_script_bridge',
+            currentTabId: this.currentTabId
         };
+    }
+
+    // ---------- Cleanup ----------
+    destroy() {
+        console.log('[SpeechService] Destroying');
+
+        try {
+            this.stop();
+        } catch (e) {
+            console.error('[SpeechService] Error during stop:', e);
+        }
+
+        this.onCommandCallbacks = [];
+        this.onTranscriptCallbacks = [];
+        this.onErrorCallbacks = [];
+        this.onStatusCallbacks = [];
     }
 }
