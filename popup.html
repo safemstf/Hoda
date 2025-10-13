@@ -203,6 +203,22 @@
         color: var(--error);
       }
 
+      .keyboard-hint {
+        margin-top: 8px;
+        font-size: 11px;
+        color: var(--text-muted);
+        text-align: center;
+      }
+
+      kbd {
+        padding: 2px 6px;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        font-family: 'SF Mono', 'Consolas', monospace;
+        font-size: 10px;
+      }
+
       /* Transcript Card */
       .card {
         background: var(--bg-card);
@@ -433,25 +449,6 @@
           transition: none !important;
         }
       }
-
-      /* Loading state */
-      .loading {
-        opacity: 0.6;
-        pointer-events: none;
-      }
-
-      .spinner {
-        width: 16px;
-        height: 16px;
-        border: 2px solid rgba(99, 102, 241, 0.3);
-        border-top-color: var(--primary);
-        border-radius: 50%;
-        animation: spin 0.6s linear infinite;
-      }
-
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
     </style>
   </head>
   <body>
@@ -478,6 +475,9 @@
       <div class="mic-section">
         <button class="mic-button" id="micBtn" disabled>🎤</button>
         <div class="status-text" id="statusText">Initializing...</div>
+        <div class="keyboard-hint">
+          Press <kbd>Ctrl+Shift+H</kbd> to toggle
+        </div>
       </div>
 
       <!-- Transcript Card -->
@@ -538,7 +538,7 @@
     <div class="footer">
       <a href="#" class="link" id="openTests">
         <span>🧪</span>
-        <span>Open Test Page</span>
+        <span>Open Settings</span>
       </a>
     </div>
 

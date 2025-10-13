@@ -1,10 +1,231 @@
-// tests/index.js - Updated for Test Launcher
-// External module for test-launcher.html — replaces inline script.
+// tests/index.js - Test Launcher with Settings Management
+// External module for test-launcher.html
 
 (async () => {
-  console.log('🧪 Hoda Test Launcher initialized');
+  console.log('🧪 Hoda Test Launcher & Settings initialized');
 
-  // Show status messages
+  // Default settings
+  const DEFAULT_SETTINGS = {
+    wakeWordRequired: false,
+    audioFeedback: true,
+    visualFeedback: true,
+    llmEnabled: false
+  };
+
+  // Current settings (loaded from storage)
+  let currentSettings = { ...DEFAULT_SETTINGS };
+
+  // ============================================================================
+  // SETTINGS MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Load settings from chrome.storage.local
+   */
+  async function loadSettings() {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        const result = await chrome.storage.local.get([
+          'wakeWordRequired',
+          'audioFeedback',
+          'visualFeedback',
+          'llmEnabled',
+          'rateLimitReset',
+          'dailyUsage'
+        ]);
+
+        console.log('Loaded settings:', result);
+
+        // Update current settings
+        currentSettings = {
+          wakeWordRequired: result.wakeWordRequired ?? DEFAULT_SETTINGS.wakeWordRequired,
+          audioFeedback: result.audioFeedback ?? DEFAULT_SETTINGS.audioFeedback,
+          visualFeedback: result.visualFeedback ?? DEFAULT_SETTINGS.visualFeedback,
+          llmEnabled: result.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled
+        };
+
+        // Update UI
+        updateSettingsUI();
+        updateQuotaUI(result.dailyUsage || 0);
+
+        showStatus('Settings loaded', 'success');
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+      showStatus(`Error loading settings: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Update UI controls to match current settings
+   */
+  function updateSettingsUI() {
+    // Wake word required
+    const wakeWordCheckbox = document.getElementById('wakeWordRequired');
+    const wakeWordStatus = document.getElementById('wakeWordStatus');
+    if (wakeWordCheckbox) {
+      wakeWordCheckbox.checked = currentSettings.wakeWordRequired;
+      if (wakeWordStatus) {
+        wakeWordStatus.textContent = currentSettings.wakeWordRequired ? 'Required' : 'Optional';
+        wakeWordStatus.className = currentSettings.wakeWordRequired 
+          ? 'setting-badge warning' 
+          : 'setting-badge';
+      }
+    }
+
+    // Audio feedback
+    const audioCheckbox = document.getElementById('audioFeedback');
+    if (audioCheckbox) {
+      audioCheckbox.checked = currentSettings.audioFeedback;
+    }
+
+    // Visual feedback
+    const visualCheckbox = document.getElementById('visualFeedback');
+    if (visualCheckbox) {
+      visualCheckbox.checked = currentSettings.visualFeedback;
+    }
+
+    // LLM (disabled for now)
+    const llmCheckbox = document.getElementById('llmEnabled');
+    if (llmCheckbox) {
+      llmCheckbox.checked = currentSettings.llmEnabled;
+      llmCheckbox.disabled = true; // Future feature
+    }
+  }
+
+  /**
+   * Update quota display
+   */
+  function updateQuotaUI(dailyUsage) {
+    const quotaUsed = document.getElementById('quotaUsed');
+    const quotaTotal = document.getElementById('quotaTotal');
+    const quotaFill = document.getElementById('quotaFill');
+
+    const total = 40;
+    const remaining = total - dailyUsage;
+    const percentage = (remaining / total) * 100;
+
+    if (quotaUsed) {
+      quotaUsed.textContent = remaining;
+    }
+
+    if (quotaTotal) {
+      quotaTotal.textContent = total;
+    }
+
+    if (quotaFill) {
+      quotaFill.style.width = `${percentage}%`;
+      
+      // Change color based on remaining
+      if (percentage < 25) {
+        quotaFill.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+      } else if (percentage < 50) {
+        quotaFill.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+      } else {
+        quotaFill.style.background = 'linear-gradient(90deg, #10b981, #6366f1)';
+      }
+    }
+  }
+
+  /**
+   * Save settings to chrome.storage.local
+   */
+  async function saveSettings() {
+    try {
+      // Get values from UI
+      const wakeWordCheckbox = document.getElementById('wakeWordRequired');
+      const audioCheckbox = document.getElementById('audioFeedback');
+      const visualCheckbox = document.getElementById('visualFeedback');
+      const llmCheckbox = document.getElementById('llmEnabled');
+
+      const settingsToSave = {
+        wakeWordRequired: wakeWordCheckbox?.checked ?? false,
+        audioFeedback: audioCheckbox?.checked ?? true,
+        visualFeedback: visualCheckbox?.checked ?? true,
+        llmEnabled: llmCheckbox?.checked ?? false
+      };
+
+      console.log('Saving settings:', settingsToSave);
+
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        await chrome.storage.local.set(settingsToSave);
+        currentSettings = settingsToSave;
+        
+        showStatus('✅ Settings saved successfully!', 'success');
+        
+        // Update UI
+        updateSettingsUI();
+      } else {
+        showStatus('⚠️ Chrome storage not available', 'error');
+      }
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      showStatus(`❌ Error saving settings: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Reset settings to defaults
+   */
+  async function resetSettings() {
+    try {
+      if (!confirm('Reset all settings to defaults?')) {
+        return;
+      }
+
+      console.log('Resetting settings to defaults');
+
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        await chrome.storage.local.set(DEFAULT_SETTINGS);
+        currentSettings = { ...DEFAULT_SETTINGS };
+        
+        // Update UI
+        updateSettingsUI();
+        
+        showStatus('🔄 Settings reset to defaults', 'success');
+      }
+    } catch (error) {
+      console.error('Error resetting settings:', error);
+      showStatus(`❌ Error resetting settings: ${error.message}`, 'error');
+    }
+  }
+
+  /**
+   * Setup settings event listeners
+   */
+  function setupSettingsListeners() {
+    // Save button
+    const saveButton = document.getElementById('saveSettings');
+    if (saveButton) {
+      saveButton.addEventListener('click', saveSettings);
+    }
+
+    // Reset button
+    const resetButton = document.getElementById('resetSettings');
+    if (resetButton) {
+      resetButton.addEventListener('click', resetSettings);
+    }
+
+    // Wake word status update
+    const wakeWordCheckbox = document.getElementById('wakeWordRequired');
+    const wakeWordStatus = document.getElementById('wakeWordStatus');
+    if (wakeWordCheckbox && wakeWordStatus) {
+      wakeWordCheckbox.addEventListener('change', (e) => {
+        wakeWordStatus.textContent = e.target.checked ? 'Required' : 'Optional';
+        wakeWordStatus.className = e.target.checked 
+          ? 'setting-badge warning' 
+          : 'setting-badge';
+      });
+    }
+  }
+
+  // ============================================================================
+  // TEST LAUNCHER FUNCTIONALITY
+  // ============================================================================
+
+  /**
+   * Show status messages
+   */
   const showStatus = (message, type = 'info') => {
     const statusContainer = document.getElementById('statusContainer');
     const statusMsg = document.getElementById('statusMsg');
@@ -16,14 +237,16 @@
     statusContainer.hidden = false;
     
     // Auto-hide info messages after 3 seconds
-    if (type === 'info') {
+    if (type === 'info' || type === 'success') {
       setTimeout(() => {
         statusContainer.hidden = true;
       }, 3000);
     }
   };
 
-  // Get the correct URL for a test file
+  /**
+   * Get the correct URL for a test file
+   */
   function getTestUrl(filename) {
     // If we're in extension context, use runtime.getURL
     if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getURL) {
@@ -36,7 +259,9 @@
     return filename;
   }
 
-  // Open test in new tab
+  /**
+   * Open test in new tab
+   */
   function openTestInNewTab(filename) {
     try {
       const url = getTestUrl(filename);
@@ -51,7 +276,9 @@
     }
   }
 
-  // Open test in preview iframe
+  /**
+   * Open test in preview iframe
+   */
   function openTestInPreview(filename) {
     try {
       const url = getTestUrl(filename);
@@ -65,7 +292,9 @@
     }
   }
 
-  // Navigate to test in current tab
+  /**
+   * Navigate to test in current tab
+   */
   function openTestInCurrentTab(filename) {
     try {
       const url = getTestUrl(filename);
@@ -75,7 +304,9 @@
     }
   }
 
-  // Main test launcher function
+  /**
+   * Main test launcher function
+   */
   function launchTest(filename, action) {
     const openInNewTabCheckbox = document.getElementById('openInNewTab');
     const openInNewTab = openInNewTabCheckbox ? openInNewTabCheckbox.checked : true;
@@ -93,8 +324,10 @@
     }
   }
 
-  // Attach event listeners to all test buttons
-  function initializeEventListeners() {
+  /**
+   * Attach event listeners to all test buttons
+   */
+  function initializeTestListeners() {
     // Open Test buttons
     const openButtons = document.querySelectorAll('[data-file]');
     openButtons.forEach(button => {
@@ -115,29 +348,26 @@
       });
     });
 
-    // Update status dots based on test availability (simulated)
-    const statusDots = document.querySelectorAll('.status-dot');
-    statusDots.forEach(dot => {
-      // Simulate test availability - in real implementation, you'd check actual test status
-      dot.className = 'status-dot pending';
-    });
-
     console.log(`Initialized ${openButtons.length} open buttons and ${previewButtons.length} preview buttons`);
   }
 
-  // Initialize the launcher
-  function initializeLauncher() {
+  // ============================================================================
+  // INITIALIZATION
+  // ============================================================================
+
+  /**
+   * Initialize the launcher
+   */
+  async function initializeLauncher() {
     try {
-      initializeEventListeners();
-      showStatus('Test launcher ready - click any test to begin', 'success');
+      // Load settings first
+      await loadSettings();
       
-      // Hide status after a moment
-      setTimeout(() => {
-        const statusContainer = document.getElementById('statusContainer');
-        if (statusContainer) {
-          statusContainer.hidden = true;
-        }
-      }, 3000);
+      // Setup event listeners
+      setupSettingsListeners();
+      initializeTestListeners();
+      
+      console.log('✅ Test launcher & settings initialized');
       
     } catch (error) {
       console.error('Error initializing launcher:', error);
@@ -155,13 +385,7 @@
   // Export functions for global access if needed
   window.launchTest = launchTest;
   window.showStatus = showStatus;
-
-  // Remove any microphone-related global functions that might conflict
-  delete window.toggleMicrophone;
-  delete window.pauseMicrophone;
-  delete window.resumeMicrophone;
-  delete window.stopMicrophone;
-  delete window.runTest;
-  delete window.runAllTests;
+  window.saveSettings = saveSettings;
+  window.resetSettings = resetSettings;
 
 })();

@@ -560,12 +560,19 @@ function stopListening() {
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Popup] Initializing...');
   
+  // Load rate limit data from storage FIRST
   const stored = await chrome.storage.local.get(['rateLimitReset', 'dailyUsage', 'wakeWordRequired']);
+  
   if (stored.rateLimitReset) {
     RATE_LIMIT.lastReset = stored.rateLimitReset;
     RATE_LIMIT.dailyCount = stored.dailyUsage || 0;
+    console.log('[Popup] Loaded usage from storage:', RATE_LIMIT.dailyCount);
   }
+  
   RATE_LIMIT.checkDailyReset();
+  
+  // Update quota UI immediately with loaded data
+  updateQuotaUI();
   
   // Load wake word setting
   if (stored.wakeWordRequired !== undefined) {
@@ -581,11 +588,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (hasSupport) {
     const status = RATE_LIMIT.getStatus();
     updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
-    updateQuotaUI();
     UI.micBtn.disabled = false;
     
     // Log resolver info
     console.log('[Popup] Resolver stats:', resolver.getStats());
+    console.log('[Popup] Rate limit status:', status);
     
     if (status.remaining < 5) {
       showCommandResult(`⚠️ Only ${status.remaining} left today!`, true);
@@ -602,9 +609,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 function updateQuotaUI() {
   const status = RATE_LIMIT.getStatus();
   
+  console.log('[Popup] Updating quota UI:', status);
+  
   if (UI.quotaBar) {
     const percent = (status.remaining / status.dailyLimit) * 100;
     UI.quotaBar.style.width = percent + '%';
+    
+    // Change color based on remaining
+    if (percent < 25) {
+      UI.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
+    } else if (percent < 50) {
+      UI.quotaBar.style.background = 'linear-gradient(90deg, #f59e0b, rgba(245, 158, 11, 0.9))';
+    } else {
+      UI.quotaBar.style.background = 'linear-gradient(90deg, #10b981, rgba(255, 255, 255, 0.9))';
+    }
   }
   
   if (UI.quotaText) {
@@ -706,6 +724,7 @@ async function saveStats() {
 // EVENT LISTENERS
 // ============================================================================
 function setupEventListeners() {
+  // Mic button
   UI.micBtn?.addEventListener('click', async () => {
     if (!state.isListening) {
       await startListening();
@@ -714,6 +733,21 @@ function setupEventListeners() {
     }
   });
   
+  // Keyboard shortcut: Ctrl+Shift+H (Cmd+Shift+H on Mac)
+  document.addEventListener('keydown', async (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
+      e.preventDefault();
+      console.log('[Popup] 🎹 Keyboard shortcut activated');
+      
+      if (!state.isListening) {
+        await startListening();
+      } else {
+        stopListening();
+      }
+    }
+  });
+  
+  // Quick action buttons
   document.getElementById('btnScrollDown')?.addEventListener('click', async () => {
     await checkActiveTab();
     if (state.currentTabId) {

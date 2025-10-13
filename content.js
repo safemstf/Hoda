@@ -172,7 +172,25 @@ console.log('[Content] Loading with command queue...');
   class FeedbackManager {
     constructor() {
       this.audioContext = null;
+      this.settings = {
+        audioEnabled: true,
+        visualEnabled: true
+      };
       this.initAudioContext();
+      this.loadSettings();
+    }
+
+    async loadSettings() {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.storage) {
+          const result = await chrome.storage.local.get(['audioFeedback', 'visualFeedback']);
+          this.settings.audioEnabled = result.audioFeedback !== false;
+          this.settings.visualEnabled = result.visualFeedback !== false;
+          console.log('[Feedback] Settings loaded:', this.settings);
+        }
+      } catch (err) {
+        console.warn('[Feedback] Could not load settings:', err);
+      }
     }
 
     initAudioContext() {
@@ -184,7 +202,7 @@ console.log('[Content] Loading with command queue...');
     }
 
     playBeep(type = 'success') {
-      if (!this.audioContext) return;
+      if (!this.settings.audioEnabled || !this.audioContext) return;
 
       try {
         const osc = this.audioContext.createOscillator();
@@ -227,6 +245,8 @@ console.log('[Content] Loading with command queue...');
     }
 
     showOverlay(message, type = 'success') {
+      if (!this.settings.visualEnabled) return;
+      
       let overlay = document.getElementById('hoda-feedback-overlay');
       
       if (!overlay) {
@@ -476,7 +496,14 @@ console.log('[Content] Loading with command queue...');
 • Zoom: "zoom in", "zoom out", "reset zoom"
 • Links: "list links", "open link 1"
 • Stop: Say "stop" to interrupt current action
-Say "Hoda" + command, or just the command directly.`;
+
+Activation:
+• Click mic button in popup
+• Or press Ctrl+Shift+H (Cmd+Shift+H on Mac)
+
+Wake Word (Optional):
+• Say "Hoda" + command (e.g., "Hoda scroll down")
+• Or just say command directly`;
 
       this.showHelpOverlay(helpText);
       console.log('[Executor] Help shown');
@@ -627,6 +654,12 @@ ${text}
     if (msg.type === 'TEST_FEEDBACK') {
       feedback.playBeep('success');
       feedback.showOverlay('✓ Working!', 'success');
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (msg.type === 'RELOAD_SETTINGS') {
+      feedback.loadSettings();
       sendResponse({ ok: true });
       return true;
     }
