@@ -1,125 +1,207 @@
-﻿/**
- * background.js - MV3 service worker
- * Handles messages from popup/content and triggers TTS confirmations.
- */
+﻿// background.js - Service worker for Hoda extension
+// Handles message routing and transcript storage
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("Voice Nav extension installed.");
+console.log('[Background] Service worker started');
+
+// Listen for messages from content scripts and popup
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  console.log('[Background] Message received:', msg.type, msg);
+
+  // Handle transcript from content script
+  if (msg.type === 'TRANSCRIPT') {
+    handleTranscript(msg, sender, sendResponse);
+    return true; // Keep channel open for async response
+  }
+
+  // Handle STT errors from content script
+  if (msg.type === 'STT_ERROR') {
+    handleSTTError(msg, sender, sendResponse);
+    return true;
+  }
+
+  // Handle other messages (future commands, etc.)
+  return false;
 });
 
-async function injectContentToTab(tabId) {
+/**
+ * Handle STT error from content script
+ * Forward to popup for user notification
+ */
+async function handleSTTError(msg, sender, sendResponse) {
+  console.error('[Background] STT Error:', msg.error, msg.message);
+  
+  // Forward to popup (if open)
   try {
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      files: ['content.js']
-    });
-    // small delay so the content script can register listeners
-    await new Promise(r => setTimeout(r, 150));
-    return { ok: true };
+    const views = chrome.extension.getViews({ type: 'popup' });
+    
+    if (views.length > 0) {
+      console.log('[Background] Forwarding error to popup');
+      
+      // Try runtime message
+      try {
+        await chrome.runtime.sendMessage({
+          type: 'STT_ERROR',
+          error: msg.error,
+          message: msg.message
+        });
+      } catch (e) {
+        // Ignore if no receivers
+      }
+    }
   } catch (err) {
-    console.warn('injectContentToTab failed:', err && err.message ? err.message : err);
-    return { ok: false, err: err && err.message ? err.message : String(err) };
+    console.warn('[Background] Could not forward error to popup:', err);
+  }
+  
+  sendResponse({ ok: true });
+}
+
+/**
+ * Handle transcript from content script
+ * Saves to storage and forwards to popup
+ */
+async function handleTranscript(msg, sender, sendResponse) {
+  try {
+    const transcript = {
+      text: msg.text,
+      confidence: msg.confidence || 0.92,
+      timestamp: Date.now(),
+      tabId: sender.tab?.id,
+      url: sender.tab?.url
+    };
+
+    console.log('[Background] Processing transcript:', transcript.text);
+
+    // Save to storage (keep last 50 transcripts)
+    await saveTranscript(transcript);
+
+    // Forward to popup (if it's open)
+    await forwardToPopup(transcript);
+
+    // Send success response back to content script
+    sendResponse({ 
+      ok: true, 
+      saved: true,
+      timestamp: transcript.timestamp 
+    });
+
+  } catch (err) {
+    console.error('[Background] Error handling transcript:', err);
+    sendResponse({ 
+      ok: false, 
+      error: err.message 
+    });
   }
 }
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  console.log("BG received:", message, 'from', sender && (sender.tab ? `tab ${sender.tab.id}` : 'extension'));
+/**
+ * Save transcript to chrome.storage.local
+ */
+async function saveTranscript(transcript) {
+  try {
+    // Get existing transcripts
+    const result = await chrome.storage.local.get(['transcripts']);
+    let transcripts = result.transcripts || [];
 
-  // Support both { cmd: '...' } messages and { type: '...' } styles if you need them
-  const cmd = (message && (message.cmd || message.type)) || null;
+    // Add new transcript
+    transcripts.push(transcript);
 
-  if (!cmd) {
-    sendResponse({ ok: false, err: "no-cmd" });
-    return;
-  }
-
-  (async () => {
-    switch (cmd) {
-      case "confirm": {
-        // speak confirmation using browser TTS
-        const text = message.text || "Action completed";
-        if (chrome.tts) {
-          chrome.tts.speak(text, { rate: 1.0 }, () => {
-            // check for runtime error
-            if (chrome.runtime.lastError) {
-              console.warn('TTS speak error:', chrome.runtime.lastError.message);
-              sendResponse({ ok: false, err: chrome.runtime.lastError.message });
-            } else {
-              sendResponse({ ok: true });
-            }
-          });
-          // tell runtime we will respond asynchronously
-          return true;
-        } else {
-          console.log("TTS not available");
-          sendResponse({ ok: true, note: "no-tts" });
-          return;
-        }
-      }
-
-      case "openUrl": {
-        if (message.url) {
-          chrome.tabs.create({ url: message.url }, (tab) => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ ok: false, err: chrome.runtime.lastError.message });
-            } else {
-              sendResponse({ ok: true, tabId: tab?.id });
-            }
-          });
-          return true;
-        }
-        sendResponse({ ok: false, err: "no-url" });
-        return;
-      }
-
-      // NEW: ensure content script exists in the specified tab (or active tab)
-      case "ensureContent": {
-        // allow message.tabId override, otherwise use sender.tab or active tab
-        let tabId = message.tabId || (sender && sender.tab && sender.tab.id);
-        if (!tabId) {
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          tabId = tab && tab.id;
-        }
-        if (!tabId) {
-          sendResponse({ ok: false, err: 'no-tab' });
-          return;
-        }
-
-        // Only permit http(s) injection
-        try {
-          const tabInfo = await chrome.tabs.get(tabId);
-          if (!tabInfo || !tabInfo.url || !/^https?:\/\//i.test(tabInfo.url)) {
-            sendResponse({ ok: false, err: 'unsupported-url', url: tabInfo && tabInfo.url });
-            return;
-          }
-        } catch (e) {
-          sendResponse({ ok: false, err: e && e.message ? e.message : String(e) });
-          return;
-        }
-
-        const injected = await injectContentToTab(tabId);
-        if (!injected.ok) {
-          sendResponse({ ok: false, err: injected.err });
-          return;
-        }
-
-        // test PING after injection
-        try {
-          const resp = await chrome.tabs.sendMessage(tabId, { type: 'PING' });
-          sendResponse({ ok: true, ping: resp });
-        } catch (e) {
-          sendResponse({ ok: false, err: e && e.message ? e.message : String(e) });
-        }
-        return;
-      }
-
-      default: {
-        sendResponse({ ok: false, err: "unknown-cmd" });
-        return;
-      }
+    // Keep only last 50
+    if (transcripts.length > 50) {
+      transcripts = transcripts.slice(-50);
     }
-  })();
 
-  // indicate we may call sendResponse asynchronously for cases above that return true
-  return true;
+    // Save back to storage
+    await chrome.storage.local.set({ transcripts });
+
+    console.log('[Background] Transcript saved. Total:', transcripts.length);
+  } catch (err) {
+    console.error('[Background] Storage error:', err);
+    throw err;
+  }
+}
+
+/**
+ * Forward transcript to popup (if open)
+ */
+async function forwardToPopup(transcript) {
+  try {
+    // Get all extension views (includes popup if open)
+    const views = chrome.extension.getViews({ type: 'popup' });
+    
+    if (views.length > 0) {
+      console.log('[Background] Forwarding to popup');
+      
+      // Send directly to popup window
+      views.forEach(view => {
+        if (view.handleTranscript) {
+          view.handleTranscript(transcript);
+        }
+      });
+
+      // Also try runtime message (backup method)
+      try {
+        await chrome.runtime.sendMessage({
+          type: 'TRANSCRIPT_SAVED',
+          transcript: transcript
+        });
+      } catch (e) {
+        // Ignore if no receivers
+      }
+    } else {
+      console.log('[Background] Popup not open, transcript only saved to storage');
+    }
+  } catch (err) {
+    console.warn('[Background] Could not forward to popup:', err);
+    // Don't throw - it's OK if popup isn't open
+  }
+}
+
+/**
+ * Get transcript history
+ */
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'GET_TRANSCRIPTS') {
+    chrome.storage.local.get(['transcripts'], (result) => {
+      sendResponse({ 
+        ok: true, 
+        transcripts: result.transcripts || [] 
+      });
+    });
+    return true;
+  }
 });
+
+/**
+ * Clear transcript history
+ */
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg.type === 'CLEAR_TRANSCRIPTS') {
+    chrome.storage.local.set({ transcripts: [] }, () => {
+      console.log('[Background] Transcripts cleared');
+      sendResponse({ ok: true });
+    });
+    return true;
+  }
+});
+
+// Keep service worker alive (Edge specific workaround)
+chrome.runtime.onStartup.addListener(() => {
+  console.log('[Background] Extension startup');
+});
+
+chrome.runtime.onInstalled.addListener((details) => {
+  console.log('[Background] Extension installed/updated:', details.reason);
+  
+  // Initialize storage on install
+  if (details.reason === 'install') {
+    chrome.storage.local.set({ 
+      transcripts: [],
+      stats: {
+        totalCommands: 0,
+        recognizedCommands: 0
+      }
+    });
+  }
+});
+
+console.log('[Background] Ready');

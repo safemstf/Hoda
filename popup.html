@@ -10,215 +10,537 @@
         box-sizing: border-box;
       }
 
+      :root {
+        --primary: #6366f1;
+        --primary-dark: #4f46e5;
+        --primary-light: #818cf8;
+        --secondary: #8b5cf6;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+        --bg-main: #f8fafc;
+        --bg-card: #ffffff;
+        --text-primary: #0f172a;
+        --text-secondary: #64748b;
+        --text-muted: #94a3b8;
+        --border: #e2e8f0;
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+        --radius-sm: 6px;
+        --radius-md: 10px;
+        --radius-lg: 16px;
+        --radius-full: 9999px;
+      }
+
       body { 
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-        width: 380px;
-        padding: 16px;
-        background: #f5f5f5;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
+        width: 400px;
+        min-height: 500px;
+        background: var(--bg-main);
+        color: var(--text-primary);
+        padding: 0;
+        margin: 0;
+        overflow-x: hidden;
       }
 
-      h2 {
-        font-size: 18px;
-        margin-bottom: 12px;
-        color: #333;
+      /* Header */
+      .header {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+        color: white;
+        padding: 20px 20px 24px;
+        position: relative;
+        overflow: hidden;
       }
 
-      .status-card {
-        background: white;
-        border-radius: 8px;
-        padding: 16px;
+      .header::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        right: -20%;
+        width: 300px;
+        height: 300px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 50%;
+      }
+
+      .header-content {
+        position: relative;
+        z-index: 1;
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 10px;
         margin-bottom: 12px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+
+      .logo-icon {
+        font-size: 28px;
+      }
+
+      .logo-text {
+        font-size: 22px;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+      }
+
+      .quota-bar-container {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: var(--radius-full);
+        height: 6px;
+        overflow: hidden;
+        backdrop-filter: blur(10px);
+      }
+
+      .quota-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--success), rgba(255, 255, 255, 0.9));
+        border-radius: var(--radius-full);
+        transition: width 0.3s ease;
+      }
+
+      .quota-text {
+        font-size: 11px;
+        opacity: 0.9;
+        margin-top: 6px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      /* Main Content */
+      .content {
+        padding: 20px;
+      }
+
+      /* Mic Section */
+      .mic-section {
+        text-align: center;
+        margin-bottom: 24px;
       }
 
       .mic-button {
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
+        width: 100px;
+        height: 100px;
+        border-radius: var(--radius-full);
         border: none;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
         color: white;
-        font-size: 32px;
+        font-size: 40px;
         cursor: pointer;
-        display: block;
-        margin: 16px auto;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 16px;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: var(--shadow-md);
+        position: relative;
       }
 
-      .mic-button:hover {
+      .mic-button::before {
+        content: '';
+        position: absolute;
+        inset: -4px;
+        border-radius: var(--radius-full);
+        padding: 4px;
+        background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+
+      .mic-button:hover:not(:disabled) {
         transform: scale(1.05);
+        box-shadow: var(--shadow-glow);
+      }
+
+      .mic-button:hover:not(:disabled)::before {
+        opacity: 1;
+      }
+
+      .mic-button:active:not(:disabled) {
+        transform: scale(0.95);
       }
 
       .mic-button:disabled {
         opacity: 0.5;
         cursor: not-allowed;
+        background: var(--text-muted);
       }
 
       .mic-button.listening {
-        animation: pulse 1.5s infinite;
+        animation: pulse 2s infinite;
+        box-shadow: var(--shadow-glow);
       }
 
       @keyframes pulse {
-        0%, 100% { box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3); }
-        50% { box-shadow: 0 4px 20px rgba(102, 126, 234, 0.6); }
+        0%, 100% { 
+          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+        }
+        50% { 
+          box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
+        }
       }
 
       .status-text {
-        text-align: center;
         font-size: 14px;
-        color: #666;
-        margin-bottom: 8px;
+        color: var(--text-secondary);
+        font-weight: 500;
+        transition: color 0.3s;
       }
 
       .status-text.active {
-        color: #667eea;
+        color: var(--primary);
         font-weight: 600;
       }
 
-      .transcript-box {
-        background: #f8f8f8;
-        border: 1px solid #e0e0e0;
-        border-radius: 6px;
-        padding: 12px;
-        min-height: 60px;
-        font-size: 13px;
-        color: #333;
-        font-family: 'Courier New', monospace;
-        margin-top: 8px;
+      .status-text.error {
+        color: var(--error);
       }
 
-      .transcript-box.empty {
-        color: #999;
-        font-style: italic;
-      }
-
-      .command-result {
-        background: #e8f5e9;
-        border: 1px solid #4caf50;
-        border-radius: 6px;
-        padding: 10px;
-        font-size: 12px;
-        margin-top: 8px;
-        display: none;
-      }
-
-      .command-result.show {
-        display: block;
-      }
-
-      .command-result.error {
-        background: #ffebee;
-        border-color: #f44336;
-      }
-
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .stat-item {
-        background: #f8f8f8;
-        padding: 8px;
-        border-radius: 4px;
-        text-align: center;
-      }
-
-      .stat-value {
-        font-size: 18px;
-        font-weight: 700;
-        color: #667eea;
-      }
-
-      .stat-label {
-        font-size: 10px;
-        color: #666;
-        text-transform: uppercase;
-        margin-top: 4px;
-      }
-
-      .quick-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 8px;
-        margin-top: 8px;
-      }
-
-      .quick-btn {
-        padding: 8px;
-        border: 1px solid #ddd;
-        background: white;
-        border-radius: 4px;
-        font-size: 12px;
-        cursor: pointer;
+      /* Transcript Card */
+      .card {
+        background: var(--bg-card);
+        border-radius: var(--radius-md);
+        padding: 16px;
+        margin-bottom: 16px;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border);
         transition: all 0.2s;
       }
 
-      .quick-btn:hover {
-        background: #f5f5f5;
-        border-color: #667eea;
+      .card:hover {
+        box-shadow: var(--shadow-md);
       }
 
-      .divider {
-        height: 1px;
-        background: #e0e0e0;
-        margin: 12px 0;
+      .card-title {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .transcript-box {
+        background: var(--bg-main);
+        border: 2px dashed var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px;
+        min-height: 70px;
+        font-size: 14px;
+        color: var(--text-primary);
+        font-family: 'SF Mono', 'Consolas', monospace;
+        line-height: 1.6;
+        transition: all 0.3s;
+      }
+
+      .transcript-box.empty {
+        color: var(--text-muted);
+        font-style: italic;
+        border-style: dashed;
+      }
+
+      .transcript-box:not(.empty) {
+        border-color: var(--primary);
+        border-style: solid;
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+      }
+
+      /* Command Result */
+      .command-result {
+        padding: 12px 14px;
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        margin-top: 12px;
+        display: none;
+        animation: slideIn 0.3s ease;
+        font-weight: 500;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .command-result.show {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .command-result.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+      }
+
+      .command-result.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+      }
+
+      .command-result.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+      }
+
+      /* Stats */
+      .stats-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .stat-item {
+        background: linear-gradient(135deg, var(--bg-main), var(--bg-card));
+        padding: 16px;
+        border-radius: var(--radius-md);
+        text-align: center;
+        border: 1px solid var(--border);
+        transition: all 0.2s;
+      }
+
+      .stat-item:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+
+      .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 4px;
+      }
+
+      .stat-label {
+        font-size: 11px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+      }
+
+      /* Quick Actions */
+      .quick-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .quick-btn {
+        padding: 12px;
+        border: 1px solid var(--border);
+        background: var(--bg-card);
+        border-radius: var(--radius-sm);
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      .quick-btn:hover {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+      }
+
+      .quick-btn:active {
+        transform: translateY(0);
+      }
+
+      /* Footer */
+      .footer {
+        padding: 16px 20px;
+        border-top: 1px solid var(--border);
+        background: var(--bg-card);
       }
 
       .link {
-        color: #667eea;
+        color: var(--primary);
         text-decoration: none;
-        font-size: 12px;
-        display: block;
-        text-align: center;
-        margin-top: 8px;
+        font-size: 13px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-weight: 500;
+        transition: color 0.2s;
       }
 
       .link:hover {
+        color: var(--primary-dark);
         text-decoration: underline;
+      }
+
+      /* Badge */
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        padding: 4px 8px;
+        border-radius: var(--radius-full);
+        font-size: 11px;
+        font-weight: 600;
+        background: rgba(99, 102, 241, 0.1);
+        color: var(--primary);
+      }
+
+      .badge.success {
+        background: rgba(16, 185, 129, 0.1);
+        color: var(--success);
+      }
+
+      .badge.warning {
+        background: rgba(245, 158, 11, 0.1);
+        color: var(--warning);
+      }
+
+      .badge.error {
+        background: rgba(239, 68, 68, 0.1);
+        color: var(--error);
+      }
+
+      /* Accessibility */
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+
+      /* Loading state */
+      .loading {
+        opacity: 0.6;
+        pointer-events: none;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(99, 102, 241, 0.3);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
     </style>
   </head>
   <body>
-    <div class="status-card">
-      <h2>🎤 Voice Control</h2>
-      <button class="mic-button" id="micBtn" disabled>🎤</button>
-      <div class="status-text" id="statusText">Initializing...</div>
-      
-      <div class="transcript-box empty" id="transcript">
-        Waiting for voice input...
-      </div>
-
-      <div class="command-result" id="commandResult"></div>
-    </div>
-
-    <div class="status-card">
-      <h2>📊 Statistics</h2>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value" id="statTotal">0</div>
-          <div class="stat-label">Total</div>
+    <!-- Header with quota -->
+    <div class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">🎤</span>
+          <span class="logo-text">Hoda Voice</span>
         </div>
-        <div class="stat-item">
-          <div class="stat-value" id="statRecognized">0</div>
-          <div class="stat-label">Recognized</div>
+        <div class="quota-bar-container">
+          <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
+        </div>
+        <div class="quota-text">
+          <span id="quotaText">40/40 requests left</span>
+          <span id="quotaReset" class="badge">Resets in 24h</span>
         </div>
       </div>
     </div>
 
-    <div class="status-card">
-      <h2>⚡ Quick Actions</h2>
-      <div class="quick-actions">
-        <button class="quick-btn" id="btnScrollDown">⬇️ Scroll Down</button>
-        <button class="quick-btn" id="btnScrollUp">⬆️ Scroll Up</button>
-        <button class="quick-btn" id="btnListLinks">🔗 List Links</button>
-        <button class="quick-btn" id="btnHelp">❓ Help</button>
+    <!-- Main Content -->
+    <div class="content">
+      <!-- Mic Section -->
+      <div class="mic-section">
+        <button class="mic-button" id="micBtn" disabled>🎤</button>
+        <div class="status-text" id="statusText">Initializing...</div>
+      </div>
+
+      <!-- Transcript Card -->
+      <div class="card">
+        <div class="card-title">
+          💬 Transcript
+        </div>
+        <div class="transcript-box empty" id="transcript">
+          Click the mic and start speaking...
+        </div>
+        <div class="command-result" id="commandResult"></div>
+      </div>
+
+      <!-- Stats Card -->
+      <div class="card">
+        <div class="card-title">
+          📊 Session Stats
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statRecognized">0</div>
+            <div class="stat-label">Recognized</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions Card -->
+      <div class="card">
+        <div class="card-title">
+          ⚡ Quick Actions
+        </div>
+        <div class="quick-actions">
+          <button class="quick-btn" id="btnScrollDown">
+            <span>⬇️</span>
+            <span>Scroll Down</span>
+          </button>
+          <button class="quick-btn" id="btnScrollUp">
+            <span>⬆️</span>
+            <span>Scroll Up</span>
+          </button>
+          <button class="quick-btn" id="btnListLinks">
+            <span>🔗</span>
+            <span>List Links</span>
+          </button>
+          <button class="quick-btn" id="btnHelp">
+            <span>❓</span>
+            <span>Help</span>
+          </button>
+        </div>
       </div>
     </div>
 
-    <a href="#" class="link" id="openTests">Open Test Page</a>
+    <!-- Footer -->
+    <div class="footer">
+      <a href="#" class="link" id="openTests">
+        <span>🧪</span>
+        <span>Open Test Page</span>
+      </a>
+    </div>
 
     <!-- Load popup logic -->
     <script type="module" src="popup.js"></script>

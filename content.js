@@ -1,339 +1,666 @@
-﻿// content.js
+﻿// content.js - With Command Queue System
+console.log('[Content] Loading with command queue...');
 
-console.log('[hoda content.js] loaded on', location.href);
-// Plain JS content script: STT + command parsing + page actions
-(function () {
-  /* ----------------- feedback ----------------- */
-  function playBeep(duration = 100, freq = 880, volume = 0.02) {
-    try {
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      var ctx = new Ctx();
-      var o = ctx.createOscillator();
-      var g = ctx.createGain();
-      o.type = 'sine';
-      o.frequency.value = freq;
-      g.gain.value = volume;
-      o.connect(g); g.connect(ctx.destination);
-      o.start();
-      setTimeout(function () { try { o.stop(); ctx.close(); } catch (e) { } }, duration);
-    } catch (e) {
-      // ignore
-    }
-  }
+(function() {
+  'use strict';
 
-  /* ----------------- commands interpreter ----------------- */
-  function wordsToNumber(s) {
-    if (!s) return null;
-    s = String(s).toLowerCase().replace(/-/g, ' ').trim();
-    if (/^\d+$/.test(s)) return Number(s);
-    var small = {
-      zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9,
-      ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
-      seventeen: 17, eighteen: 18, nineteen: 19
-    };
-    var tens = {
-      twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90
-    };
-    var parts = s.split(/\s+/);
-    var total = 0;
-    var current = 0;
-    for (var i = 0; i < parts.length; i++) {
-      var p = parts[i];
-      if (p === 'and') continue;
-      if (small[p] !== undefined) current += small[p];
-      else if (tens[p] !== undefined) current += tens[p];
-      else if (p === 'hundred') current = current === 0 ? 100 : current * 100;
-      else if (p === 'thousand') { current = current === 0 ? 1000 : current * 1000; total += current; current = 0; }
-      else if (/^\d+$/.test(p)) current += Number(p);
-      else { /* ignore unknown token */ }
-    }
-    total += current;
-    return Number.isFinite(total) ? total : null;
-  }
-
-  function interpretTranscript(text) {
-    var cleaned = (text || '').toLowerCase().trim();
-
-    // numeric "open link 3"
-    var m = cleaned.match(/\bopen (?:link|the link)\s+([0-9]+)\b/);
-    if (m) return { cmd: 'open link', arg: Number(m[1]), raw: cleaned };
-
-    // "open link three"
-    m = cleaned.match(/\bopen (?:link|the link)\s+([a-z\s-]+)\b/);
-    if (m) {
-      var num = wordsToNumber(m[1].trim());
-      if (num !== null && num !== 0) return { cmd: 'open link', arg: num, raw: cleaned };
+  // ============================================================================
+  // COMMAND QUEUE (Sequential Processing)
+  // ============================================================================
+  class CommandQueue {
+    constructor() {
+      this.queue = [];
+      this.isProcessing = false;
+      this.currentCommand = null;
+      this.interruptRequested = false;
+      console.log('[Queue] Initialized');
     }
 
-    if (/\b(go down|scroll down|scroll|down)\b/.test(cleaned)) return { cmd: 'scroll down', raw: cleaned };
-    if (/\b(go up|scroll up|up)\b/.test(cleaned)) return { cmd: 'scroll up', raw: cleaned };
-    if (/\b(go back|back)\b/.test(cleaned)) return { cmd: 'go back', raw: cleaned };
-    if (/\b(read (the )?page|start reading|read this)\b/.test(cleaned)) return { cmd: 'read page', raw: cleaned };
-    if (/\b(stop reading|stop|cancel)\b/.test(cleaned)) return { cmd: 'stop reading', raw: cleaned };
-    if (/\b(pause)\b/.test(cleaned)) return { cmd: 'pause', raw: cleaned };
-    if (/\b(resume)\b/.test(cleaned)) return { cmd: 'resume', raw: cleaned };
-    if (/\b(list links|links|list)\b/.test(cleaned)) return { cmd: 'list links', raw: cleaned };
-    if (/\b(help|what can i say|what can you do)\b/.test(cleaned)) return { cmd: 'help', raw: cleaned };
-    if (/\b(repeat)\b/.test(cleaned)) return { cmd: 'repeat', raw: cleaned };
-    if (/\b(zoom in|bigger|increase zoom)\b/.test(cleaned)) return { cmd: 'zoom in', raw: cleaned };
-    if (/\b(zoom out|smaller|decrease zoom)\b/.test(cleaned)) return { cmd: 'zoom out', raw: cleaned };
-    if (/\b(reset zoom|default zoom)\b/.test(cleaned)) return { cmd: 'reset zoom', raw: cleaned };
+    /**
+     * Add command to queue
+     * Priority commands (stop, cancel) jump to front
+     */
+    enqueue(command, priority = false) {
+      const queueItem = {
+        command,
+        timestamp: Date.now(),
+        id: this.generateId()
+      };
 
-    // "open link google" or similar -> text match
-    m = cleaned.match(/\bopen (?:link )?(.{1,60})$/);
-    if (m && m[1]) {
-      var candidate = m[1].trim();
-      if (!/^\d+$/.test(candidate)) return { cmd: 'open link', text: candidate, raw: cleaned };
-    }
-
-    return { cmd: 'unknown', raw: cleaned };
-  }
-
-  /* ----------------- ContentSTT ----------------- */
-  function ContentSTT(options) {
-    options = options || {};
-    this.lang = options.lang || 'en-US';
-    this.wakeWord = (options.wakeWord === undefined) ? null : options.wakeWord;
-    this.onTranscript = options.onTranscript || function () { };
-    this.onCommand = options.onCommand || function () { };
-    this.minConfidence = options.minConfidence || 0;
-
-    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) {
-      console.warn('SpeechRecognition not available in this runtime');
-      this._available = false;
-      return;
-    }
-
-    this.rec = new SR();
-    this.rec.continuous = true;
-    this.rec.interimResults = true;
-    this.rec.lang = this.lang;
-
-    var self = this;
-    this.rec.onresult = function (ev) { self._handleResult(ev); };
-    this.rec.onerror = function (ev) { self._handleError(ev); };
-    this.rec.onend = function () { self._handleEnd(); };
-
-    this._available = true;
-    this._shouldRestart = false;
-    this._listening = false;
-    this._recentFinals = [];
-    this._awaitingCommand = false;
-    this._awaitTimeout = null;
-  }
-
-  ContentSTT.prototype.available = function () { return !!this._available; };
-  Object.defineProperty(ContentSTT.prototype, 'listening', {
-    get: function () { return !!this._listening; }
-  });
-
-  ContentSTT.prototype.start = function () {
-    if (!this._available) throw new Error('SpeechRecognition unavailable');
-    this._shouldRestart = true;
-    try { this.rec.start(); } catch (e) { }
-    this._listening = true;
-  };
-
-  ContentSTT.prototype.stop = function () {
-    this._shouldRestart = false;
-    try { this.rec.stop(); } catch (e) { }
-    this._listening = false;
-    clearTimeout(this._awaitTimeout);
-    this._awaitingCommand = false;
-  };
-
-  ContentSTT.prototype._handleResult = function (ev) {
-    var interim = '';
-    var final = '';
-    for (var i = ev.resultIndex; i < ev.results.length; i++) {
-      var r = ev.results[i][0];
-      if (ev.results[i].isFinal) final += r.transcript;
-      else interim += r.transcript;
-    }
-    var transcript = (final ? final : interim).trim();
-    var isFinal = !!final;
-    try { this.onTranscript({ transcript: transcript, isFinal: isFinal, raw: ev }); } catch (e) { }
-
-    if (!isFinal) return;
-
-    var cleaned = final.trim();
-    if (this._recentFinals.length && this._recentFinals[this._recentFinals.length - 1] === cleaned) {
-      return;
-    }
-    this._recentFinals.push(cleaned);
-    if (this._recentFinals.length > 6) this._recentFinals.shift();
-
-    if (this.wakeWord) {
-      if (cleaned.toLowerCase().indexOf(this.wakeWord.toLowerCase()) !== -1) {
-        playBeep();
-        this._awaitingCommand = true;
-        var self = this;
-        clearTimeout(this._awaitTimeout);
-        this._awaitTimeout = setTimeout(function () { self._awaitingCommand = false; }, 6000);
-        return;
-      } else if (this._awaitingCommand) {
-        this._awaitingCommand = false;
-        this._processFinal(cleaned);
-        return;
+      if (priority) {
+        console.log('[Queue] 🚨 Priority command:', command.intent);
+        this.queue.unshift(queueItem); // Add to front
+        
+        // If something is running, request interrupt
+        if (this.isProcessing) {
+          this.interruptRequested = true;
+        }
       } else {
+        console.log('[Queue] ➕ Enqueued:', command.intent);
+        this.queue.push(queueItem);
+      }
+
+      // Start processing if not already
+      if (!this.isProcessing) {
+        this.processNext();
+      }
+
+      return queueItem.id;
+    }
+
+    /**
+     * Process next command in queue
+     */
+    async processNext() {
+      if (this.queue.length === 0) {
+        this.isProcessing = false;
+        this.currentCommand = null;
+        console.log('[Queue] ✅ Queue empty');
         return;
       }
-    } else {
-      this._processFinal(cleaned);
-    }
-  };
 
-  ContentSTT.prototype._processFinal = function (finalText) {
-    var interpreted = interpretTranscript(finalText);
-    try {
-      this.onCommand({
-        cmd: interpreted.cmd,
-        arg: interpreted.arg,
-        text: interpreted.text,
-        rawTranscript: finalText,
-        meta: interpreted
+      this.isProcessing = true;
+      const item = this.queue.shift();
+      this.currentCommand = item;
+      this.interruptRequested = false;
+
+      console.log('[Queue] 🔄 Processing:', item.command.intent);
+
+      try {
+        // Execute command
+        await this.executeCommand(item.command);
+        
+        console.log('[Queue] ✅ Completed:', item.command.intent);
+      } catch (err) {
+        console.error('[Queue] ❌ Error:', err);
+      } finally {
+        this.currentCommand = null;
+        
+        // Check if interrupted
+        if (this.interruptRequested) {
+          console.log('[Queue] ⚠️ Interrupted, clearing queue');
+          this.queue = [];
+          this.interruptRequested = false;
+        }
+        
+        // Process next (with small delay to prevent blocking)
+        setTimeout(() => this.processNext(), 50);
+      }
+    }
+
+    /**
+     * Execute command (delegated to executor)
+     */
+    async executeCommand(command) {
+      return window.__hoda_executor.execute(command);
+    }
+
+    /**
+     * Stop/interrupt current command
+     */
+    interrupt() {
+      console.log('[Queue] 🛑 Interrupt requested');
+      this.interruptRequested = true;
+      
+      // Clear queue
+      this.queue = [];
+      
+      // Stop any ongoing actions
+      this.stopCurrentAction();
+    }
+
+    /**
+     * Stop ongoing actions (scrolling, TTS, etc.)
+     */
+    stopCurrentAction() {
+      // Stop text-to-speech
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        console.log('[Queue] Stopped TTS');
+      }
+
+      // Stop smooth scrolling (force immediate stop)
+      if (this.currentCommand?.command.intent === 'navigate') {
+        window.scrollTo({
+          top: window.scrollY,
+          behavior: 'auto' // Immediate stop
+        });
+        console.log('[Queue] Stopped scrolling');
+      }
+    }
+
+    /**
+     * Clear all queued commands
+     */
+    clear() {
+      console.log('[Queue] 🗑️ Clearing queue');
+      this.queue = [];
+      this.interruptRequested = false;
+    }
+
+    /**
+     * Get queue status
+     */
+    getStatus() {
+      return {
+        queueLength: this.queue.length,
+        isProcessing: this.isProcessing,
+        currentCommand: this.currentCommand?.command.intent || null,
+        interruptRequested: this.interruptRequested
+      };
+    }
+
+    /**
+     * Check if command should have priority
+     */
+    isPriorityCommand(intent) {
+      const priorityIntents = ['stop', 'cancel', 'pause', 'interrupt'];
+      return priorityIntents.includes(intent);
+    }
+
+    /**
+     * Generate unique ID
+     */
+    generateId() {
+      return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+  }
+
+  // ============================================================================
+  // FEEDBACK MANAGER
+  // ============================================================================
+  class FeedbackManager {
+    constructor() {
+      this.audioContext = null;
+      this.initAudioContext();
+    }
+
+    initAudioContext() {
+      try {
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (err) {
+        console.warn('[Feedback] Audio unavailable:', err);
+      }
+    }
+
+    playBeep(type = 'success') {
+      if (!this.audioContext) return;
+
+      try {
+        const osc = this.audioContext.createOscillator();
+        const gain = this.audioContext.createGain();
+        osc.connect(gain);
+        gain.connect(this.audioContext.destination);
+
+        if (type === 'success') {
+          osc.frequency.value = 800;
+          gain.gain.value = 0.3;
+          osc.start();
+          osc.stop(this.audioContext.currentTime + 0.1);
+        } else if (type === 'error') {
+          osc.frequency.value = 200;
+          osc.type = 'sawtooth';
+          gain.gain.value = 0.3;
+          osc.start();
+          osc.stop(this.audioContext.currentTime + 0.15);
+        } else if (type === 'stop') {
+          // Double low beep for stop
+          osc.frequency.value = 300;
+          gain.gain.value = 0.25;
+          osc.start();
+          osc.stop(this.audioContext.currentTime + 0.08);
+          
+          setTimeout(() => {
+            const osc2 = this.audioContext.createOscillator();
+            const gain2 = this.audioContext.createGain();
+            osc2.connect(gain2);
+            gain2.connect(this.audioContext.destination);
+            osc2.frequency.value = 250;
+            gain2.gain.value = 0.25;
+            osc2.start();
+            osc2.stop(this.audioContext.currentTime + 0.08);
+          }, 100);
+        }
+      } catch (err) {
+        console.error('[Feedback] Beep error:', err);
+      }
+    }
+
+    showOverlay(message, type = 'success') {
+      let overlay = document.getElementById('hoda-feedback-overlay');
+      
+      if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'hoda-feedback-overlay';
+        document.body.appendChild(overlay);
+      }
+
+      const bgColor = type === 'error' 
+        ? 'rgba(244, 67, 54, 0.95)' 
+        : type === 'warning'
+        ? 'rgba(245, 158, 11, 0.95)'
+        : 'rgba(76, 175, 80, 0.95)';
+
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        top: '20px',
+        right: '20px',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        backgroundColor: bgColor,
+        color: 'white',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        fontWeight: '500',
+        zIndex: '2147483647',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        maxWidth: '400px',
+        pointerEvents: 'none',
+        transition: 'opacity 0.3s',
+        opacity: '1'
       });
-    } catch (e) { }
-    playBeep(90, 880, 0.02);
-  };
 
-  ContentSTT.prototype._handleError = function (ev) {
-    console.warn('STT error', ev);
-    if (this._shouldRestart) {
-      var self = this;
-      setTimeout(function () { try { self.rec.start(); } catch (e) { } }, 500);
+      overlay.textContent = message;
+
+      clearTimeout(overlay._timer);
+      overlay._timer = setTimeout(() => {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 300);
+      }, 2000);
     }
-  };
 
-  ContentSTT.prototype._handleEnd = function () {
-    this._listening = false;
-    if (this._shouldRestart) {
-      var self = this;
-      setTimeout(function () { try { self.rec.start(); self._listening = true; } catch (e) { } }, 300);
+    confirmCommand(command) {
+      this.playBeep('success');
+      this.showOverlay(`✓ "${command.original || ''}"`, 'success');
     }
-  };
 
-  /* ----------------- UI + command handling ----------------- */
-  var stt = null;
+    showError(message) {
+      this.playBeep('error');
+      this.showOverlay('⚠️ ' + message, 'error');
+    }
 
-  function ensureSTT() {
-    if (stt) return stt;
-    stt = new ContentSTT({
-      lang: 'en-US',
-      wakeWord: null, // set to 'hey hoda' if desired
-      onTranscript: function (ev) {
-        showOverlay(ev.transcript, ev.isFinal ? 2500 : 800);
-      },
-      onCommand: function (c) { handleCommand(c); }
-    });
-    return stt;
+    showStop() {
+      this.playBeep('stop');
+      this.showOverlay('🛑 Stopped', 'warning');
+    }
   }
 
-  function showOverlay(text, ms) {
-    ms = ms === undefined ? 2000 : ms;
-    var el = document.getElementById('hoda-stt-overlay');
-    if (!el) {
-      el = document.createElement('div');
-      el.id = 'hoda-stt-overlay';
-      Object.assign(el.style, {
-        position: 'fixed', right: '12px', bottom: '12px', zIndex: 2147483647,
-        padding: '8px 12px', borderRadius: '8px', background: 'rgba(0,0,0,0.75)',
-        color: 'white', fontFamily: 'Segoe UI, Roboto, sans-serif', fontSize: '13px'
+  // ============================================================================
+  // COMMAND EXECUTOR
+  // ============================================================================
+  class CommandExecutor {
+    constructor(feedback) {
+      this.feedback = feedback;
+      this.linkList = [];
+    }
+
+    async execute(cmd) {
+      const intent = cmd.intent || cmd.normalized?.intent;
+      const slots = cmd.slots || cmd.normalized?.slots || {};
+
+      console.log('[Executor] Executing:', intent, slots);
+
+      try {
+        let result;
+
+        // Handle stop/cancel commands immediately
+        if (intent === 'stop' || intent === 'cancel') {
+          result = await this.doStop();
+          if (this.feedback) this.feedback.showStop();
+          return result;
+        }
+
+        switch (intent) {
+          case 'navigate':
+            result = await this.doNavigate(slots);
+            break;
+          case 'zoom':
+            result = await this.doZoom(slots);
+            break;
+          case 'link_action':
+            result = await this.doLinkAction(slots);
+            break;
+          case 'read':
+            result = await this.doRead(slots);
+            break;
+          case 'help':
+            result = await this.doHelp();
+            break;
+          default:
+            result = { success: false, message: `Unknown: ${intent}` };
+        }
+
+        if (result.success && this.feedback) {
+          this.feedback.confirmCommand(cmd);
+        } else if (!result.success && this.feedback) {
+          this.feedback.showError(result.message);
+        }
+
+        return result;
+      } catch (err) {
+        console.error('[Executor] Error:', err);
+        if (this.feedback) this.feedback.showError(err.message);
+        return { success: false, message: err.message };
+      }
+    }
+
+    async doStop() {
+      console.log('[Executor] STOP command');
+      
+      // Interrupt queue
+      if (window.__hoda_queue) {
+        window.__hoda_queue.interrupt();
+      }
+
+      return { success: true, message: 'Stopped' };
+    }
+
+    async doNavigate(slots) {
+      const dir = slots.direction;
+      const target = slots.target;
+
+      if (target === 'top') {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return { success: true, message: 'Scrolled to top' };
+      }
+
+      if (target === 'bottom') {
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        return { success: true, message: 'Scrolled to bottom' };
+      }
+
+      if (dir === 'back') {
+        window.history.back();
+        return { success: true, message: 'Going back' };
+      }
+
+      if (dir === 'forward') {
+        window.history.forward();
+        return { success: true, message: 'Going forward' };
+      }
+
+      const amt = window.innerHeight * 0.5;
+      const y = dir === 'down' ? amt : -amt;
+      window.scrollBy({ top: y, behavior: 'smooth' });
+      
+      return { success: true, message: `Scrolled ${dir}` };
+    }
+
+    async doZoom(slots) {
+      const action = slots.action;
+      let zoom = parseFloat(document.body.style.zoom) || 1.0;
+
+      if (action === 'in' || action === 'bigger') {
+        zoom += 0.1;
+      } else if (action === 'out' || action === 'smaller') {
+        zoom -= 0.1;
+      } else if (action === 'reset' || action === 'normal') {
+        zoom = 1.0;
+      }
+
+      zoom = Math.max(0.5, Math.min(3.0, zoom));
+      document.body.style.zoom = zoom;
+
+      return { success: true, message: `Zoom: ${Math.round(zoom * 100)}%` };
+    }
+
+    async doLinkAction(slots) {
+      if (slots.action === 'list' || !slots.action) {
+        this.linkList = Array.from(document.querySelectorAll('a[href]'));
+        
+        // Show visual list
+        this.showLinkList(this.linkList.slice(0, 10));
+        
+        console.log('[Executor] Found', this.linkList.length, 'links');
+        return { success: true, message: `Found ${this.linkList.length} links` };
+      }
+
+      if (slots.linkNumber) {
+        const idx = slots.linkNumber - 1;
+        if (idx >= 0 && idx < this.linkList.length) {
+          this.linkList[idx].click();
+          return { success: true, message: `Opening link ${slots.linkNumber}` };
+        }
+        return { success: false, message: `Link ${slots.linkNumber} not found` };
+      }
+
+      return { success: false, message: 'Invalid link action' };
+    }
+
+    async doRead(slots) {
+      const action = slots.action;
+
+      if (action === 'stop') {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          return { success: true, message: 'Stopped reading' };
+        }
+        return { success: false, message: 'Not reading' };
+      }
+
+      if (action === 'pause') {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          return { success: true, message: 'Paused' };
+        }
+        return { success: false, message: 'Not reading' };
+      }
+
+      if (action === 'resume') {
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+          return { success: true, message: 'Resumed' };
+        }
+        return { success: false, message: 'Nothing to resume' };
+      }
+
+      // Start reading
+      const text = this.extractPageText();
+      if (!text) {
+        return { success: false, message: 'No text found' };
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      utterance.volume = 0.8;
+      window.speechSynthesis.speak(utterance);
+
+      return { success: true, message: 'Reading' };
+    }
+
+    async doHelp() {
+      const helpText = `Voice Commands:
+• Navigation: "scroll down", "scroll up", "go to top"
+• Reading: "read page", "stop reading", "pause"
+• Zoom: "zoom in", "zoom out", "reset zoom"
+• Links: "list links", "open link 1"
+• Stop: Say "stop" to interrupt current action
+Say "Hoda" + command, or just the command directly.`;
+
+      this.showHelpOverlay(helpText);
+      console.log('[Executor] Help shown');
+      return { success: true, message: 'Help shown' };
+    }
+
+    extractPageText() {
+      const main = document.querySelector('main, article, .content, [role="main"]');
+      const target = main || document.body;
+      const clone = target.cloneNode(true);
+      clone.querySelectorAll('script, style, nav, footer').forEach(el => el.remove());
+      return clone.textContent.trim().substring(0, 5000);
+    }
+
+    showLinkList(links) {
+      const overlay = this.createOverlay('hoda-link-list');
+      
+      overlay.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+          📎 Available Links
+        </div>
+        ${links.map((link, i) => {
+          const text = link.textContent.trim() || link.href;
+          return `
+            <div style="margin: 5px 0; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+              <strong>${i + 1}.</strong> ${text.substring(0, 60)}
+            </div>
+          `;
+        }).join('')}
+        <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
+          Say "open link [number]" to open
+        </div>
+      `;
+
+      overlay.style.maxHeight = '400px';
+      overlay.style.overflowY = 'auto';
+    }
+
+    showHelpOverlay(text) {
+      const overlay = this.createOverlay('hoda-help');
+      
+      overlay.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+          🎤 Hoda Voice Commands
+        </div>
+        <pre style="white-space: pre-wrap; font-family: system-ui; font-size: 13px; line-height: 1.6;">
+${text}
+        </pre>
+      `;
+
+      overlay.style.maxWidth = '500px';
+      overlay.style.maxHeight = '600px';
+      overlay.style.overflowY = 'auto';
+    }
+
+    createOverlay(id) {
+      const existing = document.getElementById(id);
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = id;
+      
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        top: '80px',
+        right: '20px',
+        padding: '20px',
+        borderRadius: '12px',
+        backgroundColor: 'rgba(0, 0, 0, 0.92)',
+        color: 'white',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        zIndex: '2147483646',
+        boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
+        maxWidth: '400px',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
       });
-      document.documentElement.appendChild(el);
-    }
-    el.textContent = text;
-    el.style.display = 'block';
-    clearTimeout(el._t);
-    el._t = setTimeout(function () { el.style.display = 'none'; }, ms);
-  }
 
-  function handleCommand(evt) {
-    var cmd = evt.cmd;
-    var arg = evt.arg;
-    var text = evt.text;
-    switch (cmd) {
-      case 'scroll down':
-        window.scrollBy({ top: window.innerHeight * 0.9, behavior: 'smooth' });
-        chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Scrolling down' });
-        break;
-      case 'scroll up':
-        window.scrollBy({ top: -window.innerHeight * 0.9, behavior: 'smooth' });
-        chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Scrolling up' });
-        break;
-      case 'go back':
-        history.back();
-        chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Going back' });
-        break;
-      case 'list links':
-        (function () {
-          var anchors = Array.from(document.querySelectorAll('a')).filter(function (a) { return (a.href && a.offsetParent !== null); }).slice(0, 10);
-          var lines = anchors.map(function (a, i) {
-            var txt = a.textContent || a.getAttribute('aria-label') || a.href;
-            return (i + 1) + '. ' + (txt && txt.slice ? txt.slice(0, 60) : String(txt));
-          });
-          showOverlay(lines.join(' • '), 6000);
-          chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Links listed' });
-        }());
-        break;
-      case 'open link':
-        (function () {
-          if (arg && Number.isFinite(arg)) {
-            var anchors = Array.from(document.querySelectorAll('a')).filter(function (a) { return (a.href && a.offsetParent !== null); });
-            var target = anchors[arg - 1];
-            if (target) { target.click(); chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Opening link' }); }
-            else chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Link not found' });
-          } else if (text) {
-            var t = text.toLowerCase();
-            var anchors2 = Array.from(document.querySelectorAll('a')).filter(function (a) { return (a.href && a.offsetParent !== null); });
-            var match = anchors2.find(function (a) {
-              var hay = (a.textContent || a.getAttribute('aria-label') || '').toLowerCase();
-              return hay.indexOf(t) !== -1;
-            });
-            if (match) { match.click(); chrome.runtime.sendMessage({ cmd: 'confirm', text: 'Opening link' }); }
-            else chrome.runtime.sendMessage({ cmd: 'confirm', text: 'No matching link' });
-          }
-        }());
-        break;
-      default:
-        chrome.runtime.sendMessage({ cmd: 'confirm', text: "I didn't understand" });
-        break;
+      document.body.appendChild(overlay);
+
+      setTimeout(() => {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.5s';
+        setTimeout(() => overlay.remove(), 500);
+      }, 8000);
+
+      return overlay;
     }
   }
 
-  /* ----------------- message listener ----------------- */
-  chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+  // ============================================================================
+  // INITIALIZE
+  // ============================================================================
+  const feedback = new FeedbackManager();
+  const executor = new CommandExecutor(feedback);
+  const queue = new CommandQueue();
+
+  // Expose executor globally (queue needs it)
+  window.__hoda_executor = executor;
+  window.__hoda_queue = queue;
+
+  // ============================================================================
+  // MESSAGE LISTENER
+  // ============================================================================
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     if (!msg || !msg.type) return;
 
+    console.log('[Content] 📨 Received:', msg.type);
+
     if (msg.type === 'PING') {
-      // simple pong for health checks
-      sendResponse({ ok: true, msg: 'pong', url: location.href });
+      sendResponse({ ok: true, url: location.href });
       return true;
     }
 
-    if (msg.type === 'START_STT') {
-      try {
-        ensureSTT().start();
-        sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, err: e && e.message });
-      }
-      return true;
-    } else if (msg.type === 'STOP_STT') {
-      try {
-        if (stt && stt.listening) stt.stop();
-        sendResponse({ ok: true });
-      } catch (e) {
-        sendResponse({ ok: false, err: e && e.message });
-      }
+    if (msg.type === 'EXECUTE_COMMAND') {
+      console.log('[Content] Adding to queue:', msg.command.intent);
+      
+      // Check if priority command (stop, cancel)
+      const isPriority = queue.isPriorityCommand(msg.command.intent);
+      
+      // Add to queue
+      const commandId = queue.enqueue(msg.command, isPriority);
+      
+      sendResponse({ 
+        ok: true, 
+        queued: true,
+        commandId: commandId,
+        queueStatus: queue.getStatus()
+      });
+      
       return true;
     }
+
+    if (msg.type === 'GET_QUEUE_STATUS') {
+      sendResponse({ 
+        ok: true, 
+        status: queue.getStatus() 
+      });
+      return true;
+    }
+
+    if (msg.type === 'CLEAR_QUEUE') {
+      queue.clear();
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (msg.type === 'TEST_FEEDBACK') {
+      feedback.playBeep('success');
+      feedback.showOverlay('✓ Working!', 'success');
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    return false;
   });
 
-  // Optionally: expose for debugging on the page
-  window.__hoda_content_stt = {
-    ensureSTT: ensureSTT,
-    version: '1.0'
+  // ============================================================================
+  // DEBUG INTERFACE
+  // ============================================================================
+  window.__hoda = {
+    feedback,
+    executor,
+    queue,
+    
+    test() {
+      console.log('[Content] Testing...');
+      feedback.playBeep('success');
+      feedback.showOverlay('✓ Queue system working!', 'success');
+    },
+    
+    testQueue() {
+      console.log('[Content] Testing queue...');
+      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 1' });
+      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 2' });
+      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 3' });
+      console.log('Queue status:', queue.getStatus());
+    },
+    
+    testStop() {
+      console.log('[Content] Testing stop...');
+      queue.enqueue({ intent: 'stop', original: 'stop' }, true);
+    }
   };
+
+  console.log('[Content] ✅ Ready with command queue');
 })();

@@ -137,6 +137,27 @@ export class CommandNormalizer {
         if (lowerExample.includes('scroll down')) {
             variations.push('go down', 'move down', 'page down', 'down');
         }
+        // In commandNormalizer.js - Add these to generateVariations():
+
+        // Natural language patterns
+        if (lowerExample.includes('scroll')) {
+            variations.push(
+                'can you scroll',
+                'please scroll',
+                'scroll please',
+                'I want to scroll'
+            );
+        }
+
+        if (lowerExample.includes('zoom in') || lowerExample.includes('bigger')) {
+            variations.push(
+                'can you make it bigger',
+                'please make this bigger',
+                'make the text bigger',
+                'I need bigger text',
+                'increase the size'
+            );
+        }
         if (lowerExample.includes('scroll up')) {
             variations.push('go up', 'move up', 'page up', 'up');
         }
