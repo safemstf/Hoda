@@ -1,227 +1,171 @@
-# 🚀 Quick Start Guide
+# Hoda Voice Assistant
 
-Get Hoda Voice Assistant running in 5 minutes!
+![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
+![Issues](https://img.shields.io/github/issues/safemstf/Hoda?style=for-the-badge)
+![Node.js](https://img.shields.io/badge/Node-18.x-green?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-4.x-blue?style=for-the-badge)
 
 ---
 
-## ⚡ Super Quick Setup
+## Quick Start Guide
 
-### 1. Install Extension (30 seconds)
+Get Hoda Voice Assistant running in 5 minutes.
+
+---
+
+## Super Quick Setup
+
+### 1. Install Extension
 
 ```bash
-# Clone or download
+# Clone the repository
 git clone https://github.com/safemstf/Hoda.git
-
-# Or download ZIP and extract
 ```
+
+Or download the ZIP and extract it.
 
 **Load in browser:**
+
 1. Open `chrome://extensions/`
-2. Toggle **Developer mode** ON (top right)
+2. Toggle **Developer mode** ON
 3. Click **Load unpacked**
-4. Select the `Hoda` folder
+4. Select the **Hoda** folder
 5. Click **Select Folder**
+6. Extension installed!
 
-✅ Extension installed!
+### 2. Grant Permissions
 
----
-
-### 2. Grant Permissions (30 seconds)
-
-1. Click the Hoda icon in browser toolbar
+1. Click the Hoda icon in the browser toolbar
 2. Click "Allow" when asked for microphone
-3. That's it!
+3. Microphone ready!
 
-✅ Microphone ready!
+### 3. Try Your First Command
 
----
-
-### 3. Try Your First Command (30 seconds)
-
-1. Click the 🎤 mic button in popup
-2. Wait for it to turn red 🔴
+1. Click the mic button in the popup
+2. Wait for it to turn red
 3. Say: **"scroll down"**
-4. Watch the page scroll! ✨
-
-✅ It works!
+4. It works!
 
 ---
 
-## 🎓 Learn 5 Essential Commands
+## Learn 5 Essential Commands
 
-### 1. Navigation
-```
-"scroll down"    → Scroll page down
-"go to top"      → Jump to top
-```
+### Navigation
+- `"scroll down"` → Scroll page down
+- `"go to top"` → Jump to top
 
-### 2. Zoom
-```
-"zoom in"        → Make text bigger
-"reset zoom"     → Back to normal
-```
+### Zoom
+- `"zoom in"` → Make text bigger
+- `"reset zoom"` → Back to normal
 
-### 3. Links
-```
-"list links"     → Show all links
-"open link 1"    → Open first link
-```
+### Links
+- `"list links"` → Show all links
+- `"open link 1"` → Open first link
 
-### 4. Reading
-```
-"read page"      → Read content aloud
-"stop"           → Stop everything
-```
+### Reading
+- `"read page"` → Read content aloud
+- `"stop"` → Stop everything
 
-### 5. Help
-```
-"help"           → See all commands
-```
+### Help
+- `"help"` → See all commands
 
 ---
 
-## ⚡ Pro Tips
+## Pro Tips
 
-### Keyboard Shortcut
-Press **Ctrl+Shift+H** (Cmd+Shift+H on Mac) to activate listening without clicking!
-
-### Wake Word (Optional)
-Say **"Hoda"** before commands:
-```
-"Hoda scroll down"
-"Hoda zoom in"
-```
-
-Enable in: Extension → Open Test Page → Settings
-
-### Natural Language
-Speak naturally - these all work:
-```
-"scroll down" = "go down" = "move down" = "page down"
-"zoom in" = "make it bigger" = "increase size"
-```
+- **Keyboard Shortcut:** `Ctrl+Shift+H` (`Cmd+Shift+H` on Mac) to activate listening without clicking
+- **Wake Word (Optional):** Say "Hoda" before commands
+  - `"Hoda scroll down"`
+  - `"Hoda zoom in"`
+- **Natural Language:** Speak naturally; e.g., "scroll down", "go down", "page down" all work
 
 ---
 
-## 🔧 Quick Settings
+## Quick Settings
 
 Click **Open Test Page** in popup to configure:
 
-- 🔊 **Audio Feedback** - Beeps on/off
-- 👁️ **Visual Feedback** - Overlays on/off
-- 🔔 **Wake Word** - Required or optional
+- **Audio Feedback** - Beeps on/off
+- **Visual Feedback** - Overlays on/off
+- **Wake Word** - Required or optional
 
 ---
 
-## 🐛 Quick Troubleshooting
+## Troubleshooting
 
-### Nothing happens when I speak?
+### Nothing happens when speaking?
 
 **Check:**
-1. Is mic button red? 🔴
-2. Is microphone allowed? (Check browser settings)
-3. Is background noise low?
+- Mic button is red
+- Microphone is allowed
+- Background noise is low
 
 **Fix:**
-- Click mic again to restart
-- Try keyboard shortcut: Ctrl+Shift+H
-- Check quota hasn't hit limit (40/day)
+- Click mic again
+- Use keyboard shortcut: `Ctrl+Shift+H`
+- Check daily quota (40 requests/day)
 
-### "Network error" message?
+### Network error?
 
-**Cause:** Used too many requests today (40 limit)
+**Cause:** quota reached
 
-**Fix:** Wait 24 hours or check quota in settings
+**Fix:** wait 24 hours or check settings
 
-### Commands not working on this page?
+### Commands not working?
 
-**Won't work on:**
-- `chrome://` pages
-- `edge://` pages
-- Browser settings pages
-- Local files
+**Won't work on:** `chrome://`, `edge://`, browser settings, local files
 
-**Works on:**
-- Any HTTP/HTTPS website
+**Works on:** HTTP/HTTPS websites
 
 ---
 
-## 📚 What's Next?
+## What's Next?
 
-### Learn More Commands
-- Check the full README
-- Say "help" in the extension
-- Open Test Page → try all commands
-
-### Customize Settings
-- Enable/disable audio feedback
-- Toggle visual overlays
-- Require wake word
-
-### Explore Advanced
-- Multi-step commands (coming soon)
-- AI-powered understanding (coming soon)
-- Custom commands (coming soon)
+- **Learn more commands:** say "help" or check README
+- **Customize settings:** enable/disable audio feedback, toggle overlays
+- **Explore advanced:** multi-step commands, AI-powered understanding, custom commands (coming soon)
 
 ---
 
-## 🎯 Common Use Cases
+## Common Use Cases
 
 ### Reading Articles
-```
-1. "read page"           → Start reading
-2. "pause"               → Take a break
-3. "resume"              → Continue
-4. "stop"                → All done
-```
+1. `"read page"` → Start reading
+2. `"pause"` → Take a break
+3. `"resume"` → Continue
+4. `"stop"` → Stop reading
 
 ### Quick Navigation
-```
-1. "list links"          → See all links
-2. "open link 3"         → Click third link
-3. "go back"             → Return to previous page
-```
+1. `"list links"` → See all links
+2. `"open link 3"` → Click third link
+3. `"go back"` → Return to previous page
 
 ### Accessibility
-```
-1. "zoom in"             → Larger text
-2. "read page"           → Listen instead of read
-3. "scroll down"         → Hands-free browsing
-```
+1. `"zoom in"` → Larger text
+2. `"read page"` → Listen instead of read
+3. `"scroll down"` → Hands-free browsing
 
 ---
 
-## 💡 Did You Know?
+## Did You Know?
 
-- **Quota resets daily** - Get 40 fresh requests every 24 hours
-- **Commands queue** - Say multiple commands, they execute in order
-- **Context aware** - Extension remembers your last command
-- **Offline ready** - Most code runs locally (except speech recognition)
-- **Privacy first** - No data sent to our servers (uses browser's API)
-
----
-
-## 🆘 Need Help?
-
-- **Commands list**: Say "help" or check README
-- **Not working**: See Troubleshooting section in README
-- **Bug found**: [Report on GitHub](https://github.com/yourusername/hoda-voice-assistant/issues)
-- **Feature idea**: Open a feature request!
+- **Quota resets daily:** 40 requests per 24 hours
+- **Commands queue:** multiple commands execute in order
+- **Context aware:** remembers last command
+- **Offline ready:** most code runs locally
+- **Privacy first:** no data sent to servers
 
 ---
 
-## ✨ You're Ready!
+## Need Help?
 
-That's it! You now know enough to use Hoda Voice Assistant productively.
-
-**Explore more:**
-- Try all 30+ commands
-- Customize your settings
-- Share with friends
-- Contribute on GitHub
-
-**Happy voice browsing! 🎤**
+- **Commands list:** say "help" or check README
+- **Not working:** see troubleshooting section
+- **Bug found:** [Report on GitHub](https://github.com/safemstf/Hoda/issues)
+- **Feature idea:** open a feature request
 
 ---
 
-*Made with ❤️ for accessibility*
+You're ready! Explore all commands, customize settings, and contribute on GitHub.
+
+**Made with ❤️ for accessibility**
