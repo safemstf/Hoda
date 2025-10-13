@@ -160,7 +160,7 @@ class WakeWordDetector {
 // ============================================================================
 const RATE_LIMIT = {
   maxRequestsPerMinute: 10,
-  maxRequestsPerDay: 40,
+  maxRequestsPerDay: 100,
   requests: [],
   dailyCount: 0,
   lastReset: Date.now(),
