@@ -392,54 +392,333 @@ console.log('[Content] Loading with command queue...');
       return { success: true, message: 'Stopped' };
     }
 
-    // ---- NAVIGATE (supports large and numeric amounts) ----
+
+    /**
+     * ENHANCED LINK ACTION with TTS support
+     */
+    async doLinkAction(slots) {
+      const action = slots.action;
+      const linkNumber = slots.linkNumber;
+      const target = slots.target;
+
+      // List links and READ them aloud
+      if (action === 'list' || !action) {
+        this.linkList = Array.from(document.querySelectorAll('a[href]'))
+          .filter(a => a.offsetParent !== null);
+
+        const visible = this.linkList.slice(0, 10);
+
+        // Show visual overlay
+        this.showLinkList(visible);
+
+        // READ the links aloud
+        this.readLinkList(visible);
+
+        console.log('[Executor] Found', this.linkList.length, 'links');
+        return { success: true, message: `Found ${this.linkList.length} links` };
+      }
+
+      // Open link by number
+      if (linkNumber !== undefined && linkNumber !== null) {
+        const index = Number(linkNumber) - 1;
+        if (!this.linkList || this.linkList.length === 0) {
+          return { success: false, message: 'No link list cached. Say "list links" first.' };
+        }
+        if (index >= 0 && index < this.linkList.length) {
+          const link = this.linkList[index];
+
+          // Announce which link is being opened
+          this.speakShort(`Opening link ${linkNumber}: ${this.getLinkText(link)}`);
+
+          try {
+            link.focus();
+            link.click();
+          } catch (e) {
+            window.location.href = link.href;
+          }
+          return { success: true, message: `Opening link ${linkNumber}` };
+        }
+        return { success: false, message: `Link ${linkNumber} not found` };
+      }
+
+      // Open link by text match
+      if (target) {
+        const q = target.toLowerCase();
+        const found = Array.from(document.querySelectorAll('a[href]')).find(a =>
+          ((a.textContent || a.getAttribute('aria-label') || a.href) || '').toLowerCase().includes(q)
+        );
+        if (found) {
+          this.speakShort(`Opening ${target}`);
+          try { found.focus(); found.click(); } catch (e) { window.location.href = found.href; }
+          return { success: true, message: `Opening ${target}` };
+        }
+        return { success: false, message: `Link "${target}" not found` };
+      }
+
+      return { success: false, message: 'Invalid link action' };
+    }
+
+    /**
+     * ENHANCED NAVIGATION with debugging
+     */
     async doNavigate(slots) {
       const dir = slots.direction;
       const target = slots.target;
+      const amount = slots.amount;
+
+      // DEBUG: Log what we received
+      console.log('[Executor] doNavigate called with:', { dir, target, amount });
 
       // Stop reading when navigating
       if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
         this.stopReading();
       }
 
-      if (target === 'top') {
+      // TOP
+      if (target === 'top' || dir === 'top') {
+        console.log('[Executor] Going to TOP');
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        this.speakShort('Going to top');
         return { success: true, message: 'Scrolled to top' };
       }
 
-      if (target === 'bottom') {
+      // BOTTOM
+      if (target === 'bottom' || dir === 'bottom') {
+        console.log('[Executor] Going to BOTTOM');
         window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+        this.speakShort('Going to bottom');
         return { success: true, message: 'Scrolled to bottom' };
       }
 
+      // BACK - Browser history
       if (dir === 'back') {
-        window.history.back();
+        console.log('[Executor] BACK - Navigating to previous page');
+
+        // Try to speak (but don't let it block navigation)
+        try {
+          this.speakShort('Going back');
+        } catch (e) {
+          console.warn('[Executor] speakShort failed, continuing anyway:', e);
+        }
+
+        // Navigate back
+        try {
+          window.history.back();
+          console.log('[Executor] ✅ history.back() called');
+        } catch (e) {
+          console.error('[Executor] ❌ history.back() failed:', e);
+        }
+
         return { success: true, message: 'Going back' };
       }
 
+      // FORWARD - Browser history
       if (dir === 'forward') {
-        window.history.forward();
+        console.log('[Executor] FORWARD - Navigating to next page');
+
+        try {
+          this.speakShort('Going forward');
+        } catch (e) {
+          console.warn('[Executor] speakShort failed, continuing anyway:', e);
+        }
+
+        try {
+          window.history.forward();
+          console.log('[Executor] ✅ history.forward() called');
+        } catch (e) {
+          console.error('[Executor] ❌ history.forward() failed:', e);
+        }
+
         return { success: true, message: 'Going forward' };
       }
 
-      // Determine scroll amount
+      // REFRESH
+      if (dir === 'refresh' || target === 'refresh') {
+        console.log('[Executor] REFRESH - Reloading page');
+
+        try {
+          this.speakShort('Refreshing page');
+        } catch (e) {
+          console.warn('[Executor] speakShort failed:', e);
+        }
+
+        window.location.reload();
+        return { success: true, message: 'Refreshing' };
+      }
+
+      // HOME (go to domain root)
+      if (dir === 'home' || target === 'home') {
+        console.log('[Executor] HOME - Going to homepage');
+
+        try {
+          this.speakShort('Going home');
+        } catch (e) {
+          console.warn('[Executor] speakShort failed:', e);
+        }
+
+        const url = new URL(window.location.href);
+        const homeUrl = `${url.protocol}//${url.host}`;
+        window.location.href = homeUrl;
+        return { success: true, message: 'Going home' };
+      }
+
+      // SCROLL UP/DOWN
+      console.log('[Executor] SCROLL - direction:', dir);
+
       let scrollAmount;
-      if (slots.amount === 'large') {
-        scrollAmount = window.innerHeight * 1.5; // bigger jump
-      } else if (!isNaN(Number(slots.amount))) {
-        // numeric amount in pixels
-        scrollAmount = Number(slots.amount);
+      if (amount === 'large') {
+        scrollAmount = window.innerHeight * 1.5;
+      } else if (!isNaN(Number(amount))) {
+        scrollAmount = Number(amount);
       } else {
         scrollAmount = window.innerHeight * 0.5; // default
       }
 
       const scrollY = dir === 'down' ? scrollAmount : -scrollAmount;
+
+      console.log('[Executor] Scrolling:', dir, 'amount:', scrollY);
+
       window.scrollBy({ top: scrollY, behavior: 'smooth' });
 
       return {
         success: true,
         message: `Scrolled ${dir}`
       };
+    }
+
+    /**
+     * NEW: Read link list aloud
+     */
+    readLinkList(links) {
+      if (!links || links.length === 0) return;
+
+      // Stop any current reading
+      this.stopReading();
+
+      // Build spoken text
+      const intro = `Found ${links.length} links. `;
+      const linkDescriptions = links.map((link, i) => {
+        const text = this.getLinkText(link);
+        return `Link ${i + 1}: ${text}`;
+      }).join('. ');
+
+      const fullText = intro + linkDescriptions + '. Say "open link" followed by a number to open it.';
+
+      // Speak it
+      this.speakLong(fullText);
+    }
+
+    /**
+     * NEW: Get readable text from link
+     */
+    getLinkText(link) {
+      const text = (link.textContent || link.getAttribute('aria-label') || '').trim();
+      if (text && text.length > 0) {
+        return text.substring(0, 100); // Limit length
+      }
+
+      // Fallback to href
+      try {
+        const url = new URL(link.href);
+        return url.pathname.split('/').filter(p => p).pop() || 'link';
+      } catch (e) {
+        return 'link';
+      }
+    }
+
+    /**
+     * NEW: Speak short announcements (non-blocking)
+     */
+    speakShort(text) {
+      if (!text) return;
+
+      try {
+        // Cancel only if currently speaking something short
+        // Don't interrupt long reading sessions
+        if (window.speechSynthesis.speaking && !this._tts.autoContinue) {
+          window.speechSynthesis.cancel();
+        }
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.1;
+        utterance.volume = 0.9;
+        utterance.pitch = 1.0;
+
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.warn('[Executor] speakShort failed:', e);
+      }
+    }
+
+    /**
+     * NEW: Speak longer content (like link lists)
+     */
+    speakLong(text) {
+      if (!text) return;
+
+      // Stop any current reading
+      this.stopReading();
+
+      // Use the chunked TTS system
+      const chunks = this.chunkTextToSentences(text, 1600);
+      if (!chunks || chunks.length === 0) return;
+
+      this._tts.chunks = chunks;
+      this._tts.chunkIndex = 0;
+      this._tts.autoContinue = true;
+      this._tts.stopped = false;
+
+      this._speakNextChunk();
+    }
+
+    /**
+     * ENHANCED: Better visual link list
+     */
+    showLinkList(links) {
+      const overlay = this.createOverlay('hoda-link-list');
+
+      overlay.innerHTML = `
+    <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+      <span>🔗</span>
+      <span>Available Links</span>
+      <span style="font-size: 12px; opacity: 0.7; font-weight: normal;">(${links.length} shown)</span>
+    </div>
+    <div style="font-size: 12px; opacity: 0.8; margin-bottom: 12px; padding: 8px; background: rgba(255,255,255,0.05); border-radius: 4px;">
+      🎤 Reading links aloud... Say "open link [number]"
+    </div>
+    ${links.map((link, i) => {
+        const text = this.getLinkText(link);
+        const href = link.href;
+
+        return `
+        <div style="margin: 8px 0; padding: 10px; background: rgba(255,255,255,0.06); border-radius: 6px; border-left: 3px solid #10b981;">
+          <div style="display: flex; gap: 8px; align-items: start;">
+            <strong style="color: #10b981; min-width: 30px;">${i + 1}.</strong>
+            <div style="flex: 1;">
+              <div style="margin-bottom: 4px;">${text}</div>
+              <div style="font-size: 11px; opacity: 0.6; word-break: break-all;">${href.substring(0, 60)}${href.length > 60 ? '...' : ''}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      }).join('')}
+    <div style="margin-top: 12px; font-size: 12px; opacity: 0.9; padding: 8px; background: rgba(16, 185, 129, 0.1); border-radius: 4px;">
+      💡 Say "open link 1" (or any number) to navigate
+    </div>
+  `;
+
+      overlay.style.maxHeight = '500px';
+      overlay.style.overflowY = 'auto';
+      overlay.style.maxWidth = '450px';
+
+      // Auto-hide after reading completes (with extra time)
+      setTimeout(() => {
+        if (overlay && overlay.parentNode) {
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.5s';
+          setTimeout(() => overlay.remove(), 500);
+        }
+      }, 15000); // 15 seconds
     }
 
     // ---- ZOOM ----
@@ -464,51 +743,6 @@ console.log('[Content] Loading with command queue...');
         success: true,
         message: `Zoom: ${Math.round(currentZoom * 100)}%`
       };
-    }
-
-    // ---- LINKS: list, open by number, open by text ----
-    async doLinkAction(slots) {
-      const action = slots.action;
-      const linkNumber = slots.linkNumber;
-      const target = slots.target;
-
-      // Cache visible links only (ignore display:none)
-      if (action === 'list' || !action) {
-        this.linkList = Array.from(document.querySelectorAll('a[href]')).filter(a => a.offsetParent !== null);
-        const visible = this.linkList.slice(0, 10);
-        this.showLinkList(visible);
-        console.log('[Executor] Found', this.linkList.length, 'links');
-        return { success: true, message: `Found ${this.linkList.length} links` };
-      }
-
-      // Open link by its cached number
-      if (linkNumber !== undefined && linkNumber !== null) {
-        const index = Number(linkNumber) - 1;
-        if (!this.linkList || this.linkList.length === 0) {
-          return { success: false, message: 'No link list cached. Say "list links" first.' };
-        }
-        if (index >= 0 && index < this.linkList.length) {
-          const link = this.linkList[index];
-          try { link.focus(); link.click(); } catch (e) { window.location.href = link.href; }
-          return { success: true, message: `Opening link ${linkNumber}` };
-        }
-        return { success: false, message: `Link ${linkNumber} not found` };
-      }
-
-      // Open link by text match (case-insensitive)
-      if (target) {
-        const q = target.toLowerCase();
-        const found = Array.from(document.querySelectorAll('a[href]')).find(a =>
-          ((a.textContent || a.getAttribute('aria-label') || a.href) || '').toLowerCase().includes(q)
-        );
-        if (found) {
-          try { found.focus(); found.click(); } catch (e) { window.location.href = found.href; }
-          return { success: true, message: `Opening ${target}` };
-        }
-        return { success: false, message: `Link "${target}" not found` };
-      }
-
-      return { success: false, message: 'Invalid link action' };
     }
 
     // ---- FIND CONTENT (deterministic search + highlight) ----
@@ -834,29 +1068,6 @@ Wake Word (Optional):
       return clone.textContent.trim().substring(0, 5000);
     }
 
-    showLinkList(links) {
-      const overlay = this.createOverlay('hoda-link-list');
-
-      overlay.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
-        📎 Available Links
-      </div>
-      ${links.map((link, i) => {
-        const text = (link.textContent || link.getAttribute('aria-label') || link.href || '').trim();
-        return `
-          <div style="margin: 5px 0; padding: 5px; background: rgba(255,255,255,0.06); border-radius: 4px;">
-            <strong>${i + 1}.</strong> ${text.substring(0, 120)}
-          </div>
-        `;
-      }).join('')}
-      <div style="margin-top: 10px; font-size: 12px; opacity: 0.9;">
-        Say "open link [number]" to open
-      </div>
-    `;
-
-      overlay.style.maxHeight = '400px';
-      overlay.style.overflowY = 'auto';
-    }
 
     showHelpOverlay(text) {
       const overlay = this.createOverlay('hoda-help');

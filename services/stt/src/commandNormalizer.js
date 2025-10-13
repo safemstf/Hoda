@@ -107,22 +107,16 @@ export class CommandNormalizer {
     }
 
     /**
-     * Generate variations for a command
-     * Returns an array of strings or regex-like strings (not compiled)
+     * CLEAN generateVariations - Aligned with clean intent schema
      */
     generateVariations(example) {
-        // Defensive guards: if example undefined/null, return empty list
         if (example === null || example === undefined) return [];
-
         const exampleStr = String(example).trim();
         if (!exampleStr) return [];
-
         const lowerExample = exampleStr.toLowerCase();
-
-        // Start with original (raw string). We'll decide escaping/regex later in builder.
         const variations = [exampleStr];
 
-        // Apply synonym substitutions - guard synonyms
+        // Apply synonym substitutions first
         for (const [word, synonyms] of Object.entries(this.synonyms || {})) {
             if (typeof word !== 'string' || !Array.isArray(synonyms)) continue;
             if (lowerExample.includes(word)) {
@@ -133,76 +127,208 @@ export class CommandNormalizer {
             }
         }
 
-        // Add common variations for specific patterns (strings, some with regex tokens intentionally)
-        if (lowerExample.includes('scroll down')) {
-            variations.push('go down', 'move down', 'page down', 'down');
-        }
-        // In commandNormalizer.js - Add these to generateVariations():
+        // ========================================================================
+        // SCROLL VARIATIONS (within page)
+        // ========================================================================
 
-        // Natural language patterns
-        if (lowerExample.includes('scroll')) {
+        // Scroll down
+        if (lowerExample.includes('scroll down') || lowerExample === 'down') {
             variations.push(
-                'can you scroll',
-                'please scroll',
-                'scroll please',
-                'I want to scroll'
+                'page down',
+                'down',
+                'move down',
+                'go down'
             );
         }
+
+        // Scroll up
+        if (lowerExample.includes('scroll up') || lowerExample === 'up') {
+            variations.push(
+                'page up',
+                'up',
+                'move up'
+            );
+        }
+
+        // Scroll to top
+        if (lowerExample.includes('top') && !lowerExample.includes('bottom')) {
+            variations.push(
+                'top',
+                'scroll to top',
+                'go to top',
+                'beginning',
+                'start'
+            );
+        }
+
+        // Scroll to bottom
+        if (lowerExample.includes('bottom')) {
+            variations.push(
+                'bottom',
+                'scroll to bottom',
+                'go to bottom',
+                'end'
+            );
+        }
+
+        // ========================================================================
+        // BROWSER NAVIGATION (between pages)
+        // ========================================================================
+
+        // Go back / previous page
+        if (lowerExample.includes('back') || lowerExample.includes('previous page')) {
+            // Only add browser navigation variations
+            variations.push(
+                'go back',
+                'back',
+                'previous page',
+                'last page'
+            );
+        }
+
+        // Go forward / next page
+        if (lowerExample.includes('forward') || lowerExample.includes('next page')) {
+            variations.push(
+                'go forward',
+                'forward',
+                'next page'
+            );
+        }
+
+        // ========================================================================
+        // PAGE ACTIONS
+        // ========================================================================
+
+        // Refresh
+        if (lowerExample.includes('refresh') || lowerExample.includes('reload')) {
+            variations.push(
+                'refresh',
+                'reload',
+                'refresh page',
+                'reload page'
+            );
+        }
+
+        // Home
+        if (lowerExample.includes('home')) {
+            variations.push(
+                'home',
+                'go home',
+                'home page'
+            );
+        }
+
+        // ========================================================================
+        // LINK ACTIONS
+        // ========================================================================
+
+        if (lowerExample.includes('list') && lowerExample.includes('link')) {
+            variations.push(
+                'list links',
+                'show links',
+                'what links'
+            );
+        }
+
+        if (lowerExample.includes('open link')) {
+            variations.push(
+                'open link (\\d+)',
+                'click link (\\d+)',
+                'link (\\d+)'
+            );
+        }
+
+        // ========================================================================
+        // ZOOM ACTIONS
+        // ========================================================================
 
         if (lowerExample.includes('zoom in') || lowerExample.includes('bigger')) {
             variations.push(
-                'can you make it bigger',
-                'please make this bigger',
-                'make the text bigger',
-                'I need bigger text',
-                'increase the size'
+                'zoom in',
+                'bigger',
+                'make bigger',
+                'increase size'
             );
         }
-        if (lowerExample.includes('scroll up')) {
-            variations.push('go up', 'move up', 'page up', 'up');
-        }
-        if (lowerExample.includes('scroll to top')) {
-            variations.push('go to top', 'top of page', 'beginning', 'scroll all the way up');
-        }
-        if (lowerExample.includes('go back')) {
-            variations.push('back', 'previous page', 'navigate back');
-        }
-        if (lowerExample.includes('zoom in')) {
-            variations.push('make bigger', 'make it bigger', 'make text bigger', 'increase size', 'enlarge', 'bigger');
-        }
-        if (lowerExample.includes('zoom out')) {
-            variations.push('make smaller', 'make it smaller', 'decrease size', 'reduce', 'smaller');
-        }
-        if (lowerExample.includes('reset zoom')) {
-            variations.push('normal size', 'default size', 'normal zoom', 'default zoom', '100 percent');
-        }
-        if (lowerExample.includes('read')) {
-            variations.push('read to me', 'start reading', 'read it', 'what does this say', 'what does it say');
-        }
-        if (lowerExample.includes('stop')) {
-            variations.push('stop reading', 'be quiet', 'silence');
-        }
-        if (lowerExample.includes('pause')) {
-            variations.push('pause reading', 'hold on', 'wait');
-        }
-        if (lowerExample.includes('list') && lowerExample.includes('link')) {
-            variations.push('show links', 'show all links', 'what are the links', 'available links');
-        }
-        // these are intentionally regex-like strings to capture numbers/queries
-        if (lowerExample.includes('open') && lowerExample.includes('link')) {
-            variations.push('open link (\\d+)', 'click link (\\d+)', 'go to link (\\d+)', 'follow link (\\d+)');
-        }
-        if (lowerExample.includes('find')) {
-            variations.push('find (.+)', 'search for (.+)', 'look for (.+)', 'where is (.+)', 'locate (.+)');
-        }
-        if (lowerExample.includes('click')) {
-            variations.push('click (.+)', 'press (.+)', 'select (.+)');
-        }
-        if (lowerExample === 'help') {
-            variations.push('what can you do', 'show commands', 'list commands', 'how do i', 'instructions');
+
+        if (lowerExample.includes('zoom out') || lowerExample.includes('smaller')) {
+            variations.push(
+                'zoom out',
+                'smaller',
+                'make smaller',
+                'decrease size'
+            );
         }
 
-        // dedupe simple string list while preserving order
+        if (lowerExample.includes('reset zoom')) {
+            variations.push(
+                'reset zoom',
+                'normal size',
+                'default size'
+            );
+        }
+
+        // ========================================================================
+        // READING ACTIONS
+        // ========================================================================
+
+        if (lowerExample.includes('read') && !lowerExample.includes('stop')) {
+            variations.push(
+                'read page',
+                'read this',
+                'start reading'
+            );
+        }
+
+        if (lowerExample.includes('stop reading')) {
+            variations.push(
+                'stop reading',
+                'stop'
+            );
+        }
+
+        if (lowerExample.includes('pause')) {
+            variations.push(
+                'pause',
+                'pause reading'
+            );
+        }
+
+        if (lowerExample.includes('resume') || lowerExample.includes('continue')) {
+            variations.push(
+                'resume',
+                'resume reading',
+                'continue reading'
+            );
+        }
+
+        // ========================================================================
+        // FIND ACTIONS
+        // ========================================================================
+
+        if (lowerExample.includes('find')) {
+            variations.push(
+                'find (.+)',
+                'search for (.+)',
+                'where is (.+)',
+                'locate (.+)'
+            );
+        }
+
+        // ========================================================================
+        // HELP
+        // ========================================================================
+
+        if (lowerExample === 'help') {
+            variations.push(
+                'help',
+                'what can you do',
+                'show commands',
+                'list commands'
+            );
+        }
+
+        // Deduplicate
         const seen = new Set();
         const deduped = [];
         for (const v of variations) {
@@ -215,6 +341,221 @@ export class CommandNormalizer {
 
         return deduped;
     }
+    /**
+     * Enhanced synonym map - ADD to buildSynonymMap()
+     */
+    buildSynonymMap() {
+        return {
+            scroll: ['move', 'navigate', 'go'],
+            click: ['press', 'select', 'tap', 'open'],
+            read: ['speak', 'say', 'tell'],
+            stop: ['end', 'quit', 'cancel', 'close', 'halt'],
+            pause: ['hold', 'wait'],
+            resume: ['continue', 'proceed', 'keep going'],
+            zoom: ['magnify', 'size', 'scale'],
+            find: ['search', 'locate', 'look for', 'where is'],
+            bigger: ['larger', 'increase', 'enlarge'],
+            smaller: ['decrease', 'reduce', 'shrink'],
+            // New additions
+            back: ['previous', 'return', 'backward'],
+            forward: ['next', 'ahead', 'onward'],
+            refresh: ['reload', 'update'],
+            home: ['homepage', 'main page', 'start']
+        };
+    }
+
+    /**
+     * PRECISE extractSlots - Rule-based slot extraction
+     * Follows COMMAND_RULES from intents-temporary.js
+     */
+    extractSlots(match, actionName) {
+        const slots = {};
+        const matchedText = match[0].toLowerCase();
+
+        console.log('[Normalizer] extractSlots:', matchedText, 'action:', actionName);
+
+        // ========================================================================
+        // STEP 1: Extract capture groups (for numbers, queries, etc.)
+        // ========================================================================
+        if (match.length > 1) {
+            const g1 = match[1];
+            if (g1 !== undefined && g1 !== null) {
+                const g1Str = String(g1).trim();
+
+                // Link numbers
+                if (/^\d+$/.test(g1Str)) {
+                    slots.linkNumber = parseInt(g1Str, 10);
+                }
+                // Search queries
+                else if (actionName.toLowerCase().includes('find') ||
+                    actionName.toLowerCase().includes('search') ||
+                    actionName.toLowerCase().includes('locate')) {
+                    slots.query = g1Str;
+                }
+                // Link targets
+                else if (actionName.toLowerCase().includes('open') ||
+                    actionName.toLowerCase().includes('click')) {
+                    slots.target = g1Str;
+                }
+                // Generic value
+                else {
+                    slots.value = g1Str;
+                }
+            }
+        }
+
+        // ========================================================================
+        // STEP 2: Extract navigation slots (STRICT RULES)
+        // ========================================================================
+        if (actionName.toLowerCase().includes('scroll') ||
+            actionName.toLowerCase().includes('navigate') ||
+            actionName.toLowerCase().includes('move') ||
+            actionName.toLowerCase().includes('page') ||
+            actionName.toLowerCase().includes('go')) {
+
+            // --------------------------------------------------------------------
+            // RULE 1: Browser History (HIGHEST PRIORITY)
+            // These ALWAYS mean browser navigation, never scrolling
+            // --------------------------------------------------------------------
+            if (matchedText.includes('previous page') ||
+                matchedText.includes('next page') ||
+                matchedText.includes('last page')) {
+
+                if (matchedText.includes('previous') || matchedText.includes('last')) {
+                    slots.direction = 'back';
+                    console.log('[Normalizer] → Browser BACK (previous/next page)');
+                } else if (matchedText.includes('next')) {
+                    slots.direction = 'forward';
+                    console.log('[Normalizer] → Browser FORWARD (next page)');
+                }
+            }
+
+            // --------------------------------------------------------------------
+            // RULE 2: Explicit browser commands
+            // "go back", "go forward", "back", "forward"
+            // --------------------------------------------------------------------
+            else if (matchedText.includes('go back') ||
+                (matchedText === 'back' || matchedText.includes(' back ')) &&
+                !matchedText.includes('scroll') &&
+                !matchedText.includes('up')) {
+                slots.direction = 'back';
+                console.log('[Normalizer] → Browser BACK');
+            }
+            else if (matchedText.includes('go forward') ||
+                matchedText.includes('forward') ||
+                matchedText.includes('ahead')) {
+                slots.direction = 'forward';
+                console.log('[Normalizer] → Browser FORWARD');
+            }
+
+            // --------------------------------------------------------------------
+            // RULE 3: Page actions (reload, refresh, home)
+            // --------------------------------------------------------------------
+            else if (matchedText.includes('refresh') ||
+                matchedText.includes('reload')) {
+                slots.target = 'refresh';
+                console.log('[Normalizer] → REFRESH page');
+            }
+            else if (matchedText.includes('home')) {
+                slots.target = 'home';
+                console.log('[Normalizer] → GO HOME');
+            }
+
+            // --------------------------------------------------------------------
+            // RULE 4: Scroll to top/bottom (explicit "scroll to" or standalone)
+            // --------------------------------------------------------------------
+            else if (matchedText.includes('top') ||
+                matchedText.includes('beginning') ||
+                matchedText.includes('start')) {
+                slots.target = 'top';
+                console.log('[Normalizer] → Scroll to TOP');
+            }
+            else if (matchedText.includes('bottom') ||
+                matchedText.includes('end')) {
+                slots.target = 'bottom';
+                console.log('[Normalizer] → Scroll to BOTTOM');
+            }
+
+            // --------------------------------------------------------------------
+            // RULE 5: Incremental scrolling (up/down)
+            // --------------------------------------------------------------------
+            else if (matchedText.includes('down') ||
+                matchedText.includes('page down')) {
+                slots.direction = 'down';
+                console.log('[Normalizer] → Scroll DOWN');
+            }
+            else if (matchedText.includes('up') ||
+                matchedText.includes('page up') ||
+                matchedText.includes('back up')) {
+                slots.direction = 'up';
+                console.log('[Normalizer] → Scroll UP');
+            }
+        }
+
+        // ========================================================================
+        // STEP 3: Extract zoom slots
+        // ========================================================================
+        if (actionName.toLowerCase().includes('zoom') ||
+            actionName.toLowerCase().includes('bigger') ||
+            actionName.toLowerCase().includes('smaller')) {
+
+            if (matchedText.includes('in') ||
+                matchedText.includes('bigger') ||
+                matchedText.includes('increase')) {
+                slots.action = 'in';
+            }
+            else if (matchedText.includes('out') ||
+                matchedText.includes('smaller') ||
+                matchedText.includes('decrease')) {
+                slots.action = 'out';
+            }
+            else if (matchedText.includes('reset') ||
+                matchedText.includes('normal') ||
+                matchedText.includes('default')) {
+                slots.action = 'reset';
+            }
+        }
+
+        // ========================================================================
+        // STEP 4: Extract reading slots
+        // ========================================================================
+        if (actionName.toLowerCase().includes('read')) {
+            if (matchedText.includes('stop')) {
+                slots.action = 'stop';
+            }
+            else if (matchedText.includes('pause') || matchedText.includes('hold')) {
+                slots.action = 'pause';
+            }
+            else if (matchedText.includes('resume') || matchedText.includes('continue')) {
+                slots.action = 'resume';
+            }
+            else {
+                slots.action = 'start';
+            }
+
+            // Scope (page vs viewport)
+            if (matchedText.includes('this') || matchedText.includes('visible')) {
+                slots.scope = 'this';
+            } else {
+                slots.scope = 'page';
+            }
+        }
+
+        // ========================================================================
+        // STEP 5: Extract link action slots
+        // ========================================================================
+        if (actionName.toLowerCase().includes('link')) {
+            if (matchedText.includes('list') || matchedText.includes('show')) {
+                slots.action = 'list';
+            }
+            else if (matchedText.includes('open') || matchedText.includes('click')) {
+                slots.action = 'open';
+            }
+        }
+
+        console.log('[Normalizer] Extracted slots:', slots);
+        return slots;
+    }
 
     /**
      * Escape special regex characters
@@ -222,24 +563,6 @@ export class CommandNormalizer {
     escapeRegex(str) {
         // Coerce to string to prevent errors when undefined/null is passed
         return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    /**
-     * Build synonym map for better matching
-     */
-    buildSynonymMap() {
-        return {
-            scroll: ['move', 'navigate', 'go'],
-            click: ['press', 'select', 'tap', 'open'],
-            read: ['speak', 'say', 'tell'],
-            stop: ['end', 'quit', 'cancel', 'close'],
-            pause: ['hold', 'wait'],
-            resume: ['continue', 'proceed', 'keep going'],
-            zoom: ['magnify', 'size', 'scale'],
-            find: ['search', 'locate', 'look for'],
-            bigger: ['larger', 'increase', 'enlarge'],
-            smaller: ['decrease', 'reduce', 'shrink']
-        };
     }
 
     /**
@@ -301,70 +624,6 @@ export class CommandNormalizer {
         }
 
         return null;
-    }
-
-    /**
-     * Extract slot values from regex match
-     * Uses both the actionName context and captured groups. More tolerant than exact action-name checks.
-     */
-    extractSlots(match, actionName) {
-        const slots = {};
-
-        // If there are capture groups, try to interpret them:
-        if (match.length > 1) {
-            const g1 = match[1];
-
-            if (g1 !== undefined && g1 !== null) {
-                const g1Str = String(g1).trim();
-
-                // If group looks numeric, it's likely a link index
-                if (/^\d+$/.test(g1Str)) {
-                    slots.linkNumber = parseInt(g1Str, 10);
-                } else {
-                    // If actionName or intent suggests a 'find' type, it's query text
-                    if (actionName.toLowerCase().includes('find') || actionName.toLowerCase().includes('search') || /find|search|look/i.test(actionName)) {
-                        slots.query = g1Str;
-                    } else if (actionName.toLowerCase().includes('click') || actionName.toLowerCase().includes('press') || actionName.toLowerCase().includes('select') || /click|press|select/i.test(actionName)) {
-                        // likely a click target
-                        slots.target = g1Str;
-                    } else if (actionName.toLowerCase().includes('open') && actionName.toLowerCase().includes('link')) {
-                        // fallback: open link with named target
-                        if (/^\d+$/.test(g1Str)) slots.linkNumber = parseInt(g1Str, 10);
-                        else slots.target = g1Str;
-                    } else {
-                        // Generic fallback: attach as 'value'
-                        slots.value = g1Str;
-                    }
-                }
-            }
-        }
-
-        // Add action-specific inferred slots (from actionName itself)
-        try {
-            const lowerAction = String(actionName || '').toLowerCase();
-
-            if (lowerAction.includes('scroll')) {
-                const direction = lowerAction.replace('scroll', '').toLowerCase();
-                // direction could be '' if example was 'scroll' alone
-                if (direction) {
-                    // normalize: remove leading non-letters
-                    const d = direction.replace(/[^a-z]/g, '');
-                    if (d) slots.direction = d;
-                } else {
-                    // If no direction in action name, but match text contains up/down words, try to guess
-                    // (match input not available here; caller may fill)
-                }
-            }
-
-            if (lowerAction.includes('zoom')) {
-                const action = lowerAction.replace('zoom', '').toLowerCase().replace(/[^a-z]/g, '');
-                if (action) slots.action = action;
-            }
-        } catch (e) {
-            // harmless fallback
-        }
-
-        return slots;
     }
 
     /**
@@ -486,28 +745,3 @@ export function getCommandNormalizer() {
     }
     return normalizerInstance;
 }
-
-/* ====== Quick dev-test snippet ======
-Paste into console (after module load) to sanity-check:
-
-try {
-  const n = new CommandNormalizer();
-  console.log('synonyms:', n.synonyms);
-  console.log('intents:', Object.keys(n.commandPatterns));
-  for (const [intent, actions] of Object.entries(n.commandPatterns)) {
-    console.log(`Intent: ${intent}`);
-    for (const [action, regs] of Object.entries(actions)) {
-      console.log(`  ${action}:`, regs.map(r => r.toString()));
-    }
-  }
-
-  // sample tests
-  [['scroll down','navigate'], ['open link 2','link_action'], ['find login button','find_content']].forEach(([utter, _]) => {
-    console.log('TEST:', utter, '=>', n.normalize(utter));
-  });
-} catch (e) {
-  console.error('Normalizer init error', e);
-}
-
-======================================= */
-
