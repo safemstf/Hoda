@@ -1,7 +1,7 @@
 ﻿// content.js - With Command Queue System
 console.log('[Content] Loading with command queue...');
 
-(function() {
+(function () {
   'use strict';
 
   // ============================================================================
@@ -30,7 +30,7 @@ console.log('[Content] Loading with command queue...');
       if (priority) {
         console.log('[Queue] 🚨 Priority command:', command.intent);
         this.queue.unshift(queueItem); // Add to front
-        
+
         // If something is running, request interrupt
         if (this.isProcessing) {
           this.interruptRequested = true;
@@ -69,20 +69,20 @@ console.log('[Content] Loading with command queue...');
       try {
         // Execute command
         await this.executeCommand(item.command);
-        
+
         console.log('[Queue] ✅ Completed:', item.command.intent);
       } catch (err) {
         console.error('[Queue] ❌ Error:', err);
       } finally {
         this.currentCommand = null;
-        
+
         // Check if interrupted
         if (this.interruptRequested) {
           console.log('[Queue] ⚠️ Interrupted, clearing queue');
           this.queue = [];
           this.interruptRequested = false;
         }
-        
+
         // Process next (with small delay to prevent blocking)
         setTimeout(() => this.processNext(), 50);
       }
@@ -101,10 +101,10 @@ console.log('[Content] Loading with command queue...');
     interrupt() {
       console.log('[Queue] 🛑 Interrupt requested');
       this.interruptRequested = true;
-      
+
       // Clear queue
       this.queue = [];
-      
+
       // Stop any ongoing actions
       this.stopCurrentAction();
     }
@@ -227,7 +227,7 @@ console.log('[Content] Loading with command queue...');
           gain.gain.value = 0.25;
           osc.start();
           osc.stop(this.audioContext.currentTime + 0.08);
-          
+
           setTimeout(() => {
             const osc2 = this.audioContext.createOscillator();
             const gain2 = this.audioContext.createGain();
@@ -246,20 +246,20 @@ console.log('[Content] Loading with command queue...');
 
     showOverlay(message, type = 'success') {
       if (!this.settings.visualEnabled) return;
-      
+
       let overlay = document.getElementById('hoda-feedback-overlay');
-      
+
       if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'hoda-feedback-overlay';
         document.body.appendChild(overlay);
       }
 
-      const bgColor = type === 'error' 
-        ? 'rgba(244, 67, 54, 0.95)' 
+      const bgColor = type === 'error'
+        ? 'rgba(244, 67, 54, 0.95)'
         : type === 'warning'
-        ? 'rgba(245, 158, 11, 0.95)'
-        : 'rgba(76, 175, 80, 0.95)';
+          ? 'rgba(245, 158, 11, 0.95)'
+          : 'rgba(76, 175, 80, 0.95)';
 
       Object.assign(overlay.style, {
         position: 'fixed',
@@ -312,6 +312,16 @@ console.log('[Content] Loading with command queue...');
     constructor(feedback) {
       this.feedback = feedback;
       this.linkList = [];
+      // TTS controller (chunked reading)
+      this._tts = {
+        utterance: null,
+        readingText: '',
+        chunks: [],
+        chunkIndex: 0,
+        autoContinue: false,
+        stopped: false
+      };
+      console.log('[Executor] Initialized');
     }
 
     async execute(cmd) {
@@ -343,6 +353,9 @@ console.log('[Content] Loading with command queue...');
           case 'read':
             result = await this.doRead(slots);
             break;
+          case 'find_content':
+            result = await this.doFindContent(slots);
+            break;
           case 'help':
             result = await this.doHelp();
             break;
@@ -364,20 +377,30 @@ console.log('[Content] Loading with command queue...');
       }
     }
 
+    // ---- STOP ----
     async doStop() {
       console.log('[Executor] STOP command');
-      
-      // Interrupt queue
-      if (window.__hoda_queue) {
-        window.__hoda_queue.interrupt();
+
+      // Interrupt queue if present
+      if (window.__hoda_queue && typeof window.__hoda_queue.interrupt === 'function') {
+        try { window.__hoda_queue.interrupt(); } catch (e) { }
       }
+
+      // Stop reading via helper (cancels speechSynthesis & clears chunks)
+      this.stopReading();
 
       return { success: true, message: 'Stopped' };
     }
 
+    // ---- NAVIGATE (supports large and numeric amounts) ----
     async doNavigate(slots) {
       const dir = slots.direction;
       const target = slots.target;
+
+      // Stop reading when navigating
+      if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
+        this.stopReading();
+      }
 
       if (target === 'top') {
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -399,102 +422,266 @@ console.log('[Content] Loading with command queue...');
         return { success: true, message: 'Going forward' };
       }
 
-      const amt = window.innerHeight * 0.5;
-      const y = dir === 'down' ? amt : -amt;
-      window.scrollBy({ top: y, behavior: 'smooth' });
-      
-      return { success: true, message: `Scrolled ${dir}` };
-    }
-
-    async doZoom(slots) {
-      const action = slots.action;
-      let zoom = parseFloat(document.body.style.zoom) || 1.0;
-
-      if (action === 'in' || action === 'bigger') {
-        zoom += 0.1;
-      } else if (action === 'out' || action === 'smaller') {
-        zoom -= 0.1;
-      } else if (action === 'reset' || action === 'normal') {
-        zoom = 1.0;
+      // Determine scroll amount
+      let scrollAmount;
+      if (slots.amount === 'large') {
+        scrollAmount = window.innerHeight * 1.5; // bigger jump
+      } else if (!isNaN(Number(slots.amount))) {
+        // numeric amount in pixels
+        scrollAmount = Number(slots.amount);
+      } else {
+        scrollAmount = window.innerHeight * 0.5; // default
       }
 
-      zoom = Math.max(0.5, Math.min(3.0, zoom));
-      document.body.style.zoom = zoom;
+      const scrollY = dir === 'down' ? scrollAmount : -scrollAmount;
+      window.scrollBy({ top: scrollY, behavior: 'smooth' });
 
-      return { success: true, message: `Zoom: ${Math.round(zoom * 100)}%` };
+      return {
+        success: true,
+        message: `Scrolled ${dir}`
+      };
     }
 
+    // ---- ZOOM ----
+    async doZoom(slots) {
+      const action = slots.action;
+      const amount = parseFloat(slots.amount) || 0.1;
+
+      let currentZoom = parseFloat(document.body.style.zoom) || 1.0;
+
+      if (action === 'in' || action === 'bigger') {
+        currentZoom += amount;
+      } else if (action === 'out' || action === 'smaller') {
+        currentZoom -= amount;
+      } else if (action === 'reset' || action === 'normal') {
+        currentZoom = 1.0;
+      }
+
+      currentZoom = Math.max(0.5, Math.min(3.0, currentZoom));
+      document.body.style.zoom = currentZoom;
+
+      return {
+        success: true,
+        message: `Zoom: ${Math.round(currentZoom * 100)}%`
+      };
+    }
+
+    // ---- LINKS: list, open by number, open by text ----
     async doLinkAction(slots) {
-      if (slots.action === 'list' || !slots.action) {
-        this.linkList = Array.from(document.querySelectorAll('a[href]'));
-        
-        // Show visual list
-        this.showLinkList(this.linkList.slice(0, 10));
-        
+      const action = slots.action;
+      const linkNumber = slots.linkNumber;
+      const target = slots.target;
+
+      // Cache visible links only (ignore display:none)
+      if (action === 'list' || !action) {
+        this.linkList = Array.from(document.querySelectorAll('a[href]')).filter(a => a.offsetParent !== null);
+        const visible = this.linkList.slice(0, 10);
+        this.showLinkList(visible);
         console.log('[Executor] Found', this.linkList.length, 'links');
         return { success: true, message: `Found ${this.linkList.length} links` };
       }
 
-      if (slots.linkNumber) {
-        const idx = slots.linkNumber - 1;
-        if (idx >= 0 && idx < this.linkList.length) {
-          this.linkList[idx].click();
-          return { success: true, message: `Opening link ${slots.linkNumber}` };
+      // Open link by its cached number
+      if (linkNumber !== undefined && linkNumber !== null) {
+        const index = Number(linkNumber) - 1;
+        if (!this.linkList || this.linkList.length === 0) {
+          return { success: false, message: 'No link list cached. Say "list links" first.' };
         }
-        return { success: false, message: `Link ${slots.linkNumber} not found` };
+        if (index >= 0 && index < this.linkList.length) {
+          const link = this.linkList[index];
+          try { link.focus(); link.click(); } catch (e) { window.location.href = link.href; }
+          return { success: true, message: `Opening link ${linkNumber}` };
+        }
+        return { success: false, message: `Link ${linkNumber} not found` };
+      }
+
+      // Open link by text match (case-insensitive)
+      if (target) {
+        const q = target.toLowerCase();
+        const found = Array.from(document.querySelectorAll('a[href]')).find(a =>
+          ((a.textContent || a.getAttribute('aria-label') || a.href) || '').toLowerCase().includes(q)
+        );
+        if (found) {
+          try { found.focus(); found.click(); } catch (e) { window.location.href = found.href; }
+          return { success: true, message: `Opening ${target}` };
+        }
+        return { success: false, message: `Link "${target}" not found` };
       }
 
       return { success: false, message: 'Invalid link action' };
     }
 
-    async doRead(slots) {
-      const action = slots.action;
+    // ---- FIND CONTENT (deterministic search + highlight) ----
+    findAndHighlight(query) {
+      if (!query) return { success: false, message: 'No search query provided' };
 
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node) {
+            if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        }
+      );
+
+      const lowerQuery = query.toLowerCase();
+      let node;
+      while ((node = walker.nextNode())) {
+        const text = node.nodeValue.toLowerCase();
+        const idx = text.indexOf(lowerQuery);
+        if (idx !== -1) {
+          const range = document.createRange();
+          range.setStart(node, idx);
+          range.setEnd(node, idx + query.length);
+
+          // create highlight element
+          let highlight = document.createElement('mark');
+          highlight.style.background = 'yellow';
+          highlight.style.color = 'black';
+          highlight.style.padding = '0 2px';
+
+          // try to surround contents; if it fails (complex DOM), fallback gracefully
+          try {
+            range.surroundContents(highlight);
+          } catch (e) {
+            // fallback: split text node
+            try {
+              const parent = node.parentNode;
+              const before = node.nodeValue.substring(0, idx);
+              const matchText = node.nodeValue.substring(idx, idx + query.length);
+              const after = node.nodeValue.substring(idx + query.length);
+
+              const beforeNode = document.createTextNode(before);
+              const afterNode = document.createTextNode(after);
+              const matchNode = document.createElement('mark');
+              matchNode.textContent = matchText;
+              matchNode.style.background = 'yellow';
+              matchNode.style.color = 'black';
+              matchNode.style.padding = '0 2px';
+
+              parent.insertBefore(beforeNode, node);
+              parent.insertBefore(matchNode, node);
+              parent.insertBefore(afterNode, node);
+              parent.removeChild(node);
+
+              highlight = matchNode; // ensure highlight references the created node
+            } catch (innerErr) {
+              console.error('[Executor] highlight fallback failed', innerErr);
+            }
+          }
+
+          // scroll into view and remove highlight after short delay
+          try {
+            highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch (e) { /* ignore */ }
+
+          setTimeout(() => {
+            try {
+              if (highlight && highlight.parentNode) {
+                const txt = document.createTextNode(highlight.textContent);
+                highlight.parentNode.replaceChild(txt, highlight);
+              }
+            } catch (e) { /* ignore if DOM changed */ }
+          }, 4000);
+
+          return { success: true, message: `Found "${query}"` };
+        }
+      }
+
+      return { success: false, message: `"${query}" not found` };
+    }
+
+    async doFindContent(slots) {
+      const q = (slots.query || '').trim();
+      if (!q) return { success: false, message: 'No search query provided' };
+      try { return this.findAndHighlight(q); } catch (err) { console.error('[Executor] find error', err); return { success: false, message: 'Search error' }; }
+    }
+
+    // ---- READ / TTS (chunked + pause/resume/stop + scope) ----
+    async doRead(slots) {
+      const action = (slots.action || '').toLowerCase();
+      // allow 'scope' to be 'page' (default) or 'this'/'visible' for viewport-only
+      const scope = (slots.scope || slots.target || '').toLowerCase();
+
+      // STOP
       if (action === 'stop') {
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.cancel();
+        if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
+          this.stopReading();
           return { success: true, message: 'Stopped reading' };
         }
         return { success: false, message: 'Not reading' };
       }
 
+      // PAUSE
       if (action === 'pause') {
-        if (window.speechSynthesis.speaking) {
+        if (window.speechSynthesis && window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
           window.speechSynthesis.pause();
           return { success: true, message: 'Paused' };
         }
-        return { success: false, message: 'Not reading' };
+        return { success: false, message: 'Not currently speaking' };
       }
 
+      // RESUME
       if (action === 'resume') {
-        if (window.speechSynthesis.paused) {
+        if (window.speechSynthesis && window.speechSynthesis.paused) {
           window.speechSynthesis.resume();
+          return { success: true, message: 'Resumed' };
+        }
+        // If paused state not present but chunks remain, restart sequential playing
+        if (this._tts.chunks && this._tts.chunkIndex < this._tts.chunks.length) {
+          this._tts.autoContinue = true;
+          if (!window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+            this._speakNextChunk();
+          }
           return { success: true, message: 'Resumed' };
         }
         return { success: false, message: 'Nothing to resume' };
       }
 
-      // Start reading
-      const text = this.extractPageText();
-      if (!text) {
-        return { success: false, message: 'No text found' };
+      // START reading (no action or 'start')
+      // If already speaking, restart (stop then start)
+      if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        this.stopReading();
       }
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.9;
-      utterance.pitch = 1.0;
-      utterance.volume = 0.8;
-      window.speechSynthesis.speak(utterance);
+      // Determine text based on scope
+      let text = '';
+      if (scope === 'this' || scope === 'visible' || scope === 'this page') {
+        text = this.getViewportText();
+      } else {
+        // default: full page
+        text = this.extractPageText();
+      }
 
-      return { success: true, message: 'Reading' };
+      if (!text) return { success: false, message: 'No text found' };
+
+      // Chunk text into sentence-ish chunks
+      const chunks = this.chunkTextToSentences(text, 1600); // tune size if needed
+      if (!chunks || chunks.length === 0) return { success: false, message: 'No readable content' };
+
+      // Initialize _tts state
+      this._tts.chunks = chunks;
+      this._tts.chunkIndex = 0;
+      this._tts.autoContinue = true;
+      this._tts.stopped = false;
+
+      // Start speaking first chunk
+      this._speakNextChunk();
+
+      return { success: true, message: `Reading (${scope === 'this' ? 'visible area' : 'page'})` };
     }
 
+    // ---- HELP & UI helpers ----
     async doHelp() {
-      const helpText = `Voice Commands:
+      const helpText = `
+Voice Commands:
 • Navigation: "scroll down", "scroll up", "go to top"
-• Reading: "read page", "stop reading", "pause"
+• Reading: "read page", "read this", "stop reading", "pause", "resume"
 • Zoom: "zoom in", "zoom out", "reset zoom"
 • Links: "list links", "open link 1"
+• Search: "find login", "search for contact"
 • Stop: Say "stop" to interrupt current action
 
 Activation:
@@ -503,40 +690,169 @@ Activation:
 
 Wake Word (Optional):
 • Say "Hoda" + command (e.g., "Hoda scroll down")
-• Or just say command directly`;
+• Or just say command directly`.trim();
 
       this.showHelpOverlay(helpText);
       console.log('[Executor] Help shown');
       return { success: true, message: 'Help shown' };
     }
 
+    // ------------------ Helpers for reading ------------------
+
+    stopReading() {
+      try {
+        this._tts.stopped = true;
+        this._tts.autoContinue = false;
+        this._tts.chunks = [];
+        this._tts.chunkIndex = 0;
+        if (window.speechSynthesis && (window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
+          window.speechSynthesis.cancel();
+        }
+        this._tts.utterance = null;
+        this._tts.readingText = '';
+        console.log('[Executor] stopReading: cleared TTS state');
+      } catch (e) {
+        console.warn('[Executor] stopReading error', e);
+      }
+    }
+
+    _speakNextChunk() {
+      // safety checks
+      if (this._tts.stopped) return;
+      const idx = this._tts.chunkIndex;
+      if (!this._tts.chunks || idx >= this._tts.chunks.length) {
+        // finished
+        this._tts.utterance = null;
+        this._tts.autoContinue = false;
+        console.log('[Executor] finished all chunks');
+        return;
+      }
+
+      const chunk = this._tts.chunks[idx];
+      const u = new SpeechSynthesisUtterance(chunk);
+      u.rate = 0.95;
+      u.pitch = 1.0;
+      u.volume = 0.9;
+
+      u.onend = () => {
+        // if canceled, onend may still fire; check stopped
+        if (this._tts.stopped) {
+          this._tts.utterance = null;
+          return;
+        }
+        this._tts.chunkIndex += 1;
+        this._tts.utterance = null;
+        if (this._tts.autoContinue && this._tts.chunkIndex < this._tts.chunks.length) {
+          // small delay to allow interruptions
+          setTimeout(() => {
+            if (!this._tts.stopped) this._speakNextChunk();
+          }, 200);
+        } else {
+          // finished or autoContinue false
+          this._tts.autoContinue = false;
+          this._tts.utterance = null;
+        }
+      };
+
+      u.onerror = (e) => {
+        console.error('[Executor] TTS chunk error', e);
+        this._tts.utterance = null;
+        this._tts.autoContinue = false;
+      };
+
+      this._tts.utterance = u;
+      try {
+        window.speechSynthesis.speak(u);
+      } catch (e) {
+        console.error('[Executor] speak failed', e);
+      }
+    }
+
+    // Get text only from elements visible in viewport (simple heuristic)
+    getViewportText() {
+      try {
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+          acceptNode(node) {
+            if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+            const rect = parent.getBoundingClientRect();
+            // If parent intersects viewport
+            if (rect.bottom < 0 || rect.top > window.innerHeight) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          }
+        });
+
+        const parts = [];
+        let n;
+        while ((n = walker.nextNode())) {
+          parts.push(n.nodeValue.trim());
+          if (parts.length >= 200) break; // safety
+        }
+        return parts.join(' ').replace(/\s+/g, ' ').trim();
+      } catch (e) {
+        console.warn('[Executor] getViewportText failed', e);
+        return '';
+      }
+    }
+
+    // Split text into sentence-like chunks up to maxChunkChars
+    chunkTextToSentences(text, maxChunkChars = 1600) {
+      if (!text) return [];
+      const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+      const chunks = [];
+      let current = '';
+      for (const s of sentences) {
+        if ((current + s).length <= maxChunkChars) {
+          current += s + ' ';
+        } else {
+          if (current.trim()) chunks.push(current.trim());
+          if (s.length > maxChunkChars) {
+            for (let i = 0; i < s.length; i += maxChunkChars) {
+              chunks.push(s.substring(i, i + maxChunkChars).trim());
+            }
+            current = '';
+          } else {
+            current = s + ' ';
+          }
+        }
+      }
+      if (current.trim()) chunks.push(current.trim());
+      return chunks;
+    }
+
+    // ------------------ Existing helpers (unchanged) ------------------
+
     extractPageText() {
       const main = document.querySelector('main, article, .content, [role="main"]');
       const target = main || document.body;
+
+      // clone and remove non-content elements
       const clone = target.cloneNode(true);
       clone.querySelectorAll('script, style, nav, footer').forEach(el => el.remove());
+
       return clone.textContent.trim().substring(0, 5000);
     }
 
     showLinkList(links) {
       const overlay = this.createOverlay('hoda-link-list');
-      
+
       overlay.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
-          📎 Available Links
-        </div>
-        ${links.map((link, i) => {
-          const text = link.textContent.trim() || link.href;
-          return `
-            <div style="margin: 5px 0; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 4px;">
-              <strong>${i + 1}.</strong> ${text.substring(0, 60)}
-            </div>
-          `;
-        }).join('')}
-        <div style="margin-top: 10px; font-size: 12px; opacity: 0.8;">
-          Say "open link [number]" to open
-        </div>
-      `;
+      <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+        📎 Available Links
+      </div>
+      ${links.map((link, i) => {
+        const text = (link.textContent || link.getAttribute('aria-label') || link.href || '').trim();
+        return `
+          <div style="margin: 5px 0; padding: 5px; background: rgba(255,255,255,0.06); border-radius: 4px;">
+            <strong>${i + 1}.</strong> ${text.substring(0, 120)}
+          </div>
+        `;
+      }).join('')}
+      <div style="margin-top: 10px; font-size: 12px; opacity: 0.9;">
+        Say "open link [number]" to open
+      </div>
+    `;
 
       overlay.style.maxHeight = '400px';
       overlay.style.overflowY = 'auto';
@@ -544,15 +860,15 @@ Wake Word (Optional):
 
     showHelpOverlay(text) {
       const overlay = this.createOverlay('hoda-help');
-      
+
       overlay.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
-          🎤 Hoda Voice Commands
-        </div>
-        <pre style="white-space: pre-wrap; font-family: system-ui; font-size: 13px; line-height: 1.6;">
+      <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+        🎤 Hoda Voice Commands
+      </div>
+      <pre style="white-space: pre-wrap; font-family: system-ui; font-size: 13px; line-height: 1.6;">
 ${text}
-        </pre>
-      `;
+      </pre>
+    `;
 
       overlay.style.maxWidth = '500px';
       overlay.style.maxHeight = '600px';
@@ -565,7 +881,7 @@ ${text}
 
       const overlay = document.createElement('div');
       overlay.id = id;
-      
+
       Object.assign(overlay.style, {
         position: 'fixed',
         top: '80px',
@@ -574,16 +890,17 @@ ${text}
         borderRadius: '12px',
         backgroundColor: 'rgba(0, 0, 0, 0.92)',
         color: 'white',
-        fontFamily: 'system-ui, sans-serif',
+        fontFamily: 'system-ui, -apple-system, sans-serif',
         fontSize: '14px',
         zIndex: '2147483646',
         boxShadow: '0 8px 24px rgba(0, 0, 0, 0.4)',
         maxWidth: '400px',
-        border: '1px solid rgba(255, 255, 255, 0.1)'
+        border: '1px solid rgba(255, 255, 255, 0.06)'
       });
 
       document.body.appendChild(overlay);
 
+      // Auto-hide
       setTimeout(() => {
         overlay.style.opacity = '0';
         overlay.style.transition = 'opacity 0.5s';
@@ -620,27 +937,27 @@ ${text}
 
     if (msg.type === 'EXECUTE_COMMAND') {
       console.log('[Content] Adding to queue:', msg.command.intent);
-      
+
       // Check if priority command (stop, cancel)
       const isPriority = queue.isPriorityCommand(msg.command.intent);
-      
+
       // Add to queue
       const commandId = queue.enqueue(msg.command, isPriority);
-      
-      sendResponse({ 
-        ok: true, 
+
+      sendResponse({
+        ok: true,
         queued: true,
         commandId: commandId,
         queueStatus: queue.getStatus()
       });
-      
+
       return true;
     }
 
     if (msg.type === 'GET_QUEUE_STATUS') {
-      sendResponse({ 
-        ok: true, 
-        status: queue.getStatus() 
+      sendResponse({
+        ok: true,
+        status: queue.getStatus()
       });
       return true;
     }
@@ -674,13 +991,13 @@ ${text}
     feedback,
     executor,
     queue,
-    
+
     test() {
       console.log('[Content] Testing...');
       feedback.playBeep('success');
       feedback.showOverlay('✓ Queue system working!', 'success');
     },
-    
+
     testQueue() {
       console.log('[Content] Testing queue...');
       queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 1' });
@@ -688,7 +1005,7 @@ ${text}
       queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 3' });
       console.log('Queue status:', queue.getStatus());
     },
-    
+
     testStop() {
       console.log('[Content] Testing stop...');
       queue.enqueue({ intent: 'stop', original: 'stop' }, true);
