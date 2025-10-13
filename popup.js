@@ -164,45 +164,45 @@ const RATE_LIMIT = {
   requests: [],
   dailyCount: 0,
   lastReset: Date.now(),
-  
+
   checkDailyReset() {
     const now = Date.now();
     const dayInMs = 86400000;
-    
+
     if (now - this.lastReset > dayInMs) {
       console.log('[RateLimit] Daily quota reset');
       this.dailyCount = 0;
       this.lastReset = now;
-      chrome.storage.local.set({ 
+      chrome.storage.local.set({
         rateLimitReset: now,
-        dailyUsage: 0 
+        dailyUsage: 0
       });
     }
   },
-  
+
   canMakeRequest() {
     this.checkDailyReset();
     const now = Date.now();
-    
+
     this.requests = this.requests.filter(time => now - time < 60000);
     if (this.requests.length >= this.maxRequestsPerMinute) {
       console.warn('[RateLimit] ⚠️ Minute limit reached');
       return { ok: false, reason: 'minute_limit' };
     }
-    
+
     if (this.dailyCount >= this.maxRequestsPerDay) {
       console.warn('[RateLimit] ⚠️ Daily limit reached');
       return { ok: false, reason: 'daily_limit' };
     }
-    
+
     this.requests.push(now);
     this.dailyCount++;
     chrome.storage.local.set({ dailyUsage: this.dailyCount });
-    
+
     console.log(`[RateLimit] ✅ ${this.dailyCount}/${this.maxRequestsPerDay} today`);
     return { ok: true };
   },
-  
+
   getStatus() {
     this.checkDailyReset();
     return {
@@ -266,7 +266,7 @@ console.log('[Popup] Resolver initialized. LLM enabled:', resolver.config.enable
 // ============================================================================
 function initializeSpeechRecognition() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  
+
   if (!SpeechRecognition) {
     console.error('[Popup] Web Speech API not supported');
     updateStatus('⚠️ Speech recognition not supported');
@@ -306,7 +306,7 @@ function initializeSpeechRecognition() {
 
   recognition.onerror = (event) => {
     console.error('[Popup] Speech error:', event.error);
-    
+
     if (event.error === 'not-allowed') {
       updateStatus('⚠️ Microphone permission denied');
       showCommandResult('Please allow microphone access', true);
@@ -328,10 +328,10 @@ function initializeSpeechRecognition() {
 
   recognition.onend = () => {
     console.log('[Popup] Recognition ended');
-    
+
     if (state.isListening && state.networkErrorCount === 0) {
       const limitCheck = RATE_LIMIT.canMakeRequest();
-      
+
       if (limitCheck.ok) {
         try {
           recognition.start();
@@ -353,7 +353,7 @@ function initializeSpeechRecognition() {
   recognition.onstart = () => {
     console.log('[Popup] Recognition started');
     state.networkErrorCount = 0;
-    
+
     const status = RATE_LIMIT.getStatus();
     updateStatus(`Listening... 🎤 (${status.remaining} left)`);
     updateQuotaUI();
@@ -386,16 +386,16 @@ async function handleFinalTranscript(text, confidence) {
 
   // STEP 4: Extract command text
   const commandText = wakeResult.command || text;
-  
+
   // STEP 5: Resolve intent using IntentResolver (with context!)
   const normalized = await resolver.resolve(commandText, {
     previousCommand: state.lastCommand,
     currentUrl: await getCurrentTabUrl(),
     timestamp: Date.now()
   });
-  
+
   console.log('[Popup] Resolved:', normalized.intent, 'from:', normalized.source);
-  
+
   // Save as last command for context
   state.lastCommand = {
     intent: normalized.intent,
@@ -403,7 +403,7 @@ async function handleFinalTranscript(text, confidence) {
     text: commandText,
     timestamp: Date.now()
   };
-  
+
   // STEP 6: Update stats
   state.stats.totalCommands++;
   if (normalized.intent !== 'unknown') {
@@ -418,25 +418,25 @@ async function handleFinalTranscript(text, confidence) {
     const suggestionText = suggestions.length > 0
       ? `Try: ${suggestions[0].example}`
       : 'Say "help" for commands';
-    
+
     showCommandResult(`❓ Unknown: "${commandText}". ${suggestionText}`, true);
   } else {
     // Show what was recognized
     const prefix = wakeResult.type === 'wake_and_command' ? '🔔 ' : '';
     const sourceTag = normalized.source === 'llm' ? ' [AI]' : '';
     showCommandResult(`${prefix}✓ "${commandText}"${sourceTag}`, false);
-    
+
     // Execute command
     executeCommand(normalized);
   }
 
   // STEP 8: Save to storage
-  saveTranscript({ 
-    text, 
-    confidence, 
+  saveTranscript({
+    text,
+    confidence,
     intent: normalized.intent,
     source: normalized.source,
-    timestamp: Date.now() 
+    timestamp: Date.now()
   });
 }
 
@@ -456,11 +456,11 @@ async function executeCommand(normalized) {
       type: 'EXECUTE_COMMAND',
       command: normalized
     });
-    
+
     console.log('[Popup] ✅ Command sent successfully');
   } catch (err) {
     console.error('[Popup] ❌ Send failed:', err);
-    
+
     if (err.message.includes('Could not establish connection')) {
       console.log('[Popup] 💉 Injecting content script...');
       try {
@@ -468,7 +468,7 @@ async function executeCommand(normalized) {
           target: { tabId: state.currentTabId },
           files: ['content.js']
         });
-        
+
         // Retry after injection
         setTimeout(async () => {
           await chrome.tabs.sendMessage(state.currentTabId, {
@@ -489,7 +489,7 @@ async function executeCommand(normalized) {
 // ============================================================================
 async function startListening() {
   console.log('[Popup] Starting...');
-  
+
   const limitCheck = RATE_LIMIT.canMakeRequest();
   if (!limitCheck.ok) {
     const status = RATE_LIMIT.getStatus();
@@ -502,7 +502,7 @@ async function startListening() {
     }
     return;
   }
-  
+
   const tabOk = await checkActiveTab();
   if (!tabOk) return;
 
@@ -514,14 +514,14 @@ async function startListening() {
   try {
     state.recognition.start();
     state.isListening = true;
-    
+
     UI.statusText.classList.add('active');
     UI.micBtn.classList.add('listening');
     UI.micBtn.textContent = '🔴';
-    
+
     UI.transcript.textContent = 'Listening...';
     UI.transcript.classList.remove('empty');
-    
+
     console.log('[Popup] ✅ Started');
   } catch (err) {
     console.error('[Popup] Start failed:', err);
@@ -531,7 +531,7 @@ async function startListening() {
 
 function stopListening() {
   console.log('[Popup] Stopping...');
-  
+
   if (state.recognition) {
     try {
       state.recognition.stop();
@@ -539,17 +539,17 @@ function stopListening() {
       console.error('[Popup] Stop error:', e);
     }
   }
-  
+
   state.isListening = false;
   state.networkErrorCount = 0;
   wakeWordDetector.sleep();
-  
+
   const status = RATE_LIMIT.getStatus();
   updateStatus(`Stopped - ${status.remaining}/${status.dailyLimit} left`);
   UI.statusText.classList.remove('active');
   UI.micBtn.classList.remove('listening');
   UI.micBtn.textContent = '🎤';
-  
+
   UI.transcript.textContent = 'Click mic to start';
   UI.transcript.classList.add('empty');
 }
@@ -559,41 +559,50 @@ function stopListening() {
 // ============================================================================
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('[Popup] Initializing...');
-  
+
   // Load rate limit data from storage FIRST
   const stored = await chrome.storage.local.get(['rateLimitReset', 'dailyUsage', 'wakeWordRequired']);
-  
+
   if (stored.rateLimitReset) {
     RATE_LIMIT.lastReset = stored.rateLimitReset;
     RATE_LIMIT.dailyCount = stored.dailyUsage || 0;
     console.log('[Popup] Loaded usage from storage:', RATE_LIMIT.dailyCount);
+  } else {
+    // ✅ FIX: Initialize on first run
+    console.log('[Popup] First run - initializing storage');
+    RATE_LIMIT.lastReset = Date.now();
+    RATE_LIMIT.dailyCount = 0;
+    await chrome.storage.local.set({
+      rateLimitReset: RATE_LIMIT.lastReset,
+      dailyUsage: 0
+    });
   }
-  
+
   RATE_LIMIT.checkDailyReset();
-  
+
   // Update quota UI immediately with loaded data
   updateQuotaUI();
-  
+
   // Load wake word setting
   if (stored.wakeWordRequired !== undefined) {
     wakeWordDetector.setWakeWordRequired(stored.wakeWordRequired);
   }
-  
+
   await checkActiveTab();
   await loadStats();
   setupEventListeners();
-  
+
   const hasSupport = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-  
+
   if (hasSupport) {
     const status = RATE_LIMIT.getStatus();
     updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
     UI.micBtn.disabled = false;
-    
+
     // Log resolver info
     console.log('[Popup] Resolver stats:', resolver.getStats());
     console.log('[Popup] Rate limit status:', status);
-    
+
     if (status.remaining < 5) {
       showCommandResult(`⚠️ Only ${status.remaining} left today!`, true);
     }
@@ -608,13 +617,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================================
 function updateQuotaUI() {
   const status = RATE_LIMIT.getStatus();
-  
+
   console.log('[Popup] Updating quota UI:', status);
-  
+
   if (UI.quotaBar) {
     const percent = (status.remaining / status.dailyLimit) * 100;
     UI.quotaBar.style.width = percent + '%';
-    
+
     // Change color based on remaining
     if (percent < 25) {
       UI.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
@@ -624,7 +633,7 @@ function updateQuotaUI() {
       UI.quotaBar.style.background = 'linear-gradient(90deg, #10b981, rgba(255, 255, 255, 0.9))';
     }
   }
-  
+
   if (UI.quotaText) {
     UI.quotaText.textContent = `${status.remaining}/${status.dailyLimit} requests left`;
   }
@@ -732,13 +741,13 @@ function setupEventListeners() {
       stopListening();
     }
   });
-  
+
   // Keyboard shortcut: Ctrl+Shift+H (Cmd+Shift+H on Mac)
   document.addEventListener('keydown', async (e) => {
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
       e.preventDefault();
       console.log('[Popup] 🎹 Keyboard shortcut activated');
-      
+
       if (!state.isListening) {
         await startListening();
       } else {
@@ -746,51 +755,51 @@ function setupEventListeners() {
       }
     }
   });
-  
+
   // Quick action buttons
   document.getElementById('btnScrollDown')?.addEventListener('click', async () => {
     await checkActiveTab();
     if (state.currentTabId) {
-      executeCommand({ 
-        intent: 'navigate', 
-        slots: { direction: 'down' }, 
-        original: 'scroll down' 
+      executeCommand({
+        intent: 'navigate',
+        slots: { direction: 'down' },
+        original: 'scroll down'
       });
       showCommandResult('✓ Scrolled down', false);
     }
   });
-  
+
   document.getElementById('btnScrollUp')?.addEventListener('click', async () => {
     await checkActiveTab();
     if (state.currentTabId) {
-      executeCommand({ 
-        intent: 'navigate', 
-        slots: { direction: 'up' }, 
-        original: 'scroll up' 
+      executeCommand({
+        intent: 'navigate',
+        slots: { direction: 'up' },
+        original: 'scroll up'
       });
       showCommandResult('✓ Scrolled up', false);
     }
   });
-  
+
   document.getElementById('btnListLinks')?.addEventListener('click', async () => {
     await checkActiveTab();
     if (state.currentTabId) {
-      executeCommand({ 
-        intent: 'link_action', 
-        slots: { action: 'list' }, 
-        original: 'list links' 
+      executeCommand({
+        intent: 'link_action',
+        slots: { action: 'list' },
+        original: 'list links'
       });
       showCommandResult('✓ Listing links', false);
     }
   });
-  
+
   document.getElementById('btnHelp')?.addEventListener('click', async () => {
     await checkActiveTab();
     if (state.currentTabId) {
       executeCommand({ intent: 'help', original: 'help' });
     }
   });
-  
+
   document.getElementById('openTests')?.addEventListener('click', (e) => {
     e.preventDefault();
     chrome.tabs.create({ url: chrome.runtime.getURL('tests/index.html') });
@@ -809,14 +818,14 @@ window.__hoda_popup = {
   resolver,
   wakeWordDetector,
   state,
-  
+
   // Show resolver stats
   showStats() {
     console.log('Resolver Stats:', resolver.getStats());
     console.log('State:', state);
     console.log('Wake Word:', wakeWordDetector.getState());
   },
-  
+
   // Test LLM integration (next sprint)
   async testLLM() {
     console.log('Testing LLM integration...');
