@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoda Voice - Command Recognition Test</title>
+    <link rel="stylesheet" href="voice-commands-tests.css">
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Hoda Voice Commands</h1>
+            <p class="subtitle">Task 2: Command Recognition Testing</p>
+        </div>
+
+        <!-- Network Warning -->
+        <div class="network-warning">
+            <div class="icon">⚠️</div>
+            <div class="text">
+                <div class="title">Internet Connection Required</div>
+                <div class="message">Web Speech API uses Google's cloud service. Make sure you're connected to the
+                    internet before starting.</div>
+            </div>
+        </div>
+
+        <div class="voice-status">
+            <button class="voice-button" id="voice-btn">🎤</button>
+            <div class="status-text" id="status-text">Ready to Listen</div>
+            <div class="status-subtext" id="status-subtext">Click the microphone to start</div>
+
+            <div class="transcript-box">
+                <div class="transcript-label">🎙️ What You're Saying</div>
+                <div class="transcript-text" id="transcript-text">Waiting for voice input...</div>
+            </div>
+
+            <div class="recognition-feedback" id="feedback">
+                <div class="feedback-title" id="feedback-title">✓ Command Recognized</div>
+                <div class="feedback-details" id="feedback-details"></div>
+            </div>
+
+            <!-- Recent Commands Log -->
+            <div class="command-log-container" id="command-log">
+                <div class="command-log-label">Recent Commands</div>
+                <div class="command-log-list" id="command-log-list"></div>
+            </div>
+        </div>
+
+        <div class="command-panel" id="command-panel">
+            <!-- Commands will be dynamically loaded from INTENT_SCHEMAS -->
+        </div>
+
+        <div class="stats-panel">
+            <h2 class="section-title">📊 Recognition Statistics</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-total">0</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-recognized">0</div>
+                    <div class="stat-label">Recognized</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-failed">0</div>
+                    <div class="stat-label">Failed</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value" id="stat-confidence">0%</div>
+                    <div class="stat-label">Avg Confidence</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="voice-commands-tests.js"></script>
+</body>
+
+</html>
