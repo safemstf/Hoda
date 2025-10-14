@@ -1,174 +1,118 @@
-# Hoda Voice Assistant
+# WebLLM NLP Sandbox
 
-![License](https://img.shields.io/badge/License-Proprietary-red?style=for-the-badge)
-![Issues](https://img.shields.io/github/issues/safemstf/Hoda?style=for-the-badge)
-![Node.js](https://img.shields.io/badge/Node-18.x-green?style=for-the-badge)
-![TypeScript](https://img.shields.io/badge/TypeScript-4.x-blue?style=for-the-badge)
+A browser-based sandbox for testing WebLLM's natural language processing capabilities, specifically for converting natural language commands into structured JSON intents.
 
+## Overview
 
-## Contributors
-1. Safe Mustafa
----
+This sandbox validates that WebLLM can:
+1. Run locally in the browser
+2. Parse natural-language commands into structured JSON intents  
+3. Respond under 500ms (performance measurement ready)
 
-## Quick Start Guide
+## Setup
 
-Get Hoda Voice Assistant running in 5 minutes.
+### Prerequisites
+- Modern web browser with ES6 module support
+- Local HTTP server (for CORS compliance)
 
----
+### Installation
 
-## Super Quick Setup
+1. **Clone and navigate to the sandbox:**
+   ```bash
+   cd sandbox/webllm
+   ```
 
-### 1. Install Extension
+2. **Start a local HTTP server:**
+   
+   **Option A: Using Python (if available)**
+   ```bash
+   python3 -m http.server 8000
+   ```
+   
+   **Option B: Using Node.js http-server**
+   ```bash
+   npm install -g http-server
+   http-server -p 8000
+   ```
+   
+   **Option C: Using PHP (if available)**
+   ```bash
+   php -S localhost:8000
+   ```
 
-```bash
-# Clone the repository
-git clone https://github.com/safemstf/Hoda.git
+3. **Open in browser:**
+   ```
+   http://localhost:8000
+   ```
+
+## Usage
+
+1. **Wait for model loading** - The page will show "Loading model..." and then "Model loaded ✅" with details
+2. **Test commands** - Use the text input or click the test buttons
+3. **View results** - See both raw model output and parsed JSON intent
+
+## File Structure
+
+```
+/sandbox/webllm/
+├── index.html          # Main webpage with UI
+├── main.js             # WebLLM integration and command processing
+├── test-data.js        # Sample test commands
+└── README.md           # This file
 ```
 
-Or download the ZIP and extract it.
+## Expected Outputs
 
-**Load in browser:**
+### Example Commands and Expected JSON:
 
-1. Open `chrome://extensions/`
-2. Toggle **Developer mode** ON
-3. Click **Load unpacked**
-4. Select the **Hoda** folder
-5. Click **Select Folder**
-6. Extension installed!
+| Input | Expected JSON Output |
+|-------|---------------------|
+| "scroll down" | `{"intent":"scroll","direction":"down"}` |
+| "find login" | `{"intent":"find","target":"login"}` |
+| "read this" | `{"intent":"read","target":"this"}` |
+| "zoom in" | `{"intent":"zoom","direction":"in"}` |
+| "help me" | `{"intent":"help"}` |
 
-### 2. Grant Permissions
+### Model Information Displayed:
+- Model ID (e.g., "Phi-2-q4f16_1")
+- Load time in seconds
+- Memory usage (if available)
 
-1. Click the Hoda icon in the browser toolbar
-2. Click "Allow" when asked for microphone
-3. Microphone ready!
+## Technical Details
 
-### 3. Try Your First Command
-
-1. Click the mic button in the popup
-2. Wait for it to turn red
-3. Say: **"scroll down"**
-4. It works!
-
----
-
-## Learn 5 Essential Commands
-
-### Navigation
-- `"scroll down"` → Scroll page down
-- `"go to top"` → Jump to top
-
-### Zoom
-- `"zoom in"` → Make text bigger
-- `"reset zoom"` → Back to normal
-
-### Links
-- `"list links"` → Show all links
-- `"open link 1"` → Open first link
-
-### Reading
-- `"read page"` → Read content aloud
-- `"stop"` → Stop everything
-
-### Help
-- `"help"` → See all commands
-
----
-
-## Pro Tips
-
-- **Keyboard Shortcut:** `Ctrl+Shift+H` (`Cmd+Shift+H` on Mac) to activate listening without clicking
-- **Wake Word (Optional):** Say "Hoda" before commands
-  - `"Hoda scroll down"`
-  - `"Hoda zoom in"`
-- **Natural Language:** Speak naturally; e.g., "scroll down", "go down", "page down" all work
-
----
-
-## Quick Settings
-
-Click **Open Test Page** in popup to configure:
-
-- **Audio Feedback** - Beeps on/off
-- **Visual Feedback** - Overlays on/off
-- **Wake Word** - Required or optional
-
----
+- **Model**: Attempts to load `Phi-2-q4f16_1` first, falls back to other lightweight models
+- **CDN**: Uses `https://esm.run/webllm` for WebLLM import
+- **Prompt Engineering**: Structured prompt template for consistent JSON output
+- **Error Handling**: Graceful fallbacks and clear error messages
 
 ## Troubleshooting
 
-### Nothing happens when speaking?
+### Common Issues:
 
-**Check:**
-- Mic button is red
-- Microphone is allowed
-- Background noise is low
+1. **CORS Errors**: Make sure you're serving via HTTP server, not opening file directly
+2. **Model Loading Fails**: Check browser console for specific error messages
+3. **Slow Performance**: Model loading can take 10-30 seconds depending on connection
+4. **Memory Issues**: Try refreshing if browser becomes unresponsive
 
-**Fix:**
-- Click mic again
-- Use keyboard shortcut: `Ctrl+Shift+H`
-- Check daily quota (40 requests/day)
+### Browser Compatibility:
+- Chrome/Chromium (recommended)
+- Firefox
+- Safari (may have limitations)
+- Edge
 
-### Network error?
+## Performance Notes
 
-**Cause:** quota reached
+- First model load: ~10-30 seconds
+- Subsequent commands: Target <500ms response time
+- Memory usage: Varies by model (~100-500MB)
 
-**Fix:** wait 24 hours or check settings
+## Development
 
-### Commands not working?
+To modify or extend:
 
-**Won't work on:** `chrome://`, `edge://`, browser settings, local files
+1. **Add new test commands**: Edit `test-data.js`
+2. **Modify prompt template**: Update the prompt in `processCommand()` function
+3. **Change model**: Modify the `modelOptions` array in `loadModel()`
+4. **UI improvements**: Edit `index.html` styles and structure
 
-**Works on:** HTTP/HTTPS websites
 
----
-
-## What's Next?
-
-- **Learn more commands:** say "help" or check README
-- **Customize settings:** enable/disable audio feedback, toggle overlays
-- **Explore advanced:** multi-step commands, AI-powered understanding, custom commands (coming soon)
-
----
-
-## Common Use Cases
-
-### Reading Articles
-1. `"read page"` → Start reading
-2. `"pause"` → Take a break
-3. `"resume"` → Continue
-4. `"stop"` → Stop reading
-
-### Quick Navigation
-1. `"list links"` → See all links
-2. `"open link 3"` → Click third link
-3. `"go back"` → Return to previous page
-
-### Accessibility
-1. `"zoom in"` → Larger text
-2. `"read page"` → Listen instead of read
-3. `"scroll down"` → Hands-free browsing
-
----
-
-## Did You Know?
-
-- **Quota resets daily:** 40 requests per 24 hours
-- **Commands queue:** multiple commands execute in order
-- **Context aware:** remembers last command
-- **Offline ready:** most code runs locally
-- **Privacy first:** no data sent to servers
-
----
-
-## Need Help?
-
-- **Commands list:** say "help" or check README
-- **Not working:** see troubleshooting section
-- **Bug found:** [Report on GitHub](https://github.com/safemstf/Hoda/issues)
-- **Feature idea:** open a feature request
-
----
-
-You're ready! Explore all commands, customize settings, and contribute on GitHub.
-
-**Made with ❤️ for accessibility**

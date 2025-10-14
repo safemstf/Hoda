@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebLLM NLP Sandbox - Demo Mode</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status {
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+            font-weight: 500;
+        }
+        .status.loading {
+            background-color: #e3f2fd;
+            color: #1976d2;
+            border-left: 4px solid #1976d2;
+        }
+        .status.success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+        .status.error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+        .input-section {
+            margin: 30px 0;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #1976d2;
+        }
+        button {
+            padding: 12px 24px;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        button:hover:not(:disabled) {
+            background-color: #1565c0;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .output {
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #6c757d;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            margin-top: 20px;
+        }
+        .test-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        .test-btn {
+            padding: 8px 16px;
+            background-color: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .test-btn:hover {
+            background-color: #e0e0e0;
+        }
+        .demo-info {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 WebLLM NLP Sandbox - Demo Mode</h1>
+        
+        <div class="demo-info">
+            <strong>Demo Mode:</strong> This version simulates WebLLM behavior for testing the UI and workflow. 
+            It demonstrates how the real WebLLM integration will work once the model loads successfully.
+        </div>
+        
+        <div id="status" class="status loading">
+            Loading model...
+        </div>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <input type="text" id="commandInput" placeholder="Enter a natural language command (e.g., 'scroll down')" disabled>
+                <button id="processBtn" disabled>Process</button>
+            </div>
+            
+            <div class="test-buttons">
+                <button class="test-btn" onclick="loadTestCommand('scroll down')">scroll down</button>
+                <button class="test-btn" onclick="loadTestCommand('go down')">go down</button>
+                <button class="test-btn" onclick="loadTestCommand('read this')">read this</button>
+                <button class="test-btn" onclick="loadTestCommand('find login')">find login</button>
+                <button class="test-btn" onclick="loadTestCommand('zoom in')">zoom in</button>
+                <button class="test-btn" onclick="loadTestCommand('help me')">help me</button>
+            </div>
+        </div>
+        
+        <div id="output" class="output" style="display: none;"></div>
+    </div>
+
+    <script>
+        // Demo mode - simulates WebLLM behavior
+        let modelLoaded = false;
+        let loadStartTime = null;
+
+        // DOM elements
+        const statusEl = document.getElementById('status');
+        const commandInput = document.getElementById('commandInput');
+        const processBtn = document.getElementById('processBtn');
+        const outputEl = document.getElementById('output');
+
+        // Update status display
+        function updateStatus(message, type = 'loading') {
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Show output
+        function showOutput(content) {
+            outputEl.textContent = content;
+            outputEl.style.display = 'block';
+        }
+
+        // Simulate model loading
+        async function loadModel() {
+            try {
+                updateStatus('Loading WebLLM...', 'loading');
+                
+                // Simulate loading time
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                updateStatus('Initializing model...', 'loading');
+                loadStartTime = performance.now();
+                
+                // Simulate model initialization
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                updateStatus('Loading Phi-2-q4f16_1...', 'loading');
+                
+                // Simulate model download
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                
+                const loadTime = ((performance.now() - loadStartTime) / 1000).toFixed(2);
+                
+                // Get memory usage if available
+                let memoryInfo = '';
+                if (performance.memory) {
+                    const usedMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1);
+                    memoryInfo = ` | Memory: ${usedMB}MB`;
+                }
+                
+                updateStatus(`Model loaded ✅ (Demo Mode)\nModel: Phi-2-q4f16_1\nLoad time: ${loadTime}s${memoryInfo}`, 'success');
+                
+                // Enable UI
+                commandInput.disabled = false;
+                processBtn.disabled = false;
+                modelLoaded = true;
+                
+                console.log(`Model loaded: Phi-2-q4f16_1 (Demo Mode)`);
+                console.log(`Load time: ${loadTime}s`);
+                
+            } catch (error) {
+                console.error('Model loading failed:', error);
+                updateStatus(`Model loading failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Simulate command processing
+        async function processCommand(text) {
+            if (!modelLoaded) {
+                throw new Error('Model not loaded');
+            }
+            
+            // Simulate processing time
+            await new Promise(resolve => setTimeout(resolve, 200 + Math.random() * 300));
+            
+            // Simple rule-based intent parsing for demo
+            const intents = {
+                'scroll down': { intent: 'scroll', direction: 'down' },
+                'go down': { intent: 'scroll', direction: 'down' },
+                'move page down': { intent: 'scroll', direction: 'down' },
+                'read this': { intent: 'read', target: 'this' },
+                'what does this say': { intent: 'read', target: 'this' },
+                'find login': { intent: 'find', target: 'login' },
+                'locate sign in': { intent: 'find', target: 'sign in' },
+                'open link': { intent: 'open', target: 'link' },
+                'zoom in': { intent: 'zoom', direction: 'in' },
+                'help me': { intent: 'help' }
+            };
+            
+            const lowerText = text.toLowerCase();
+            let parsedIntent = { intent: 'unknown', text: text };
+            
+            // Find matching intent
+            for (const [key, value] of Object.entries(intents)) {
+                if (lowerText.includes(key)) {
+                    parsedIntent = value;
+                    break;
+                }
+            }
+            
+            // Simulate raw model response
+            const rawResponse = `{"intent":"${parsedIntent.intent}"${parsedIntent.direction ? `,"direction":"${parsedIntent.direction}"` : ''}${parsedIntent.target ? `,"target":"${parsedIntent.target}"` : ''}}`;
+            
+            return {
+                input: text,
+                rawResponse: rawResponse,
+                parsedIntent: parsedIntent
+            };
+        }
+
+        // Handle form submission
+        async function handleSubmit() {
+            const command = commandInput.value.trim();
+            if (!command) return;
+            
+            try {
+                processBtn.disabled = true;
+                updateStatus('Processing command...', 'loading');
+                
+                const result = await processCommand(command);
+                
+                const output = `Input: "${result.input}"
+
+Raw Response:
+${result.rawResponse}
+
+Parsed Intent:
+${JSON.stringify(result.parsedIntent, null, 2)}`;
+                
+                showOutput(output);
+                updateStatus('Command processed ✅', 'success');
+                
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus(`Error: ${error.message}`, 'error');
+                showOutput(`Error processing command: ${error.message}`);
+            } finally {
+                processBtn.disabled = false;
+            }
+        }
+
+        // Load test command into input
+        window.loadTestCommand = function(command) {
+            commandInput.value = command;
+            commandInput.focus();
+        };
+
+        // Event listeners
+        processBtn.addEventListener('click', handleSubmit);
+        commandInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                handleSubmit();
+            }
+        });
+
+        // Initialize
+        loadModel();
+    </script>
+</body>
+</html>
+
+
