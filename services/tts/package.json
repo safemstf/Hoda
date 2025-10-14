@@ -1,8 +1,24 @@
-﻿{
+{
   "name": "unt-csce5430-tts",
   "version": "0.1.0",
   "private": true,
+  "main": "src/index.js",
   "scripts": {
-    "test": "echo "no tests" && exit 0"
+    "demo": "node src/demo.js",
+    "test": "jest --runInBand"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "jsdom": "^27.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/src/tests/**/*.test.js"
+    ]
   }
 }
