@@ -7,7 +7,8 @@
 
 
 ## Contributors
-1. Safe Mustafa      3. Fatema Khatun                       4.Sai Shishir Koppula       5. Arkaan Sh3ikh
+1. Safe Mustafa      3. Fatema Khatun                       4.Sai Shishir Koppula       5. Arkaan Sh3ikh 6.sumanth0221
+   
 ---
 
 ## Quick Start Guide
