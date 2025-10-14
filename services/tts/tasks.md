@@ -1,73 +1,118 @@
-# TTS — Developer Tasks and Integration Guide
+# Issue #2: Text-to-Speech Engine
 
-This document turns the product sprint plan into concrete developer tasks, mapping implementation to the format contract in `services/webllm/src/formats.js` so the rest of the system can safely consume TTS outputs.
+## User Story
+As a visually impaired user, I want the system to speak responses back to me in a clear, natural voice so I can hear confirmations, feedback, and information without looking at the screen.
 
-Goals covered here:
-- Implement a small, maintainable TTS service API that works in browser extension environments (Edge/chrome) and has a Node-friendly demo fallback.
-- Provide confirmation phrases and a semantic reader compatible with the TTS output format used by `webllm`.
+## Priority
+P1 (Critical)
 
-Files added with a minimal implementation (see `src/`):
-- `src/index.js` — exports a simple API: { speaker, confirmations, reader }
-- `src/speaker.js` — speaker abstraction: speak(), pause(), resume(), stop(), setRate(), setVoice()
-- `src/confirmations.js` — short confirmation phrases and speak wrapper
-- `src/reader.js` — semantic page reader: readPageSemantic()
-- `src/demo.js` — Node demo that runs the simulated speaker
 
-Contract & shapes
-- The webllm TTS contract is documented in `services/webllm/src/formats.js` (TTS_OUTPUT_SCHEMA). Key fields your implementation must produce when speaking: `text`, `action`, `success`, `intent`, `confidence`, `requiresConfirmation`.
-- The helper methods in `confirmations` and `reader` return payloads compatible with that schema. The `speaker.speak()` method itself only speaks text and resolves when done; higher-level helpers build payloads.
+## Type
+Substantial
 
-Developer tasks (actionable)
-1) Wire the speaker to the extension environment
-   - In the extension background script, use `chrome.tts.speak(text, options, callback)` when `chrome && chrome.tts` exists.
-   - Fallback to `window.speechSynthesis` in content or UI contexts.
-   - In our minimal `Speaker` class, add the `chrome.tts` code path where available. Keep the public methods stable: speak(text, opts) -> Promise.
+---
 
-2) Confirmations API
-   - Implement `confirm(action, detail?)` to return a TTS payload (see `confirmations.js`). Keep phrases short (≤3 words + optional short detail).
-   - Use a small template map for common actions. Keep templates human-readable and testable.
+## Tasks
 
-3) Semantic reader
-   - Provide `readPageSemantic(domOrText)` which accepts either a string (plain text) or an array of sections ({role, text}).
-   - For browser use, implement an extractor that maps DOM nodes to the sections array: headline, byline, paragraphs in content order.
-   - Speak each section synchronously to preserve reading order and return a summary payload when done.
+### 1. Initialize TTS Engine
+- [x] Set up Web Speech API `SpeechSynthesis` for Microsoft Edge
+- [x] Load all available system voices (`getVoices()`)
+- [x] Log available voices and their properties
+- [x] Verify speech output works
 
-4) Voice control and immediate updates
-   - Implement `setRate(n)` and `setVoice(id)` on the speaker. When called, subsequent utterances should use these settings.
-   - For immediate effect while speaking, call `stop()` and issue a new `speak()` with the remaining text (optional improvement). Keep initial implementation simple: new settings apply to next speak.
+### 2. Voice Selection & Quality
+- [ ] Test all available English voices in Edge
+- [ ] Identify highest quality voices (Enhanced, Neural, Premium)
+- [ ] Select best default voice for accessibility
+- [ ] Test voice naturalness and clarity
+- [ ] Prioritize local voices over network voices (faster, offline)
+- [ ] Document which voices work best
 
-5) Error handling
-   - If `speak()` fails, higher-level helpers must return a payload with `success: false` and a short `text` explaining the failure.
-   - Emit QA logs with structured messages for later aggregation (extension message to background or console for local testing).
+### 3. Core Speech Function
+- [ ] Build function: `speak(text, voiceName?)` → outputs speech
+- [ ] Handle different text lengths (short/long)
+- [ ] Queue multiple speech requests
+- [ ] Prevent overlapping speech
+- [ ] Allow voice override per request
 
-How to run the demo (Node)
-- From `services/tts` run:
+### 4. Speech Quality Tuning
+- [ ] Set optimal speech rate for clarity (test 0.7x - 1.2x range)
+- [ ] Set appropriate pitch (1.0 neutral, test variations)
+- [ ] Set volume (0.9 for accessibility)
+- [ ] Test with different voice settings:
+  - [ ] Short confirmations ("Done", "Link opened")
+  - [ ] Error messages ("Link not found. Say help for commands")
+  - [ ] Longer responses (multiple sentences)
+- [ ] Find best rate/pitch combination per voice type
 
-  ```
-  cd services/tts
-  npm run demo
-  ```
+### 5. Multiple Voice Support
+- [ ] Support switching between voices
+- [ ] Test male vs female voices
+- [ ] Test different accent variations (US, UK, etc.)
+- [ ] Allow user to select preferred voice
+- [ ] Save voice preference
+- [ ] Fallback to default if preferred unavailable
 
-Notes about browser integration
-- The demo uses a simulated speaker in Node. In the browser environment, prefer `chrome.tts` for Edge/Chrome extension background scripts. Example outline for background script:
+### 6. Speech Controls
+- [ ] Implement stop current speech
+- [ ] Implement pause speech
+- [ ] Implement resume speech
+- [ ] Clear speech queue when needed
+- [ ] Test interruption handling
 
-  - When receiving a message { type: 'tts.speak', payload: { text } } call:
-    - If `chrome && chrome.tts`: call `chrome.tts.speak(text, {rate, voiceName}, callback)` and send a completion message when done.
-    - Else if `window.speechSynthesis` is available, create a SpeechSynthesisUtterance, set `rate` and `voice` as needed, and register `onend` and `onerror` handlers.
+### 7. Testing Voice Quality
+- [ ] Test each available voice with sample text
+- [ ] Rate naturalness (1-10 scale)
+- [ ] Rate clarity (1-10 scale)
+- [ ] Test pronunciation of technical terms
+- [ ] Test with punctuation and formatting
+- [ ] Compare voices side-by-side
+- [ ] Document best voices for different use cases
 
-Testing and acceptance
-- Unit tests should validate template generation and that payloads follow the TTS_OUTPUT_SCHEMA shape. The repository already contains formats; use those validators during tests.
-- Minimal integration test: call `confirm('navigate','down')` and assert returned payload has `text: 'Scrolled down'`-like result and `success: true`.
+---
 
-Follow-ups and improvements
-- Add queuing (for multiple speak calls) and interruption semantics (stop/replace current utterance).
-- Add persisted user settings for rate and voice (chrome.storage sync/local).
-- Implement DOM article extractor which returns the sections array for `readPageSemantic`.
+## Acceptance Criteria
+- [ ] System speaks with clear, natural-sounding voice
+- [ ] Best available voice is auto-selected
+- [ ] User can choose from available voices
+- [ ] Speech quality is optimized (rate, pitch, volume)
+- [ ] Multiple voices are supported and tested
+- [ ] Speech can be stopped/paused/resumed
+- [ ] Preferences are saved
 
-Implementation notes
-- Keep the speaker implementation small and well-documented. The provided `src/` files are intentionally simple and clear so extension authors can port the logic into background scripts or UI code.
-- Avoid introducing heavy dependencies; browser APIs suffice for runtime.
+---
 
-If you'd like, I can:
-- Add `chrome.tts` usage in `speaker.js` behind a feature-detect branch and a small integration example for background scripts.
-- Add unit tests for confirmation templates and reader normalization.
+## Definition of Complete
+TTS engine functional using Web Speech API; all available voices tested and documented; best voice auto-selected; `speak(text)` function works with high-quality output; rate/pitch/volume optimized for clarity; user can select preferred voice; preferences persist; queue system works; tested with various text types.
+
+---
+
+## User Personas Served
+- **Aisha** (Blind professional) - Primary beneficiary for clear audio feedback
+- **George** (Low-vision elderly) - Benefits from natural-sounding voice
+- **Nora** (Caregiver/Power-user) - Can select best voice for user's preference
+
+---
+
+## Technical Notes
+- Uses **free** Web Speech API `SpeechSynthesis` (no costs)
+- Voices from user's OS (Windows 11 has premium voices)
+- Edge typically includes: Microsoft Zira, David, Mark (US), Hazel (UK)
+- Neural/Enhanced voices provide best quality
+- Reference: `accessibleTTS.tsx` component
+
+---
+
+## Pipeline Position
+**User Voice** → STT → WebLLM → **TTS (This Issue)** → **Spoken Response**
+
+---
+
+## Dependencies
+- None (can start immediately)
+
+## Used By
+- All future features that need spoken responses
+
+## Estimated Effort
+2 weeks for one developer

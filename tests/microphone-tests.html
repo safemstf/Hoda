@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hoda Voice - Microphone Demo</title>
+  <link rel="stylesheet" href="microphone-tests.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🎤 Hoda Voice</h1>
+      <p class="subtitle">Microphone Access Demo</p>
+    </div>
+
+    <!-- Main Control -->
+    <div class="main-control">
+      <button class="mic-button" id="main-mic-btn"></button>
+      <div class="status-text" id="main-status">Ready to Start</div>
+      <div class="status-subtext" id="main-substatus">Click the microphone to begin</div>
+      
+      <!-- Control Buttons -->
+      <div class="control-buttons" id="control-buttons">
+        <button class="control-btn danger" id="pause-btn">⏸ Pause</button>
+        <button class="control-btn success" id="resume-btn" style="display: none;">▶ Resume</button>
+        <button class="control-btn danger" id="stop-btn">⏹ Stop</button>
+      </div>
+      
+      <!-- Volume Visualizer -->
+      <div class="volume-visualizer" id="visualizer">
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+        <div class="volume-bar"></div>
+      </div>
+    </div>
+
+    <!-- Tests Section -->
+    <div class="tests-section">
+      <div class="section-header">
+        <h2 class="section-title">System Tests</h2>
+        <button class="control-btn" id="run-all-btn">▶ Run All Tests</button>
+      </div>
+      <div class="test-grid">
+        <!-- Test 1 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Permission</span>
+            <div class="status-dot pending" id="dot-1"></div>
+          </div>
+          <p class="test-description">Initialize microphone and request permissions</p>
+          <button class="test-button" data-test="1">Run Test</button>
+          <div class="result" id="result-1"></div>
+        </div>
+
+        <!-- Test 2 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Status Check</span>
+            <div class="status-dot pending" id="dot-2"></div>
+          </div>
+          <p class="test-description">Check current permission status</p>
+          <button class="test-button" data-test="2">Run Test</button>
+          <div class="result" id="result-2"></div>
+        </div>
+
+        <!-- Test 3 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Audio Detection</span>
+            <div class="status-dot pending" id="dot-3"></div>
+          </div>
+          <p class="test-description">Verify audio input is working</p>
+          <button class="test-button" data-test="3">Run Test</button>
+          <div class="result" id="result-3"></div>
+        </div>
+
+        <!-- Test 4 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Error Handling</span>
+            <div class="status-dot pending" id="dot-4"></div>
+          </div>
+          <p class="test-description">Test graceful error handling</p>
+          <button class="test-button" data-test="4">Run Test</button>
+          <div class="result" id="result-4"></div>
+        </div>
+
+        <!-- Test 5 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Pause/Resume</span>
+            <div class="status-dot pending" id="dot-5"></div>
+          </div>
+          <p class="test-description">Test mic pause and resume</p>
+          <button class="test-button" data-test="5">Run Test</button>
+          <div class="result" id="result-5"></div>
+        </div>
+
+        <!-- Test 6 -->
+        <div class="test-card">
+          <div class="test-header">
+            <span class="test-title">Full Diagnostic</span>
+            <div class="status-dot pending" id="dot-6"></div>
+          </div>
+          <p class="test-description">Complete system check</p>
+          <button class="test-button" data-test="6">Run Test</button>
+          <div class="result" id="result-6"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status Panel -->
+    <div class="status-panel">
+      <h2 class="section-title">Live Status</h2>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="status-label">Browser</div>
+          <div class="status-value" id="browser">-</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Active</div>
+          <div class="status-value" id="active">No</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Permission</div>
+          <div class="status-value" id="permission">-</div>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Volume</div>
+          <div class="status-value" id="volume">0%</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="microphone-tests.js"></script>
+</body>
+</html>
