@@ -1,0 +1,13 @@
+{
+  "name": "services-tts2",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "node ./tests/run-tests.js"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {}
+}
