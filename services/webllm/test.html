@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebLLM Test - Accessibility Intent Parser</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 5px;
+        }
+        .test-section {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        input, button {
+            padding: 10px 15px;
+            font-size: 16px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        input {
+            width: 60%;
+            margin-right: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .result pre {
+            margin: 10px 0 0 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e9ecef;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 WebLLM Accessibility Intent Parser Test</h1>
+
+        <div id="status" class="status loading">
+            Initializing WebLLM engine...
+        </div>
+
+        <div class="progress-bar" id="progressBar" style="display: none;">
+            <div class="progress-fill" id="progressFill" style="width: 0%">0%</div>
+        </div>
+
+        <div class="metrics" id="metrics" style="display: none;">
+            <div class="metric">
+                <div class="metric-label">Model</div>
+                <div class="metric-value" id="modelName">-</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Load Time</div>
+                <div class="metric-value" id="loadTime">-</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Memory Usage</div>
+                <div class="metric-value" id="memoryUsage">-</div>
+            </div>
+            <div class="metric">
+                <div class="metric-label">Status</div>
+                <div class="metric-value" id="engineStatus">-</div>
+            </div>
+        </div>
+
+        <div class="test-section" id="testSection" style="display: none;">
+            <h2>Test Intent Recognition</h2>
+            <p>Enter a natural language command to test:</p>
+            <input
+                type="text"
+                id="commandInput"
+                placeholder="e.g., scroll down, read this page, find login button"
+                value="scroll down"
+            />
+            <button id="testButton" onclick="testCommand()">Test Command</button>
+
+            <div id="result" style="display: none;" class="result">
+                <strong>Result:</strong>
+                <pre id="resultJson"></pre>
+                <div style="margin-top: 10px;">
+                    <strong>Processing Time:</strong> <span id="processingTime">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>Quick Tests</h2>
+            <div style="display: grid; gap: 10px;">
+                <button onclick="quickTest('scroll down')">Test: "scroll down"</button>
+                <button onclick="quickTest('read this page to me')">Test: "read this page to me"</button>
+                <button onclick="quickTest('find the login button')">Test: "find the login button"</button>
+                <button onclick="quickTest('make text bigger')">Test: "make text bigger"</button>
+                <button onclick="quickTest('submit the form')">Test: "submit the form"</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createParser, analyzeAccessibilityUtterance } from './src/index.js';
+
+        let parser = null;
+        let loadStartTime = Date.now();
+
+        // Update status message
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Update progress bar
+        function updateProgress(progress) {
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+
+            if (progress > 0) {
+                progressBar.style.display = 'block';
+                const percentage = Math.round(progress * 100);
+                progressFill.style.width = `${percentage}%`;
+                progressFill.textContent = `${percentage}%`;
+            } else {
+                progressBar.style.display = 'none';
+            }
+        }
+
+        // Initialize the parser
+        async function init() {
+            try {
+                loadStartTime = Date.now();
+                updateStatus('Loading WebLLM model... This may take 5-15 seconds on first run.', 'loading');
+
+                // Create parser with progress tracking
+                parser = await createParser(
+                    { localOnly: true }, // Privacy settings
+                    {
+                        modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+                        temperature: 0.1,
+                        maxTokens: 200
+                    }
+                );
+
+                const loadTime = ((Date.now() - loadStartTime) / 1000).toFixed(2);
+
+                // Update UI
+                updateStatus('✅ WebLLM engine loaded successfully!', 'success');
+                document.getElementById('metrics').style.display = 'grid';
+                document.getElementById('testSection').style.display = 'block';
+
+                // Update metrics
+                document.getElementById('modelName').textContent = 'Llama-3.2-1B';
+                document.getElementById('loadTime').textContent = `${loadTime}s`;
+                document.getElementById('engineStatus').textContent = 'Ready';
+
+                // Get memory usage if available
+                if (performance.memory) {
+                    const memoryMB = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(0);
+                    document.getElementById('memoryUsage').textContent = `${memoryMB} MB`;
+                }
+
+                console.log('Parser initialized successfully');
+                console.log('Load time:', loadTime, 'seconds');
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test a command
+        window.testCommand = async function() {
+            const input = document.getElementById('commandInput');
+            const command = input.value.trim();
+
+            if (!command) {
+                alert('Please enter a command');
+                return;
+            }
+
+            if (!parser) {
+                alert('Parser not initialized yet');
+                return;
+            }
+
+            const testButton = document.getElementById('testButton');
+            testButton.disabled = true;
+            testButton.textContent = 'Processing...';
+
+            try {
+                const startTime = Date.now();
+                const result = await analyzeAccessibilityUtterance(command, null, parser);
+                const processingTime = Date.now() - startTime;
+
+                // Display result
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('resultJson').textContent = JSON.stringify(result, null, 2);
+                document.getElementById('processingTime').textContent = `${processingTime}ms`;
+
+                // Log to console
+                console.log('Command:', command);
+                console.log('Result:', result);
+                console.log('Processing time:', processingTime, 'ms');
+
+            } catch (error) {
+                console.error('Test error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                testButton.disabled = false;
+                testButton.textContent = 'Test Command';
+            }
+        };
+
+        // Quick test function
+        window.quickTest = function(command) {
+            document.getElementById('commandInput').value = command;
+            testCommand();
+        };
+
+        // Start initialization
+        init();
+    </script>
+</body>
+</html>

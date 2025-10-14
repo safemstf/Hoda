@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Natural Language Variations Test</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; }
+        .status {
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #f8f9fa;
+            font-weight: 600;
+        }
+        .pass { color: #28a745; font-weight: bold; }
+        .fail { color: #dc3545; font-weight: bold; }
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .summary-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            border-left: 4px solid #007bff;
+        }
+        .summary-label {
+            font-size: 14px;
+            color: #6c757d;
+            text-transform: uppercase;
+        }
+        .summary-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+            margin-top: 10px;
+        }
+        .category {
+            background: #e9ecef;
+            padding: 8px 12px;
+            margin: 20px 0 10px 0;
+            font-weight: 600;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Natural Language Variations Test</h1>
+        <p>Tests >85% accuracy target with multiple phrasings per intent</p>
+
+        <div id="status" class="status loading">
+            Initializing WebLLM engine...
+        </div>
+
+        <button id="startTest" onclick="runTest()" disabled>
+            Start Variation Test
+        </button>
+
+        <div class="summary" id="summary" style="display: none;">
+            <div class="summary-card">
+                <div class="summary-label">Total Tests</div>
+                <div class="summary-value" id="totalTests">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Passed</div>
+                <div class="summary-value" id="passedTests">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Failed</div>
+                <div class="summary-value" id="failedTests">-</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-label">Accuracy</div>
+                <div class="summary-value" id="accuracy">-</div>
+            </div>
+        </div>
+
+        <table id="results" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Variation</th>
+                    <th>Expected Intent</th>
+                    <th>Got Intent</th>
+                    <th>Confidence</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="resultsBody"></tbody>
+        </table>
+    </div>
+
+    <script type="module">
+        import { createService } from './src/index.js';
+
+        let service = null;
+
+        // Test variations - 10+ per category
+        const testVariations = [
+            // Navigate - 12 variations
+            { category: 'navigate', text: 'scroll down', expected: 'navigate' },
+            { category: 'navigate', text: 'go down', expected: 'navigate' },
+            { category: 'navigate', text: 'move page down', expected: 'navigate' },
+            { category: 'navigate', text: 'page down', expected: 'navigate' },
+            { category: 'navigate', text: 'scroll up', expected: 'navigate' },
+            { category: 'navigate', text: 'go up', expected: 'navigate' },
+            { category: 'navigate', text: 'move up', expected: 'navigate' },
+            { category: 'navigate', text: 'go back', expected: 'navigate' },
+            { category: 'navigate', text: 'go backwards', expected: 'navigate' },
+            { category: 'navigate', text: 'previous page', expected: 'navigate' },
+            { category: 'navigate', text: 'scroll to top', expected: 'navigate' },
+            { category: 'navigate', text: 'go to bottom', expected: 'navigate' },
+
+            // Read - 10 variations
+            { category: 'read', text: 'read this page', expected: 'read' },
+            { category: 'read', text: 'read to me', expected: 'read' },
+            { category: 'read', text: 'what does this say', expected: 'read' },
+            { category: 'read', text: 'read it', expected: 'read' },
+            { category: 'read', text: 'start reading', expected: 'read' },
+            { category: 'read', text: 'stop reading', expected: 'read' },
+            { category: 'read', text: 'pause', expected: 'read' },
+            { category: 'read', text: 'pause reading', expected: 'read' },
+            { category: 'read', text: 'resume', expected: 'read' },
+            { category: 'read', text: 'continue reading', expected: 'read' },
+
+            // Find content - 12 variations
+            { category: 'find_content', text: 'find login button', expected: 'find_content' },
+            { category: 'find_content', text: 'where is sign in', expected: 'find_content' },
+            { category: 'find_content', text: 'locate login', expected: 'find_content' },
+            { category: 'find_content', text: 'find me articles about cooking', expected: 'find_content' },
+            { category: 'find_content', text: 'search for contact', expected: 'find_content' },
+            { category: 'find_content', text: 'look for the menu', expected: 'find_content' },
+            { category: 'find_content', text: 'where\'s the search box', expected: 'find_content' },
+            { category: 'find_content', text: 'find submit button', expected: 'find_content' },
+            { category: 'find_content', text: 'locate the navigation', expected: 'find_content' },
+            { category: 'find_content', text: 'where is home link', expected: 'find_content' },
+            { category: 'find_content', text: 'search for news', expected: 'find_content' },
+            { category: 'find_content', text: 'find products', expected: 'find_content' },
+
+            // Zoom - 10 variations
+            { category: 'zoom', text: 'zoom in', expected: 'zoom' },
+            { category: 'zoom', text: 'zoom out', expected: 'zoom' },
+            { category: 'zoom', text: 'make text bigger', expected: 'zoom' },
+            { category: 'zoom', text: 'increase size', expected: 'zoom' },
+            { category: 'zoom', text: 'make it larger', expected: 'zoom' },
+            { category: 'zoom', text: 'decrease size', expected: 'zoom' },
+            { category: 'zoom', text: 'make smaller', expected: 'zoom' },
+            { category: 'zoom', text: 'reset zoom', expected: 'zoom' },
+            { category: 'zoom', text: 'normal size', expected: 'zoom' },
+            { category: 'zoom', text: 'enlarge text', expected: 'zoom' },
+
+            // Form action - 10 variations
+            { category: 'form_action', text: 'submit form', expected: 'form_action' },
+            { category: 'form_action', text: 'submit the form', expected: 'form_action' },
+            { category: 'form_action', text: 'send form', expected: 'form_action' },
+            { category: 'form_action', text: 'fill in username', expected: 'form_action' },
+            { category: 'form_action', text: 'enter my email', expected: 'form_action' },
+            { category: 'form_action', text: 'fill email field', expected: 'form_action' },
+            { category: 'form_action', text: 'type in password', expected: 'form_action' },
+            { category: 'form_action', text: 'select option', expected: 'form_action' },
+            { category: 'form_action', text: 'choose from dropdown', expected: 'form_action' },
+            { category: 'form_action', text: 'check the box', expected: 'form_action' },
+
+            // Link action - 10 variations
+            { category: 'link_action', text: 'list all links', expected: 'link_action' },
+            { category: 'link_action', text: 'show me links', expected: 'link_action' },
+            { category: 'link_action', text: 'what links are here', expected: 'link_action' },
+            { category: 'link_action', text: 'open first link', expected: 'link_action' },
+            { category: 'link_action', text: 'click on about', expected: 'link_action' },
+            { category: 'link_action', text: 'go to home page', expected: 'link_action' },
+            { category: 'link_action', text: 'open contact link', expected: 'link_action' },
+            { category: 'link_action', text: 'follow the link', expected: 'link_action' },
+            { category: 'link_action', text: 'click next', expected: 'link_action' },
+            { category: 'link_action', text: 'navigate to home', expected: 'link_action' },
+
+            // Help - 10 variations
+            { category: 'help', text: 'help', expected: 'help' },
+            { category: 'help', text: 'help me', expected: 'help' },
+            { category: 'help', text: 'what can you do', expected: 'help' },
+            { category: 'help', text: 'list commands', expected: 'help' },
+            { category: 'help', text: 'show me commands', expected: 'help' },
+            { category: 'help', text: 'what are my options', expected: 'help' },
+            { category: 'help', text: 'how do I use this', expected: 'help' },
+            { category: 'help', text: 'what can I say', expected: 'help' },
+            { category: 'help', text: 'show help', expected: 'help' },
+            { category: 'help', text: 'instructions', expected: 'help' }
+        ];
+
+        // Update status
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+        }
+
+        // Initialize
+        async function init() {
+            try {
+                updateStatus('Loading WebLLM model...', 'loading');
+
+                service = await createService({
+                    privacy: { localOnly: true }
+                });
+
+                updateStatus('✅ Ready to test natural language variations', 'success');
+                document.getElementById('startTest').disabled = false;
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Run test
+        window.runTest = async function() {
+            if (!service) {
+                alert('Service not initialized');
+                return;
+            }
+
+            const button = document.getElementById('startTest');
+            button.disabled = true;
+            button.textContent = 'Running Tests...';
+
+            const resultsBody = document.getElementById('resultsBody');
+            resultsBody.innerHTML = '';
+            document.getElementById('results').style.display = 'table';
+
+            let passed = 0;
+            let failed = 0;
+            let currentCategory = '';
+
+            updateStatus('Running variation tests...', 'loading');
+
+            for (let i = 0; i < testVariations.length; i++) {
+                const test = testVariations[i];
+
+                // Add category header
+                if (test.category !== currentCategory) {
+                    currentCategory = test.category;
+                    const row = resultsBody.insertRow();
+                    row.innerHTML = `<td colspan="6" class="category">${currentCategory.toUpperCase()}</td>`;
+                }
+
+                try {
+                    const result = await service.processCommand({
+                        text: test.text,
+                        confidence: 0.95
+                    });
+
+                    const gotIntent = result.intent.intent;
+                    const isPass = gotIntent === test.expected;
+
+                    if (isPass) {
+                        passed++;
+                    } else {
+                        failed++;
+                    }
+
+                    const row = resultsBody.insertRow();
+                    row.innerHTML = `
+                        <td>${test.category}</td>
+                        <td>"${test.text}"</td>
+                        <td>${test.expected}</td>
+                        <td>${gotIntent}</td>
+                        <td>${(result.confidence * 100).toFixed(0)}%</td>
+                        <td class="${isPass ? 'pass' : 'fail'}">
+                            ${isPass ? '✓ PASS' : '✗ FAIL'}
+                        </td>
+                    `;
+
+                    updateStatus(`Testing ${i + 1}/${testVariations.length}...`, 'loading');
+
+                } catch (error) {
+                    console.error('Test error:', error);
+                    failed++;
+                    const row = resultsBody.insertRow();
+                    row.innerHTML = `
+                        <td>${test.category}</td>
+                        <td>"${test.text}"</td>
+                        <td>${test.expected}</td>
+                        <td colspan="3" class="fail">ERROR: ${error.message}</td>
+                    `;
+                }
+            }
+
+            // Calculate stats
+            const total = testVariations.length;
+            const accuracy = ((passed / total) * 100).toFixed(1);
+            const targetMet = accuracy >= 85;
+
+            // Update summary
+            document.getElementById('summary').style.display = 'grid';
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('passedTests').textContent = passed;
+            document.getElementById('failedTests').textContent = failed;
+            document.getElementById('accuracy').textContent = `${accuracy}%`;
+
+            // Update status
+            const statusType = targetMet ? 'success' : 'error';
+            const statusIcon = targetMet ? '✅' : '⚠️';
+            updateStatus(
+                `${statusIcon} Test complete! Accuracy: ${accuracy}% (Target: 85%)`,
+                statusType
+            );
+
+            // Log results
+            console.log('Natural Language Variation Test Results:');
+            console.log('Total:', total);
+            console.log('Passed:', passed);
+            console.log('Failed:', failed);
+            console.log('Accuracy:', accuracy + '%');
+            console.log('Target Met (>85%):', targetMet);
+
+            button.disabled = false;
+            button.textContent = 'Run Again';
+        };
+
+        // Start initialization
+        init();
+    </script>
+</body>
+</html>

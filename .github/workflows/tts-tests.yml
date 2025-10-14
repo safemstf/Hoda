@@ -1,0 +1,23 @@
+name: TTS tests
+
+on:
+  push:
+    branches: [ WebLLM, main ]
+  pull_request:
+    branches: [ WebLLM, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies (tts)
+        working-directory: services/tts
+        run: npm ci
+      - name: Run tests (tts)
+        working-directory: services/tts
+        run: npm test
