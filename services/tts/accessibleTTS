@@ -1,0 +1,145 @@
+// accessibleTTS.js
+export default class AccessibleTTS {
+    constructor() {
+        this.voices = [];
+        this.queue = [];
+        this.isSpeaking = false;
+        this.currentUtterance = null;
+        this.rate = 1.0;
+        this.pitch = 1.0;
+        this.volume = 0.9;
+
+        this.synth = window.speechSynthesis;
+        this.loadVoices();
+        window.speechSynthesis.onvoiceschanged = () => this.loadVoices();
+        console.log('[TTS] AccessibleTTS initialized');
+    }
+
+    // ========================
+    // VOICE MANAGEMENT
+    // ========================
+    loadVoices() {
+        this.voices = this.synth.getVoices();
+        console.log('[TTS] Voices loaded:', this.voices.map(v => ({
+            name: v.name,
+            lang: v.lang,
+            localService: v.localService,
+            voiceURI: v.voiceURI,
+            default: v.default
+        })));
+    }
+
+    getAvailableVoices(langFilter = 'en') {
+        return this.voices.filter(v => v.lang.startsWith(langFilter));
+    }
+
+    selectDefaultVoice() {
+        const preferredVoiceName = this.getVoicePreference();
+        if (preferredVoiceName) {
+            const pref = this.voices.find(v => v.name === preferredVoiceName);
+            if (pref) return pref;
+        }
+        const englishVoices = this.getAvailableVoices('en').filter(v => v.localService);
+        const preferred = englishVoices.find(v => /premium|neural|enhanced/i.test(v.name));
+        return preferred || englishVoices[0] || null;
+    }
+
+    setVoice(voiceName) {
+        const voice = this.voices.find(v => v.name === voiceName);
+        if (!voice) {
+            console.warn('[TTS] Voice not found:', voiceName);
+            return;
+        }
+        localStorage.setItem('preferredVoice', voiceName);
+        console.log('[TTS] Preferred voice set to:', voiceName);
+    }
+
+    getVoicePreference() {
+        return localStorage.getItem('preferredVoice');
+    }
+
+    // ========================
+    // SPEAKING
+    // ========================
+    speak(text, voiceName) {
+        if (!text) return;
+        this.queue.push({ text, voiceName });
+        this.processQueue();
+    }
+
+    processQueue() {
+        if (this.isSpeaking || this.queue.length === 0) return;
+
+        const { text, voiceName } = this.queue.shift();
+        const utterance = new SpeechSynthesisUtterance(text);
+        this.currentUtterance = utterance;
+
+        utterance.voice = voiceName
+            ? this.voices.find(v => v.name === voiceName) || this.selectDefaultVoice()
+            : this.selectDefaultVoice();
+
+        utterance.rate = this.rate;
+        utterance.pitch = this.pitch;
+        utterance.volume = this.volume;
+
+        utterance.onend = () => {
+            this.isSpeaking = false;
+            this.currentUtterance = null;
+            this.processQueue();
+        };
+
+        this.isSpeaking = true;
+        this.synth.speak(utterance);
+    }
+
+    stop() {
+        this.synth.cancel();
+        this.isSpeaking = false;
+        this.queue = [];
+        this.currentUtterance = null;
+    }
+
+    pause() {
+        if (this.synth.speaking && !this.synth.paused) this.synth.pause();
+    }
+
+    resume() {
+        if (this.synth.paused) this.synth.resume();
+    }
+
+    // ========================
+    // CONFIGURATION
+    // ========================
+    setRate(rate) {
+        if (rate >= 0.7 && rate <= 1.2) this.rate = rate;
+        console.log('[TTS] Rate set to', this.rate);
+    }
+
+    setPitch(pitch) {
+        if (pitch >= 0.5 && pitch <= 2.0) this.pitch = pitch;
+        console.log('[TTS] Pitch set to', this.pitch);
+    }
+
+    setVolume(volume) {
+        if (volume >= 0 && volume <= 1) this.volume = volume;
+        console.log('[TTS] Volume set to', this.volume);
+    }
+
+    // ========================
+    // TEST VOICES
+    // ========================
+    testVoices() {
+        const englishVoices = this.getAvailableVoices('en');
+        englishVoices.forEach(v => {
+            console.log(`[TTS] Testing voice: ${v.name}`);
+            this.speak(`Hello, this is ${v.name} voice. Testing clarity and naturalness.`);
+        });
+    }
+
+    // ========================
+    // QUICK UTILITY
+    // ========================
+    getCurrentVoiceName() {
+        return this.currentUtterance?.voice?.name || null;
+    }
+}
