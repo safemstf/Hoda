@@ -107,8 +107,8 @@ export class CommandNormalizer {
     }
 
     /**
-     * CLEAN generateVariations - Aligned with clean intent schema
-     */
+ * Enhanced generateVariations with better link action support
+ */
     generateVariations(example) {
         if (example === null || example === undefined) return [];
         const exampleStr = String(example).trim();
@@ -177,7 +177,6 @@ export class CommandNormalizer {
 
         // Go back / previous page
         if (lowerExample.includes('back') || lowerExample.includes('previous page')) {
-            // Only add browser navigation variations
             variations.push(
                 'go back',
                 'back',
@@ -219,22 +218,45 @@ export class CommandNormalizer {
         }
 
         // ========================================================================
-        // LINK ACTIONS
+        // LINK ACTIONS - ENHANCED
         // ========================================================================
 
+        // List links
         if (lowerExample.includes('list') && lowerExample.includes('link')) {
             variations.push(
                 'list links',
                 'show links',
-                'what links'
+                'what links',
+                'display links',
+                'get links'
             );
         }
 
-        if (lowerExample.includes('open link')) {
+        // Open/Go to/Click link with number - ALL VARIATIONS
+        if (lowerExample.includes('link') &&
+            (lowerExample.includes('open') ||
+                lowerExample.includes('go') ||
+                lowerExample.includes('click') ||
+                lowerExample.includes('select'))) {
             variations.push(
                 'open link (\\d+)',
+                'go to link (\\d+)',
                 'click link (\\d+)',
-                'link (\\d+)'
+                'select link (\\d+)',
+                'link (\\d+)',
+                'number (\\d+)',
+                'go link (\\d+)',
+                'open (\\d+)',
+                'click (\\d+)'
+            );
+        }
+
+        // Just "link" followed by number
+        if (lowerExample.match(/^link\s+\d+$/i)) {
+            variations.push(
+                'link (\\d+)',
+                'open link (\\d+)',
+                'go to link (\\d+)'
             );
         }
 
@@ -341,8 +363,9 @@ export class CommandNormalizer {
 
         return deduped;
     }
+
     /**
-     * Enhanced synonym map - ADD to buildSynonymMap()
+     * Enhanced synonym map with link-related synonyms
      */
     buildSynonymMap() {
         return {
@@ -356,11 +379,13 @@ export class CommandNormalizer {
             find: ['search', 'locate', 'look for', 'where is'],
             bigger: ['larger', 'increase', 'enlarge'],
             smaller: ['decrease', 'reduce', 'shrink'],
-            // New additions
             back: ['previous', 'return', 'backward'],
             forward: ['next', 'ahead', 'onward'],
             refresh: ['reload', 'update'],
-            home: ['homepage', 'main page', 'start']
+            home: ['homepage', 'main page', 'start'],
+            // Link-related synonyms
+            open: ['go to', 'navigate to', 'visit', 'access'],
+            link: ['url', 'hyperlink', 'connection']
         };
     }
 

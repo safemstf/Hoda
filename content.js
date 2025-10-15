@@ -3,7 +3,7 @@ console.log('[Content] Loading with command queue and cooldown...');
 
 (function () {
   'use strict';
-  
+
   // ============================================================================
   // COMMAND QUEUE (Sequential Processing + COOLDOWN)
   // ============================================================================
@@ -13,11 +13,11 @@ console.log('[Content] Loading with command queue and cooldown...');
       this.isProcessing = false;
       this.currentCommand = null;
       this.interruptRequested = false;
-      
+
       // COOLDOWN SYSTEM to prevent echo loops
       this.cooldownActive = false;
       this.cooldownDuration = 2000; // 2 seconds default
-      
+
       console.log('[Queue] Initialized with cooldown protection');
     }
 
@@ -77,7 +77,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       try {
         // START COOLDOWN before executing
         this.startCooldown();
-        
+
         // Execute command
         await this.executeCommand(item.command);
 
@@ -104,7 +104,7 @@ console.log('[Content] Loading with command queue and cooldown...');
     startCooldown() {
       this.cooldownActive = true;
       console.log('[Queue] ⏳ Cooldown started for', this.cooldownDuration, 'ms');
-      
+
       setTimeout(() => {
         this.cooldownActive = false;
         console.log('[Queue] ✅ Cooldown ended');
@@ -233,7 +233,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
   }
-  
+
   // ============================================================================
   // FEEDBACK MANAGER (with cleanup on unload)
   // ============================================================================
@@ -269,7 +269,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       this.loadSettings();
       this.initVoices();
       this._autoRegisterCommonMicManagers();
-      
+
       // CLEANUP ON PAGE UNLOAD
       this._setupCleanup();
     }
@@ -287,7 +287,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       window.addEventListener('beforeunload', cleanup);
       window.addEventListener('unload', cleanup);
       window.addEventListener('pagehide', cleanup);
-      
+
       // Also cleanup on visibility change (tab hidden)
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
@@ -642,17 +642,17 @@ console.log('[Content] Loading with command queue and cooldown...');
     stopSpeech() {
       try {
         console.log('[Feedback] 🛑 FORCE STOPPING all TTS');
-        
+
         this._tts.stopped = true;
         this._tts.autoContinue = false;
         this._tts.chunks = [];
         this._tts.chunkIndex = 0;
-        
+
         // Cancel ALL speech synthesis
         if (window.speechSynthesis) {
           try {
             window.speechSynthesis.cancel();
-            
+
             // Force cancel again after brief delay (browser quirk)
             setTimeout(() => {
               if (window.speechSynthesis.speaking || window.speechSynthesis.paused) {
@@ -663,7 +663,7 @@ console.log('[Content] Loading with command queue and cooldown...');
             console.warn('[Feedback] speechSynthesis.cancel() error', e);
           }
         }
-        
+
         this._tts.utterance = null;
         this._tts.readingText = '';
 
@@ -848,8 +848,14 @@ console.log('[Content] Loading with command queue and cooldown...');
       const target = slots.target;
 
       if (action === 'list' || !action) {
+        // Store both element and href for reliability
         this.linkList = Array.from(document.querySelectorAll('a[href]'))
-          .filter(a => a.offsetParent !== null);
+          .filter(a => a.offsetParent !== null)
+          .map(a => ({
+            element: a,
+            href: a.href,
+            text: this.getLinkText(a)
+          }));
 
         const visible = this.linkList.slice(0, 10);
         this.showLinkList(visible);
@@ -861,13 +867,42 @@ console.log('[Content] Loading with command queue and cooldown...');
 
       if (linkNumber !== undefined && linkNumber !== null) {
         const index = Number(linkNumber) - 1;
+        console.log('[Executor] Opening link:', linkNumber, 'index:', index, 'listLength:', this.linkList.length);
+
         if (!this.linkList || this.linkList.length === 0) {
           return { success: false, message: 'No link list cached. Say "list links" first.' };
         }
+
         if (index >= 0 && index < this.linkList.length) {
-          const link = this.linkList[index];
-          this.speakShort(`Opening link ${linkNumber}: ${this.getLinkText(link)}`);
-          try { link.focus(); link.click(); } catch (e) { window.location.href = link.href; }
+          const linkData = this.linkList[index];
+          const linkText = linkData.text;
+          const href = linkData.href;
+
+          console.log('[Executor] Navigating to:', href);
+
+          // Dismiss overlay first
+          this.dismissLinkOverlay();
+
+          // Speak and then navigate
+          this.speakShort(`Opening link ${linkNumber}: ${linkText}`);
+
+          // Use setTimeout to ensure speech starts before navigation
+          setTimeout(() => {
+            try {
+              // Try element click first
+              if (linkData.element && linkData.element.parentNode) {
+                linkData.element.focus();
+                linkData.element.click();
+              } else {
+                // Fallback to direct navigation
+                window.location.href = href;
+              }
+            } catch (e) {
+              console.error('[Executor] Click failed, using href:', e);
+              window.location.href = href;
+            }
+          }, 100);
+
           return { success: true, message: `Opening link ${linkNumber}` };
         }
         return { success: false, message: `Link ${linkNumber} not found` };
@@ -880,7 +915,9 @@ console.log('[Content] Loading with command queue and cooldown...');
         );
         if (found) {
           this.speakShort(`Opening ${target}`);
-          try { found.focus(); found.click(); } catch (e) { window.location.href = found.href; }
+          setTimeout(() => {
+            try { found.focus(); found.click(); } catch (e) { window.location.href = found.href; }
+          }, 100);
           return { success: true, message: `Opening ${target}` };
         }
         return { success: false, message: `Link "${target}" not found` };
@@ -957,9 +994,8 @@ console.log('[Content] Loading with command queue and cooldown...');
       if (!links || links.length === 0) return;
 
       const intro = `Found ${links.length} links. `;
-      const linkDescriptions = links.map((link, i) => {
-        const text = this.getLinkText(link);
-        return `Link ${i + 1}: ${text}`;
+      const linkDescriptions = links.map((linkData, i) => {
+        return `Link ${i + 1}: ${linkData.text}`;
       }).join('. ');
 
       const fullText = intro + linkDescriptions + '. Say "open link" followed by a number to open it.';
@@ -988,8 +1024,16 @@ console.log('[Content] Loading with command queue and cooldown...');
       this.feedback.speakShort(text, { interruptLongReads: false });
     }
 
+    dismissLinkOverlay() {
+      const overlay = document.getElementById('hoda-link-list');
+      if (overlay) {
+        overlay.style.opacity = '0';
+        setTimeout(() => overlay.remove(), 300);
+      }
+    }
+
     showLinkList(links) {
-      const overlay = this.createOverlay('hoda-link-list');
+      const overlay = this.createLinkOverlay();
 
       overlay.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px; display: flex; align-items: center; gap: 8px;">
@@ -997,28 +1041,69 @@ console.log('[Content] Loading with command queue and cooldown...');
           <span>Available Links</span>
           <span style="font-size: 12px; opacity: 0.7; font-weight: normal;">(${links.length} shown)</span>
         </div>
-        ${links.map((link, i) => {
-          const text = this.getLinkText(link);
-          const href = link.href;
-          return `
+        ${links.map((linkData, i) => {
+        const text = linkData.text;
+        const href = linkData.href;
+        return `
             <div style="margin: 8px 0; padding: 10px; background: rgba(255,255,255,0.06); border-radius: 6px;">
               <strong style="color: #10b981;">${i + 1}.</strong> ${text}
-              <div style="font-size: 11px; opacity: 0.6;">${href.substring(0, 60)}...</div>
+              <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; word-break: break-all;">${href.substring(0, 60)}${href.length > 60 ? '...' : ''}</div>
             </div>
           `;
-        }).join('')}
+      }).join('')}
+        <div style="margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; opacity: 0.7;">
+          Say "open link [number]" to navigate
+        </div>
       `;
-
-      overlay.style.maxHeight = '500px';
-      overlay.style.overflowY = 'auto';
-      overlay.style.maxWidth = '450px';
 
       setTimeout(() => {
         if (overlay && overlay.parentNode) {
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 500);
         }
-      }, 15000);
+      }, 20000); // Longer timeout since user needs time to choose
+    }
+
+    createLinkOverlay() {
+      const id = 'hoda-link-list';
+      const existing = document.getElementById(id);
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = id;
+
+      // Position at center-bottom with margin from edges
+      Object.assign(overlay.style, {
+        position: 'fixed',
+        bottom: '80px', // Higher up to avoid voice UI
+        left: '50%',
+        transform: 'translateX(-50%)',
+        maxWidth: '500px',
+        width: '90%',
+        maxHeight: '50vh',
+        overflowY: 'auto',
+        padding: '20px',
+        borderRadius: '12px',
+        backgroundColor: 'rgba(0, 0, 0, 0.96)',
+        color: 'white',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '14px',
+        zIndex: '2147483645', // Below voice feedback
+        boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
+        border: '2px solid rgba(16, 185, 129, 0.4)',
+        opacity: '1',
+        transition: 'opacity 0.3s ease',
+        backdropFilter: 'blur(10px)'
+      });
+
+      // Add custom scrollbar styling
+      overlay.style.cssText += `
+      scrollbar-width: thin;
+      scrollbar-color: rgba(16, 185, 129, 0.5) rgba(255, 255, 255, 0.1);
+    `;
+
+      document.body.appendChild(overlay);
+      return overlay;
     }
 
     async doZoom(slots) {
@@ -1160,12 +1245,12 @@ console.log('[Content] Loading with command queue and cooldown...');
 
     async doHelp() {
       const helpText = `Voice Commands:
-• Navigation: scroll, go to top/bottom, back, forward
-• Reading: read page, stop, pause, resume
-• Zoom: zoom in/out, reset zoom
-• Links: list links, open link 1
-• Search: find [text]
-• Stop: say "stop" to interrupt`;
+      - Navigation: scroll, go to top/bottom, back, forward
+      - Reading: read page, stop, pause, resume
+      - Zoom: zoom in/out, reset zoom
+      - Links: list links, open link 1
+      - Search: find [text]
+      - Stop: say "stop" to interrupt`;
 
       this.showHelpOverlay(helpText);
       return { success: true, message: 'Help shown' };
