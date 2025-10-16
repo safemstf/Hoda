@@ -3,166 +3,667 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTS Demo - Hear It!</title>
+    <title>Voice Synthesis Studio</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 50px auto;
-            padding: 20px;
-            background: #f5f5f5;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        .controls {
-            background: white;
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #14b8a6;
+            --danger: #ef4444;
+            --dark: #1e293b;
+            --light: #f1f5f9;
+            --card: rgba(255, 255, 255, 0.95);
+            --shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+            --glow: 0 0 40px rgba(99, 102, 241, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.3) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 119, 198, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 40% 20%, rgba(255, 219, 112, 0.2) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            max-width: 1200px;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, #f0f0f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            letter-spacing: -1px;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.2rem;
+            font-weight: 300;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            animation: fadeInUp 0.8s ease-out;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--glow), var(--shadow);
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--dark);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            border-radius: 2px;
+        }
+
+        /* Quick Actions Card */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .btn {
+            padding: 15px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, var(--secondary) 0%, #0d9488 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(20, 184, 166, 0.3);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger) 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-outline {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-outline:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Text Input Section */
+        .input-group {
+            display: flex;
+            gap: 15px;
             margin-bottom: 20px;
         }
-        button {
-            background: #4CAF50;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background: #45a049;
-        }
-        button:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-        input, select {
-            padding: 8px;
-            margin: 5px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .status {
-            background: white;
+
+        .text-input {
+            flex: 1;
             padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .text-input::placeholder {
+            color: #94a3b8;
+        }
+
+        /* Voice Controls */
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(to right, var(--primary) 0%, var(--primary) var(--value, 50%), #e2e8f0 var(--value, 50%), #e2e8f0 100%);
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            border: 3px solid var(--primary);
+            transition: all 0.3s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 2px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .slider-value {
+            min-width: 60px;
+            padding: 8px 12px;
+            background: var(--light);
             border-radius: 8px;
-            margin-top: 20px;
-            min-height: 100px;
+            text-align: center;
+            font-weight: 600;
+            color: var(--primary);
         }
-        .section {
-            margin: 15px 0;
+
+        .select-wrapper {
+            position: relative;
         }
-        #log {
-            background: #f9f9f9;
-            padding: 10px;
-            border-left: 3px solid #4CAF50;
-            font-family: monospace;
-            white-space: pre-wrap;
+
+        .select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            appearance: none;
+            padding-right: 40px;
+        }
+
+        .select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+        }
+
+        .select-wrapper::after {
+            content: '▼';
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: var(--primary);
+        }
+
+        /* Status Console */
+        .console {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Fira Code', monospace;
+            color: #64748b;
+            font-size: 0.9rem;
+            line-height: 1.6;
+            max-height: 300px;
+            overflow-y: auto;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.3);
+        }
+
+        .console-line {
+            margin: 5px 0;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .console-line.success { color: #10b981; }
+        .console-line.error { color: #ef4444; }
+        .console-line.info { color: #3b82f6; }
+        .console-line.warning { color: #f59e0b; }
+
+        /* Visual Indicator */
+        .speaking-indicator {
+            position: fixed;
+            top: 30px;
+            right: 30px;
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 50px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+            align-items: center;
+            gap: 12px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .speaking-indicator.active {
+            display: flex;
+        }
+
+        .speaking-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--primary);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .speaking-dot:nth-child(2) { animation-delay: 0.2s; }
+        .speaking-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        /* Animations */
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.7; }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            h1 { font-size: 2.5rem; }
+            .main-grid { grid-template-columns: 1fr; }
+            .quick-actions { grid-template-columns: 1fr; }
+            .input-group { flex-direction: column; }
+        }
+
+        /* Custom Scrollbar */
+        .console::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .console::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+
+        .console::-webkit-scrollbar-thumb {
+            background: rgba(99, 102, 241, 0.5);
+            border-radius: 4px;
+        }
+
+        .console::-webkit-scrollbar-thumb:hover {
+            background: rgba(99, 102, 241, 0.7);
         }
     </style>
 </head>
 <body>
-    <h1>🎤 TTS Browser Demo - You'll Hear It Now!</h1>
-    
-    <div class="controls">
-        <div class="section">
-            <h3>Quick Test</h3>
-            <button onclick="quickTest()">🔊 Test Sound</button>
-            <button onclick="stopSpeaking()">⏹️ Stop</button>
-        </div>
-
-        <div class="section">
-            <h3>Custom Text</h3>
-            <input type="text" id="customText" placeholder="Type something to speak..." style="width: 300px;">
-            <button onclick="speakCustom()">Speak</button>
-        </div>
-
-        <div class="section">
-            <h3>Speed Control</h3>
-            <label>Rate: <span id="rateValue">1.0</span>x</label>
-            <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" 
-                   oninput="updateRate(this.value)">
-        </div>
-
-        <div class="section">
-            <h3>Voice Selection</h3>
-            <select id="voiceSelect">
-                <option value="">Default Voice</option>
-            </select>
-        </div>
-
-        <div class="section">
-            <h3>Demo Scripts</h3>
-            <button onclick="demoConfirmations()">Run Confirmations</button>
-            <button onclick="demoArticle()">Read Article</button>
-            <button onclick="demoQueue()">Test Queue</button>
-        </div>
+    <div class="speaking-indicator" id="speakingIndicator">
+        <div class="speaking-dot"></div>
+        <div class="speaking-dot"></div>
+        <div class="speaking-dot"></div>
+        <span>Speaking...</span>
     </div>
 
-    <div class="status">
-        <h3>Status</h3>
-        <div id="log">Ready to speak! Click any button above.</div>
+    <div class="container">
+        <header>
+            <h1>Voice Synthesis Studio</h1>
+            <p class="subtitle">Advanced Text-to-Speech Control Center</p>
+        </header>
+
+        <div class="main-grid">
+            <!-- Left Column -->
+            <div>
+                <!-- Quick Actions -->
+                <div class="card">
+                    <h2 class="card-title">Quick Actions</h2>
+                    <div class="quick-actions">
+                        <button class="btn btn-primary" onclick="quickTest()">
+                            <span>🔊</span> Test Voice
+                        </button>
+                        <button class="btn btn-danger" onclick="stopSpeaking()">
+                            <span>⏹</span> Stop
+                        </button>
+                        <button class="btn btn-secondary" onclick="pauseResume()">
+                            <span>⏸</span> Pause/Resume
+                        </button>
+                        <button class="btn btn-outline" onclick="clearConsole()">
+                            <span>🗑</span> Clear Log
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Text Input -->
+                <div class="card" style="margin-top: 30px;">
+                    <h2 class="card-title">Custom Speech</h2>
+                    <div class="input-group">
+                        <input type="text" 
+                               id="customText" 
+                               class="text-input" 
+                               placeholder="Type anything you want me to say..."
+                               onkeypress="if(event.key==='Enter') speakCustom()">
+                        <button class="btn btn-primary" onclick="speakCustom()">Speak</button>
+                    </div>
+                    
+                    <h3 class="card-title" style="margin-top: 20px; font-size: 1.1rem;">Demo Scripts</h3>
+                    <div class="quick-actions">
+                        <button class="btn btn-secondary" onclick="demoConfirmations()">
+                            <span>✅</span> Confirmations
+                        </button>
+                        <button class="btn btn-secondary" onclick="demoArticle()">
+                            <span>📰</span> Read Article
+                        </button>
+                        <button class="btn btn-secondary" onclick="demoQueue()">
+                            <span>📦</span> Test Queue
+                        </button>
+                        <button class="btn btn-secondary" onclick="demoEmotions()">
+                            <span>😊</span> Emotions
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div>
+                <!-- Voice Controls -->
+                <div class="card">
+                    <h2 class="card-title">Voice Controls</h2>
+                    
+                    <div class="control-group">
+                        <label class="control-label">Speed</label>
+                        <div class="slider-container">
+                            <input type="range" 
+                                   id="rate" 
+                                   class="slider"
+                                   min="0.5" 
+                                   max="2" 
+                                   step="0.1" 
+                                   value="1"
+                                   oninput="updateRate(this.value)">
+                            <div class="slider-value" id="rateValue">1.0x</div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Pitch</label>
+                        <div class="slider-container">
+                            <input type="range" 
+                                   id="pitch" 
+                                   class="slider"
+                                   min="0.5" 
+                                   max="2" 
+                                   step="0.1" 
+                                   value="1"
+                                   oninput="updatePitch(this.value)">
+                            <div class="slider-value" id="pitchValue">1.0x</div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Volume</label>
+                        <div class="slider-container">
+                            <input type="range" 
+                                   id="volume" 
+                                   class="slider"
+                                   min="0" 
+                                   max="1" 
+                                   step="0.1" 
+                                   value="1"
+                                   oninput="updateVolume(this.value)">
+                            <div class="slider-value" id="volumeValue">100%</div>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Voice Selection</label>
+                        <div class="select-wrapper">
+                            <select id="voiceSelect" class="select" onchange="updateVoice(this)">
+                                <option value="">Loading voices...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Console -->
+                <div class="card" style="margin-top: 30px;">
+                    <h2 class="card-title">Status Console</h2>
+                    <div class="console" id="console">
+                        <div class="console-line info">🚀 System initialized</div>
+                        <div class="console-line success">✅ Ready for input</div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // Copy your Speaker class here
+        // Enhanced Speaker class with more features
         class Speaker {
             constructor() {
                 this.rate = 1.0;
+                this.pitch = 1.0;
+                this.volume = 1.0;
                 this.voice = null;
                 this._isSpeaking = false;
+                this._isPaused = false;
                 this._queue = [];
                 this.policy = 'replace';
+                this.utterance = null;
             }
 
             speak(text, opts = {}) {
                 const rate = opts.rate || this.rate;
+                const pitch = opts.pitch || this.pitch;
+                const volume = opts.volume || this.volume;
                 const voice = opts.voice || this.voice;
                 const callPolicy = opts.policy || this.policy;
 
                 return new Promise((resolve, reject) => {
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.rate = rate;
-                    if (voice) utterance.voice = voice;
+                    this.utterance = new SpeechSynthesisUtterance(text);
+                    this.utterance.rate = rate;
+                    this.utterance.pitch = pitch;
+                    this.utterance.volume = volume;
+                    if (voice) this.utterance.voice = voice;
 
-                    utterance.onend = () => {
-                        this._isSpeaking = false;
-                        resolve();
-                        log(`✅ Finished: "${text}"`);
+                    this.utterance.onstart = () => {
+                        this._isSpeaking = true;
+                        document.getElementById('speakingIndicator').classList.add('active');
+                        log(`🔊 Speaking: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`, 'info');
                     };
 
-                    utterance.onerror = (e) => {
+                    this.utterance.onend = () => {
                         this._isSpeaking = false;
+                        document.getElementById('speakingIndicator').classList.remove('active');
+                        resolve();
+                        log(`✅ Completed`, 'success');
+                    };
+
+                    this.utterance.onerror = (e) => {
+                        this._isSpeaking = false;
+                        document.getElementById('speakingIndicator').classList.remove('active');
                         reject(e);
-                        log(`❌ Error: ${e}`);
+                        log(`❌ Error: ${e}`, 'error');
                     };
 
                     if (this._isSpeaking && callPolicy === 'replace') {
                         window.speechSynthesis.cancel();
                     }
 
-                    this._isSpeaking = true;
-                    window.speechSynthesis.speak(utterance);
-                    log(`🔊 Speaking: "${text}" (rate: ${rate}x)`);
+                    window.speechSynthesis.speak(this.utterance);
                 });
+            }
+
+            pause() {
+                if (window.speechSynthesis.speaking && !this._isPaused) {
+                    window.speechSynthesis.pause();
+                    this._isPaused = true;
+                    document.getElementById('speakingIndicator').classList.remove('active');
+                    log('⏸ Paused', 'warning');
+                }
+            }
+
+            resume() {
+                if (this._isPaused) {
+                    window.speechSynthesis.resume();
+                    this._isPaused = false;
+                    document.getElementById('speakingIndicator').classList.add('active');
+                    log('▶️ Resumed', 'info');
+                }
             }
 
             stop() {
                 window.speechSynthesis.cancel();
                 this._isSpeaking = false;
-                log('⏹️ Stopped');
+                this._isPaused = false;
+                document.getElementById('speakingIndicator').classList.remove('active');
+                log('⏹ Stopped', 'warning');
             }
 
-            setRate(rate) {
-                this.rate = Number(rate) || 1.0;
-            }
-
-            setVoice(voice) {
-                this.voice = voice;
-            }
+            setRate(rate) { this.rate = Number(rate) || 1.0; }
+            setPitch(pitch) { this.pitch = Number(pitch) || 1.0; }
+            setVolume(volume) { this.volume = Number(volume) || 1.0; }
+            setVoice(voice) { this.voice = voice; }
         }
 
-        // Copy your Confirmations class
+        // Initialize components
+        const speaker = new Speaker();
+
+        // Confirmations class
         class Confirmations {
             constructor(speaker) {
                 this.speaker = speaker;
@@ -174,15 +675,17 @@
                     scroll: 'Scrolled',
                     open: 'Opened',
                     submit: 'Submitted',
-                    save: 'Saved'
+                    save: 'Saved',
+                    delete: 'Deleted',
+                    update: 'Updated'
                 };
                 const text = templates[action] + (detail ? ` ${detail}` : '');
-                await this.speaker.speak(text);
+                await this.speaker.speak(text, { rate: 1.2 });
                 return { text, action, success: true };
             }
         }
 
-        // Copy your Reader class
+        // Reader class
         class Reader {
             constructor(speaker) {
                 this.speaker = speaker;
@@ -195,35 +698,56 @@
 
                 for (const sec of sections.filter(s => s.text)) {
                     let text = sec.text;
-                    if (sec.role === 'headline') text = `Headline. ${text}`;
-                    if (sec.role === 'byline') text = `Byline. ${text}`;
-                    await this.speaker.speak(text);
+                    let opts = {};
+                    
+                    if (sec.role === 'headline') {
+                        text = `Headline. ${text}`;
+                        opts = { pitch: 1.1, rate: 0.9 };
+                    } else if (sec.role === 'byline') {
+                        text = `Byline. ${text}`;
+                        opts = { pitch: 0.9, rate: 1.1 };
+                    }
+                    
+                    await this.speaker.speak(text, opts);
                 }
                 return { success: true };
             }
         }
 
-        // Initialize
-        const speaker = new Speaker();
         const confirmations = new Confirmations(speaker);
         const reader = new Reader(speaker);
 
-        // UI Functions
-        function log(message) {
-            const logEl = document.getElementById('log');
-            logEl.textContent += '\n' + message;
-            logEl.scrollTop = logEl.scrollHeight;
+        // Enhanced UI Functions
+        function log(message, type = 'info') {
+            const console = document.getElementById('console');
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('console').innerHTML = '<div class="console-line info">🔧 Console cleared</div>';
         }
 
         function quickTest() {
-            log('🎯 Quick test...');
-            speaker.speak('Hello! If you can hear this, TTS is working perfectly!');
+            const messages = [
+                "Hello! Welcome to the Voice Synthesis Studio.",
+                "Testing the text to speech system.",
+                "All systems operational!"
+            ];
+            const randomMsg = messages[Math.floor(Math.random() * messages.length)];
+            speaker.speak(randomMsg);
         }
 
         function speakCustom() {
-            const text = document.getElementById('customText').value;
+            const text = document.getElementById('customText').value.trim();
             if (text) {
                 speaker.speak(text);
+                document.getElementById('customText').value = '';
+            } else {
+                log('⚠️ Please enter some text first', 'warning');
             }
         }
 
@@ -231,74 +755,128 @@
             speaker.stop();
         }
 
+        function pauseResume() {
+            if (speaker._isPaused) {
+                speaker.resume();
+            } else {
+                speaker.pause();
+            }
+        }
+
         function updateRate(value) {
             speaker.setRate(value);
-            document.getElementById('rateValue').textContent = value;
-            log(`⚡ Rate set to ${value}x`);
+            document.getElementById('rateValue').textContent = `${value}x`;
+            updateSliderFill('rate', value, 0.5, 2);
+        }
+
+        function updatePitch(value) {
+            speaker.setPitch(value);
+            document.getElementById('pitchValue').textContent = `${value}x`;
+            updateSliderFill('pitch', value, 0.5, 2);
+        }
+
+        function updateVolume(value) {
+            speaker.setVolume(value);
+            document.getElementById('volumeValue').textContent = `${Math.round(value * 100)}%`;
+            updateSliderFill('volume', value, 0, 1);
+        }
+
+        function updateSliderFill(id, value, min, max) {
+            const slider = document.getElementById(id);
+            const percentage = ((value - min) / (max - min)) * 100;
+            slider.style.setProperty('--value', `${percentage}%`);
+        }
+
+        function updateVoice(select) {
+            const voices = window.speechSynthesis.getVoices();
+            const selected = voices.find(v => v.name === select.value);
+            speaker.setVoice(selected);
+            log(`🎤 Voice changed to: ${select.value || 'Default'}`, 'info');
         }
 
         async function demoConfirmations() {
-            log('📢 Running confirmations demo...');
-            await confirmations.confirm('navigate', 'home');
-            await confirmations.confirm('save', 'document');
-            await confirmations.confirm('submit', 'form');
-            log('✅ Confirmations complete');
+            log('📢 Running confirmations demo...', 'info');
+            await confirmations.confirm('navigate', 'dashboard');
+            await confirmations.confirm('save', 'preferences');
+            await confirmations.confirm('update', 'profile');
+            log('✅ Confirmations complete', 'success');
         }
 
         async function demoArticle() {
-            log('📰 Reading article...');
+            log('📰 Reading article...', 'info');
             const article = [
-                { role: 'headline', text: 'Breaking News: Browser TTS Works!' },
-                { role: 'byline', text: 'Reported just now' },
-                { role: 'paragraph', text: 'In a stunning development, the text-to-speech system is now working in your browser.' },
-                { role: 'paragraph', text: 'Users report being able to actually hear the computer speaking.' }
+                { role: 'headline', text: 'Voice Synthesis Technology Advances' },
+                { role: 'byline', text: 'Tech News Today' },
+                { role: 'paragraph', text: 'Modern text-to-speech systems have achieved remarkable naturalness and expressiveness.' },
+                { role: 'paragraph', text: 'Applications range from accessibility tools to creative content generation.' }
             ];
             await reader.readPageSemantic(article);
-            log('✅ Article complete');
+            log('✅ Article complete', 'success');
         }
 
         async function demoQueue() {
-            log('📦 Testing queue...');
+            log('📦 Testing queue system...', 'info');
             speaker.policy = 'queue';
-            speaker.speak('First message', { policy: 'queue' });
-            speaker.speak('Second message', { policy: 'queue' });
-            speaker.speak('Third message', { policy: 'queue' });
-            log('✅ Queue started');
+            speaker.speak('Message one in the queue', { policy: 'queue' });
+            speaker.speak('Message two follows', { policy: 'queue' });
+            speaker.speak('Final message three', { policy: 'queue' });
+            speaker.policy = 'replace';
+            log('✅ Queue initiated', 'success');
+        }
+
+        async function demoEmotions() {
+            log('😊 Demonstrating emotional variations...', 'info');
+            await speaker.speak('This is normal speech.', { pitch: 1, rate: 1 });
+            await speaker.speak('This sounds excited!', { pitch: 1.3, rate: 1.2 });
+            await speaker.speak('This is calm and slow.', { pitch: 0.9, rate: 0.8 });
+            await speaker.speak('Whispering quietly...', { volume: 0.3, rate: 0.9 });
+            log('✅ Emotions demo complete', 'success');
         }
 
         // Load voices
         function loadVoices() {
             const voices = window.speechSynthesis.getVoices();
             const select = document.getElementById('voiceSelect');
-            select.innerHTML = '<option value="">Default Voice</option>';
+            select.innerHTML = '<option value="">System Default</option>';
             
+            // Group voices by language
+            const voicesByLang = {};
             voices.forEach(voice => {
-                const option = document.createElement('option');
-                option.value = voice.name;
-                option.textContent = `${voice.name} (${voice.lang})`;
-                select.appendChild(option);
+                const lang = voice.lang.split('-')[0];
+                if (!voicesByLang[lang]) voicesByLang[lang] = [];
+                voicesByLang[lang].push(voice);
+            });
+
+            // Add grouped options
+            Object.keys(voicesByLang).sort().forEach(lang => {
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = lang.toUpperCase();
+                voicesByLang[lang].forEach(voice => {
+                    const option = document.createElement('option');
+                    option.value = voice.name;
+                    option.textContent = `${voice.name} (${voice.lang})`;
+                    optgroup.appendChild(option);
+                });
+                select.appendChild(optgroup);
             });
             
-            log(`📢 ${voices.length} voices available`);
+            log(`📢 ${voices.length} voices loaded`, 'success');
         }
 
-        // Handle voice selection
-        document.getElementById('voiceSelect').onchange = function() {
-            const voices = window.speechSynthesis.getVoices();
-            const selected = voices.find(v => v.name === this.value);
-            speaker.setVoice(selected);
-            log(`🎤 Voice changed to: ${this.value || 'Default'}`);
-        };
-
-        // Load voices when ready
-        if (window.speechSynthesis.onvoiceschanged !== undefined) {
-            window.speechSynthesis.onvoiceschanged = loadVoices;
-        }
-        loadVoices();
-
-        // Initial test
+        // Initialize on load
         window.onload = () => {
-            log('🚀 TTS System Ready! Click "Test Sound" to hear it.');
+            // Load voices
+            if (window.speechSynthesis.onvoiceschanged !== undefined) {
+                window.speechSynthesis.onvoiceschanged = loadVoices;
+            }
+            loadVoices();
+
+            // Initialize slider fills
+            updateSliderFill('rate', 1, 0.5, 2);
+            updateSliderFill('pitch', 1, 0.5, 2);
+            updateSliderFill('volume', 1, 0, 1);
+
+            log('🚀 Voice Synthesis Studio ready!', 'success');
         };
     </script>
 </body>
