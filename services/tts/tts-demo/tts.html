@@ -68,8 +68,15 @@
     <div class="controls">
         <div class="section">
             <h3>Quick Test</h3>
-            <button onclick="quickTest()">🔊 Test Sound</button>
+            <button onclick="quickTest()">🔊 Test Voice</button>
             <button onclick="stopSpeaking()">⏹️ Stop</button>
+        </div>
+        
+        <div class="section">
+            <h3>Voice Selection</h3>
+            <select id="voiceSelect">
+                <option value="">Default Voice</option>
+            </select>
         </div>
 
         <div class="section">
@@ -83,13 +90,6 @@
             <label>Rate: <span id="rateValue">1.0</span>x</label>
             <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" 
                    oninput="updateRate(this.value)">
-        </div>
-
-        <div class="section">
-            <h3>Voice Selection</h3>
-            <select id="voiceSelect">
-                <option value="">Default Voice</option>
-            </select>
         </div>
 
 
@@ -301,7 +301,7 @@
 
         // Initial test
         window.onload = () => {
-            log('🚀 TTS System Ready! Click "Test Sound" to hear it.');
+            log('🚀 TTS System Ready! Click "Test Voice" to hear it.');
         };
     </script>
 </body>
