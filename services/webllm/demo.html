@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoda WebLLM - Voice Accessibility Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .demo-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 1400px;
+            width: 100%;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            padding: 20px 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-icon {
+            font-size: 28px;
+            margin-right: 15px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 15px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .panel {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .panel h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+            color: #333;
+            display: flex;
+            align-items: center;
+        }
+
+        .panel-icon {
+            font-size: 32px;
+            margin-right: 10px;
+        }
+
+        .input-section {
+            margin-bottom: 25px;
+        }
+
+        .command-input {
+            width: 100%;
+            padding: 18px;
+            font-size: 20px;
+            border: 3px solid #dee2e6;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .command-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .action-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .btn {
+            padding: 15px 25px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            grid-column: 1 / -1;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .example-commands {
+            display: grid;
+            gap: 10px;
+        }
+
+        .example-command {
+            background: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 16px;
+            text-align: left;
+        }
+
+        .example-command:hover {
+            border-color: #667eea;
+            transform: translateX(5px);
+            background: #f8f9ff;
+        }
+
+        .example-command .command-text {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .example-command .command-desc {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .result-panel {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+            min-height: 200px;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .result-time {
+            background: #667eea;
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .result-content {
+            display: grid;
+            gap: 15px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+
+        .result-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6c757d;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .result-value {
+            font-size: 18px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .result-json {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745 0%, #20c997 100%);
+            border-radius: 10px;
+            transition: width 0.5s ease;
+        }
+
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 30px 40px;
+            background: #f8f9fa;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6c757d;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6c757d;
+        }
+
+        .empty-state-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+
+        .empty-state-text {
+            font-size: 18px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @media (max-width: 1200px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 32px;
+            }
+
+            .action-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="header">
+            <h1>🎤 Hoda WebLLM Demo</h1>
+            <p>Voice-Controlled Web Accessibility • Privacy-First AI</p>
+        </div>
+
+        <div class="status-bar">
+            <div id="status" class="status loading">
+                <div>
+                    <span class="status-icon loading-pulse">⏳</span>
+                    <span id="statusText">Initializing WebLLM engine...</span>
+                </div>
+            </div>
+            <div class="progress-bar" id="progressBar" style="display: none;">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="panel">
+                <h2><span class="panel-icon">💬</span> Try a Command</h2>
+
+                <div class="input-section">
+                    <input
+                        type="text"
+                        id="commandInput"
+                        class="command-input"
+                        placeholder="Type a natural language command..."
+                        value="scroll down the page"
+                        disabled
+                    />
+                    <div class="action-buttons">
+                        <button id="testButton" class="btn btn-primary" onclick="testCommand()" disabled>
+                            <span>🚀</span>
+                            <span>Process Command</span>
+                        </button>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px; color: #333; font-size: 20px;">
+                    📋 Example Commands
+                </h3>
+                <div class="example-commands" id="exampleCommands">
+                    <div class="example-command" onclick="quickTest('scroll down the page')">
+                        <div class="command-text">"scroll down the page"</div>
+                        <div class="command-desc">Navigation</div>
+                    </div>
+                    <div class="example-command" onclick="quickTest('read this page to me')">
+                        <div class="command-text">"read this page to me"</div>
+                        <div class="command-desc">Screen Reading</div>
+                    </div>
+                    <div class="example-command" onclick="quickTest('find the login button')">
+                        <div class="command-text">"find the login button"</div>
+                        <div class="command-desc">Content Search</div>
+                    </div>
+                    <div class="example-command" onclick="quickTest('make the text bigger')">
+                        <div class="command-text">"make the text bigger"</div>
+                        <div class="command-desc">Zoom Control</div>
+                    </div>
+                    <div class="example-command" onclick="quickTest('what can you do for me')">
+                        <div class="command-text">"what can you do for me"</div>
+                        <div class="command-desc">Help System</div>
+                    </div>
+                    <div class="example-command" onclick="quickTest('submit the form')">
+                        <div class="command-text">"submit the form"</div>
+                        <div class="command-desc">Form Actions</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <h2><span class="panel-icon">🎯</span> Result</h2>
+
+                <div id="resultPanel">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🤖</div>
+                        <div class="empty-state-text">Ready to process commands</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="metrics" id="metrics" style="display: none;">
+            <div class="metric-card">
+                <div class="metric-label">AI Model</div>
+                <div class="metric-value" style="font-size: 18px;">Llama 3.2</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Load Time</div>
+                <div class="metric-value" id="loadTime">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Processing</div>
+                <div class="metric-value" id="processingSpeed">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Privacy Mode</div>
+                <div class="metric-value" style="font-size: 18px;">🔒 Local</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createParser, analyzeAccessibilityUtterance } from './src/index.js';
+
+        let parser = null;
+        let loadStartTime = Date.now();
+
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+
+            let icon = '⏳';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+
+            statusEl.className = `status ${type}`;
+            statusText.innerHTML = `<span class="status-icon">${icon}</span><span>${message}</span>`;
+        }
+
+        function updateProgress(progress) {
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+
+            if (progress > 0 && progress < 1) {
+                progressBar.style.display = 'block';
+                const percentage = Math.round(progress * 100);
+                progressFill.style.width = `${percentage}%`;
+            } else {
+                progressBar.style.display = 'none';
+            }
+        }
+
+        async function init() {
+            try {
+                loadStartTime = Date.now();
+                updateStatus('Loading AI model... (This may take a few seconds)', 'loading');
+
+                parser = await createParser(
+                    { localOnly: true },
+                    {
+                        modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+                        temperature: 0.1,
+                        maxTokens: 200
+                    }
+                );
+
+                const loadTime = ((Date.now() - loadStartTime) / 1000).toFixed(2);
+
+                updateStatus('System ready! Try a command or click an example below.', 'success');
+                updateProgress(0);
+
+                document.getElementById('metrics').style.display = 'grid';
+                document.getElementById('loadTime').textContent = `${loadTime}s`;
+                document.getElementById('processingSpeed').textContent = 'Ready';
+
+                document.getElementById('commandInput').disabled = false;
+                document.getElementById('testButton').disabled = false;
+
+                const exampleCommands = document.querySelectorAll('.example-command');
+                exampleCommands.forEach(cmd => cmd.style.cursor = 'pointer');
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        window.testCommand = async function() {
+            const input = document.getElementById('commandInput');
+            const command = input.value.trim();
+
+            if (!command) {
+                alert('Please enter a command');
+                return;
+            }
+
+            if (!parser) {
+                alert('System not ready yet');
+                return;
+            }
+
+            const testButton = document.getElementById('testButton');
+            const originalText = testButton.innerHTML;
+            testButton.disabled = true;
+            testButton.innerHTML = '<span class="loading-pulse">⚙️</span><span>Processing...</span>';
+
+            try {
+                const startTime = Date.now();
+                const result = await analyzeAccessibilityUtterance(command, null, parser);
+                const processingTime = Date.now() - startTime;
+
+                document.getElementById('processingSpeed').textContent = `${processingTime}ms`;
+
+                displayResult(command, result, processingTime);
+
+            } catch (error) {
+                console.error('Processing error:', error);
+                alert(`Error: ${error.message}`);
+            } finally {
+                testButton.disabled = false;
+                testButton.innerHTML = originalText;
+            }
+        };
+
+        function displayResult(command, result, processingTime) {
+            const resultPanel = document.getElementById('resultPanel');
+            const confidence = (result.intent.confidence * 100).toFixed(0);
+
+            resultPanel.innerHTML = `
+                <div class="result-header">
+                    <div class="result-title">Parsed Intent</div>
+                    <div class="result-time">${processingTime}ms</div>
+                </div>
+
+                <div class="result-content">
+                    <div class="result-item">
+                        <div class="result-label">Original Command</div>
+                        <div class="result-value">"${command}"</div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">Detected Intent</div>
+                        <div class="result-value">${result.intent.intent}</div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">Confidence Score</div>
+                        <div class="result-value">${confidence}%</div>
+                        <div class="confidence-bar">
+                            <div class="confidence-fill" style="width: ${confidence}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">Requires Confirmation</div>
+                        <div class="result-value">${result.intent.requiresConfirmation ? '⚠️ Yes' : '✅ No'}</div>
+                    </div>
+
+                    <div class="result-item">
+                        <div class="result-label">Full Response (JSON)</div>
+                        <div class="result-json">${JSON.stringify(result, null, 2)}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.quickTest = function(command) {
+            document.getElementById('commandInput').value = command;
+            testCommand();
+        };
+
+        document.getElementById('commandInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !this.disabled) {
+                testCommand();
+            }
+        });
+
+        init();
+    </script>
+</body>
+</html>

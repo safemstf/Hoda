@@ -29,7 +29,17 @@ const server = createServer(async (req, res) => {
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
 
   let filePath = req.url === '/' ? '/test.html' : req.url;
-  filePath = join(__dirname, filePath);
+
+  // Strip query parameters
+  filePath = filePath.split('?')[0];
+
+  // Map node_modules requests
+  if (filePath.startsWith('/node_modules/')) {
+    // Serve directly from node_modules
+    filePath = join(__dirname, filePath);
+  } else {
+    filePath = join(__dirname, filePath);
+  }
 
   const ext = extname(filePath);
   const contentType = MIME_TYPES[ext] || 'application/octet-stream';
