@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoda - Full Pipeline Demo (STT → WebLLM → TTS)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+
+        .status-bar {
+            padding: 20px 40px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .status.loading { background: #fff3cd; color: #856404; }
+        .status.success { background: #d4edda; color: #155724; }
+        .status.error { background: #f8d7da; color: #721c24; }
+
+        .content {
+            padding: 40px;
+        }
+
+        .pipeline-flow {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr auto 1fr;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+        }
+
+        .flow-box {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 3px solid #667eea;
+            text-align: center;
+        }
+
+        .flow-box h3 {
+            font-size: 20px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .flow-box p {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .flow-arrow {
+            font-size: 48px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .sample-selector {
+            margin-bottom: 30px;
+        }
+
+        .sample-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .sample-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sample-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .sample-card.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+
+        .sample-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .sample-text {
+            font-size: 14px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .pipeline-stages {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .stage {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #e9ecef;
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .stage-icon {
+            font-size: 32px;
+        }
+
+        .stage-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .stage-content {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            min-height: 200px;
+        }
+
+        .json-display {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6c757d;
+        }
+
+        .btn {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .field-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #6c757d;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .field-value {
+            font-size: 16px;
+            color: #333;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading-pulse {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @media (max-width: 1200px) {
+            .pipeline-flow {
+                grid-template-columns: 1fr;
+            }
+
+            .flow-arrow {
+                transform: rotate(90deg);
+            }
+
+            .pipeline-stages {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 Full Pipeline Demo</h1>
+            <p>STT → WebLLM → TTS • Complete Integration Flow</p>
+        </div>
+
+        <div class="status-bar">
+            <div id="status" class="status loading">
+                <span class="loading-pulse">⏳</span>
+                <span id="statusText">Initializing WebLLM engine...</span>
+            </div>
+        </div>
+
+        <div class="content">
+            <div class="pipeline-flow">
+                <div class="flow-box">
+                    <h3>🎤 STT Service</h3>
+                    <p>Speech to Text</p>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <h3>🧠 WebLLM Service</h3>
+                    <p>Intent Recognition</p>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-box">
+                    <h3>🔊 TTS Service</h3>
+                    <p>Text to Speech</p>
+                </div>
+            </div>
+
+            <div class="sample-selector">
+                <h2 style="margin-bottom: 15px;">📋 Select a Sample Command:</h2>
+                <div class="sample-grid" id="sampleGrid">
+                    <!-- Will be populated by JavaScript -->
+                </div>
+            </div>
+
+            <button id="processButton" class="btn" onclick="processPipeline()" disabled>
+                🚀 Process Through Pipeline
+            </button>
+
+            <div class="pipeline-stages">
+                <div class="stage">
+                    <div class="stage-header">
+                        <span class="stage-icon">🎤</span>
+                        <span class="stage-title">1. STT Output</span>
+                    </div>
+                    <div class="stage-content" id="sttStage">
+                        <div class="empty-state">
+                            Select a sample above
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-header">
+                        <span class="stage-icon">🧠</span>
+                        <span class="stage-title">2. WebLLM Processing</span>
+                    </div>
+                    <div class="stage-content" id="webllmStage">
+                        <div class="empty-state">
+                            Waiting for processing...
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-header">
+                        <span class="stage-icon">🔊</span>
+                        <span class="stage-title">3. TTS Output</span>
+                    </div>
+                    <div class="stage-content" id="ttsStage">
+                        <div class="empty-state">
+                            Waiting for processing...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createParser, analyzeAccessibilityUtterance } from './src/index.js';
+
+        let parser = null;
+        let selectedSample = null;
+
+        // Sample STT outputs based on FORMATS.md
+        const sampleSTTOutputs = [
+            {
+                id: 1,
+                title: "Navigation Command",
+                text: "scroll down the page",
+                confidence: 0.95,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 2,
+                title: "Reading Command",
+                text: "read this page to me",
+                confidence: 0.92,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 3,
+                title: "Search Command",
+                text: "find the login button",
+                confidence: 0.88,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 4,
+                title: "Zoom Command",
+                text: "make the text bigger",
+                confidence: 0.94,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 5,
+                title: "Form Submission",
+                text: "submit the form",
+                confidence: 0.89,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 6,
+                title: "Link Navigation",
+                text: "list all links on this page",
+                confidence: 0.91,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 7,
+                title: "Help Request",
+                text: "what can you do for me",
+                confidence: 0.96,
+                language: "en-US",
+                timestamp: Date.now()
+            },
+            {
+                id: 8,
+                title: "Complex Navigation",
+                text: "go back to the previous page",
+                confidence: 0.87,
+                language: "en-US",
+                timestamp: Date.now()
+            }
+        ];
+
+        function updateStatus(message, type = 'loading') {
+            const statusEl = document.getElementById('status');
+            const statusText = document.getElementById('statusText');
+
+            let icon = '⏳';
+            if (type === 'success') icon = '✅';
+            if (type === 'error') icon = '❌';
+
+            statusEl.className = `status ${type}`;
+            statusText.innerHTML = `<span class="${type === 'loading' ? 'loading-pulse' : ''}">${icon}</span> ${message}`;
+        }
+
+        function renderSamples() {
+            const grid = document.getElementById('sampleGrid');
+            grid.innerHTML = sampleSTTOutputs.map(sample => `
+                <div class="sample-card" onclick="selectSample(${sample.id})">
+                    <div class="sample-title">${sample.title}</div>
+                    <div class="sample-text">"${sample.text}"</div>
+                </div>
+            `).join('');
+        }
+
+        window.selectSample = function(id) {
+            selectedSample = sampleSTTOutputs.find(s => s.id === id);
+
+            // Update UI
+            document.querySelectorAll('.sample-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.target.closest('.sample-card').classList.add('selected');
+
+            // Show STT stage
+            const sttStage = document.getElementById('sttStage');
+            sttStage.innerHTML = `
+                <div class="field-label">Transcribed Text</div>
+                <div class="field-value">"${selectedSample.text}"</div>
+
+                <div class="field-label">STT Confidence</div>
+                <div class="field-value">${(selectedSample.confidence * 100).toFixed(0)}%</div>
+
+                <div class="field-label">Language</div>
+                <div class="field-value">${selectedSample.language}</div>
+
+                <div class="field-label">Full STT JSON</div>
+                <div class="json-display">${JSON.stringify(selectedSample, null, 2)}</div>
+            `;
+
+            // Clear other stages
+            document.getElementById('webllmStage').innerHTML = '<div class="empty-state">Click "Process Through Pipeline" to continue</div>';
+            document.getElementById('ttsStage').innerHTML = '<div class="empty-state">Waiting for WebLLM processing...</div>';
+
+            document.getElementById('processButton').disabled = false;
+        };
+
+        window.processPipeline = async function() {
+            if (!selectedSample || !parser) {
+                alert('Please select a sample and wait for the model to load');
+                return;
+            }
+
+            const processButton = document.getElementById('processButton');
+            processButton.disabled = true;
+            processButton.innerHTML = '<span class="loading-pulse">⚙️</span> Processing...';
+
+            updateStatus('Processing through WebLLM...', 'loading');
+
+            try {
+                // Step 1: WebLLM processes STT output
+                const startTime = Date.now();
+                const webllmResult = await analyzeAccessibilityUtterance(
+                    selectedSample.text,
+                    null,
+                    parser
+                );
+                const processingTime = Date.now() - startTime;
+
+                // Step 2: Generate TTS output format (based on FORMATS.md)
+                const ttsOutput = generateTTSOutput(webllmResult);
+
+                // Display WebLLM stage
+                document.getElementById('webllmStage').innerHTML = `
+                    <div class="field-label">Detected Intent</div>
+                    <div class="field-value"><span class="highlight">${webllmResult.intent.intent}</span></div>
+
+                    <div class="field-label">Confidence</div>
+                    <div class="field-value">${(webllmResult.intent.confidence * 100).toFixed(0)}%</div>
+
+                    <div class="field-label">Processing Time</div>
+                    <div class="field-value">${processingTime}ms</div>
+
+                    <div class="field-label">Extracted Slots</div>
+                    <div class="json-display">${JSON.stringify(webllmResult.intent.slots, null, 2)}</div>
+                `;
+
+                // Display TTS stage
+                document.getElementById('ttsStage').innerHTML = `
+                    <div class="field-label">TTS Will Speak</div>
+                    <div class="field-value" style="font-size: 20px; font-weight: 600; color: #667eea;">
+                        "${ttsOutput.text}"
+                    </div>
+
+                    <div class="field-label">Action to Execute</div>
+                    <div class="field-value">${ttsOutput.action}</div>
+
+                    <div class="field-label">Requires Confirmation</div>
+                    <div class="field-value">${ttsOutput.requiresConfirmation ? '⚠️ Yes' : '✅ No'}</div>
+
+                    ${ttsOutput.confirmationPrompt ? `
+                        <div class="field-label">Confirmation Prompt</div>
+                        <div class="field-value">"${ttsOutput.confirmationPrompt}"</div>
+                    ` : ''}
+
+                    <div class="field-label">Full TTS Output JSON</div>
+                    <div class="json-display">${JSON.stringify(ttsOutput, null, 2)}</div>
+                `;
+
+                updateStatus('✅ Pipeline complete! All stages processed successfully.', 'success');
+
+            } catch (error) {
+                console.error('Pipeline error:', error);
+                updateStatus(`Error: ${error.message}`, 'error');
+                document.getElementById('webllmStage').innerHTML = `
+                    <div class="empty-state" style="color: #dc3545;">
+                        ❌ Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                processButton.disabled = false;
+                processButton.innerHTML = '🚀 Process Through Pipeline';
+            }
+        };
+
+        function generateTTSOutput(webllmResult) {
+            const intent = webllmResult.intent;
+
+            // Generate appropriate TTS text based on intent
+            let ttsText = '';
+            let confirmationPrompt = null;
+
+            switch (intent.intent) {
+                case 'navigate':
+                    if (intent.slots.direction === 'down') ttsText = 'Scrolling down';
+                    else if (intent.slots.direction === 'up') ttsText = 'Scrolling up';
+                    else if (intent.slots.direction === 'back') ttsText = 'Going back';
+                    else ttsText = 'Navigating';
+                    break;
+
+                case 'read':
+                    if (intent.slots.action === 'stop') ttsText = 'Stopped reading';
+                    else if (intent.slots.action === 'pause') ttsText = 'Paused';
+                    else if (intent.slots.action === 'resume') ttsText = 'Resuming';
+                    else ttsText = 'Reading page';
+                    break;
+
+                case 'find_content':
+                    ttsText = `Looking for ${intent.slots.query || 'content'}`;
+                    break;
+
+                case 'zoom':
+                    if (intent.slots.action === 'in') ttsText = 'Zooming in';
+                    else if (intent.slots.action === 'out') ttsText = 'Zooming out';
+                    else ttsText = 'Adjusting zoom';
+                    break;
+
+                case 'form_action':
+                    if (intent.slots.action === 'submit') {
+                        ttsText = 'Ready to submit. Confirm?';
+                        confirmationPrompt = 'Are you sure you want to submit the form?';
+                    } else if (intent.slots.field) {
+                        ttsText = `Filling ${intent.slots.field} field`;
+                    } else {
+                        ttsText = 'Processing form action';
+                    }
+                    break;
+
+                case 'link_action':
+                    if (intent.slots.action === 'list') ttsText = 'Listing all links';
+                    else if (intent.slots.target) ttsText = `Opening ${intent.slots.target} link`;
+                    else ttsText = 'Processing link action';
+                    break;
+
+                case 'help':
+                    ttsText = 'I can help you navigate, read pages, find content, zoom, fill forms, and interact with links. What would you like to do?';
+                    break;
+
+                default:
+                    ttsText = "I didn't understand. Please try again.";
+            }
+
+            // Build TTS output according to FORMATS.md
+            const ttsOutput = {
+                text: ttsText,
+                action: intent.intent,
+                success: intent.intent !== 'unknown',
+                intent: {
+                    intent: intent.intent,
+                    slots: intent.slots,
+                    confidence: intent.confidence
+                },
+                confidence: intent.confidence,
+                requiresConfirmation: intent.requiresConfirmation || false
+            };
+
+            if (confirmationPrompt) {
+                ttsOutput.confirmationPrompt = confirmationPrompt;
+            }
+
+            return ttsOutput;
+        }
+
+        async function init() {
+            try {
+                updateStatus('Loading AI model... (This may take a few seconds)', 'loading');
+
+                const startTime = Date.now();
+                parser = await createParser(
+                    { localOnly: true },
+                    {
+                        modelId: 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
+                        temperature: 0.2,
+                        maxTokens: 150
+                    }
+                );
+
+                const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                updateStatus(`System ready! Model loaded in ${loadTime}s. Select a sample to begin.`, 'success');
+
+                renderSamples();
+
+            } catch (error) {
+                console.error('Initialization error:', error);
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

@@ -10,8 +10,8 @@ export class IntentParser {
     this.privacyManager = privacyManager;
     this.config = {
       modelId: config.modelId || 'Llama-3.2-1B-Instruct-q4f16_1-MLC',
-      temperature: config.temperature || 0.1,
-      maxTokens: config.maxTokens || 200
+      temperature: config.temperature || 0.2,
+      maxTokens: config.maxTokens || 150
     };
     this.engine = null;
     this.isInitialized = false;
@@ -72,36 +72,43 @@ export class IntentParser {
    * Build the prompt for intent recognition
    */
   buildPrompt(text, pageContext = null) {
-    const intentList = Object.keys(INTENT_SCHEMAS)
-      .map(key => {
-        const schema = INTENT_SCHEMAS[key];
-        return `- ${key}: ${schema.description}\n  Examples: ${schema.examples.join(', ')}`;
-      })
-      .join('\n');
+    return `You are an intent classifier for accessibility commands. Classify the user's command into one of these intents:
 
-    return `You are an accessibility assistant that interprets natural language commands for visually impaired users.
+INTENTS:
+1. navigate - scrolling, going back/forward, page navigation
+2. read - reading page content, stopping/pausing/resuming reading
+3. find_content - finding buttons, links, text, searching
+4. zoom - making text bigger/smaller, zooming in/out
+5. form_action - filling forms, submitting, entering text
+6. link_action - clicking links, listing links, opening links
+7. help - asking for help, listing commands
 
-Available intents:
-${intentList}
+EXAMPLES:
+Input: "scroll down"
+Output: {"intent": "navigate", "slots": {"direction": "down"}, "confidence": 0.95, "requiresConfirmation": false}
 
-Task: Analyze the user's command and return a JSON object with this structure:
-{
-  "intent": "intent_name",
-  "slots": { "key": "value" },
-  "confidence": 0.0-1.0,
-  "requiresConfirmation": true/false
-}
+Input: "read this page"
+Output: {"intent": "read", "slots": {"action": "start"}, "confidence": 0.95, "requiresConfirmation": false}
 
-Rules:
-1. Choose the most appropriate intent from the list above
-2. Extract relevant parameters into slots
-3. Set confidence based on how clear the command is
-4. Set requiresConfirmation to true for form submissions or navigation away from page
-5. Return ONLY valid JSON, no additional text
+Input: "find login button"
+Output: {"intent": "find_content", "slots": {"query": "login button"}, "confidence": 0.95, "requiresConfirmation": false}
 
-User command: "${text}"
+Input: "make text bigger"
+Output: {"intent": "zoom", "slots": {"action": "in"}, "confidence": 0.95, "requiresConfirmation": false}
 
-JSON response:`;
+Input: "submit form"
+Output: {"intent": "form_action", "slots": {"action": "submit"}, "confidence": 0.95, "requiresConfirmation": true}
+
+Input: "list all links"
+Output: {"intent": "link_action", "slots": {"action": "list"}, "confidence": 0.95, "requiresConfirmation": false}
+
+Input: "help"
+Output: {"intent": "help", "slots": {}, "confidence": 0.95, "requiresConfirmation": false}
+
+Now classify this command. Return ONLY valid JSON with no extra text.
+
+Input: "${text}"
+Output:`;
   }
 
   /**
