@@ -1,27 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Llama WebLLM Environment Setup – Sumanth Penna</title>
-  <link rel="stylesheet" href="style.css" />
+  <meta charset="UTF-8">
+  <title>WhoDa–Hoda NLP Assistant</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="wrapper">
-    <h1>🦙 Llama WebLLM Setup</h1>
+  <h1>WhoDa–Hoda NLP Assistant</h1>
+  <div id="status" class="loading">Loading Llama 3 model…</div>
 
-    <p id="status" class="loading">
-      Click “Start Setup” to begin the model initialization process.
-    </p>
+  <textarea id="userInput" placeholder="Type your message..."></textarea>
+  <button id="analyzeBtn" disabled>Analyze</button>
 
-    <button id="start-btn">Start Setup</button>
-
-    <progress id="progress" value="0" max="100"></progress>
-
-    <pre id="log">Logs will appear here...</pre>
-
-    <footer>Created by <strong>Sumanth Penna</strong></footer>
-  </div>
+  <div id="output"></div>
 
   <script type="module" src="setup.js"></script>
 </body>
