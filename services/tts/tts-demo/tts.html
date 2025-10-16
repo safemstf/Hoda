@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Demo - Hear It!</title>
+    <!-- <p>By Michael, Fatema and Shishir</p> -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        input, select {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            min-height: 100px;
+        }
+        .section {
+            margin: 15px 0;
+        }
+        #log {
+            background: #f9f9f9;
+            padding: 10px;
+            border-left: 3px solid #4CAF50;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎤 TTS Browser Demo - You'll Hear It Now!</h1>
+    
+    <div class="controls">
+        <div class="section">
+            <h3>Quick Test</h3>
+            <button onclick="quickTest()">🔊 Test Sound</button>
+            <button onclick="stopSpeaking()">⏹️ Stop</button>
+        </div>
+
+        <div class="section">
+            <h3>Custom Text</h3>
+            <input type="text" id="customText" placeholder="Type something to speak..." style="width: 300px;">
+            <button onclick="speakCustom()">Speak</button>
+        </div>
+
+        <div class="section">
+            <h3>Speed Control</h3>
+            <label>Rate: <span id="rateValue">1.0</span>x</label>
+            <input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" 
+                   oninput="updateRate(this.value)">
+        </div>
+
+        <div class="section">
+            <h3>Voice Selection</h3>
+            <select id="voiceSelect">
+                <option value="">Default Voice</option>
+            </select>
+        </div>
+
+
+
+        <div class="section">
+            <h3>Demo Scripts</h3>
+            <button onclick="demoConfirmations()">Run Confirmations</button>
+            <button onclick="demoArticle()">Read Article</button>
+            <button onclick="demoQueue()">Test Queue</button>
+        </div>
+    </div>
+
+    <div class="status">
+        <h3>Status</h3>
+        <div id="log">Ready to speak! Click any button above.</div>
+    </div>
+
+    <script>
+        // Copy your Speaker class here
+        class Speaker {
+            constructor() {
+                this.rate = 1.0;
+                this.voice = null;
+                this._isSpeaking = false;
+                this._queue = [];
+                this.policy = 'replace';
+            }
+
+            speak(text, opts = {}) {
+                const rate = opts.rate || this.rate;
+                const voice = opts.voice || this.voice;
+                const callPolicy = opts.policy || this.policy;
+
+                return new Promise((resolve, reject) => {
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.rate = rate;
+                    if (voice) utterance.voice = voice;
+
+                    utterance.onend = () => {
+                        this._isSpeaking = false;
+                        resolve();
+                        log(`✅ Finished: "${text}"`);
+                    };
+
+                    utterance.onerror = (e) => {
+                        this._isSpeaking = false;
+                        reject(e);
+                        log(`❌ Error: ${e}`);
+                    };
+
+                    if (this._isSpeaking && callPolicy === 'replace') {
+                        window.speechSynthesis.cancel();
+                    }
+
+                    this._isSpeaking = true;
+                    window.speechSynthesis.speak(utterance);
+                    log(`🔊 Speaking: "${text}" (rate: ${rate}x)`);
+                });
+            }
+
+            stop() {
+                window.speechSynthesis.cancel();
+                this._isSpeaking = false;
+                log('⏹️ Stopped');
+            }
+
+            setRate(rate) {
+                this.rate = Number(rate) || 1.0;
+            }
+
+            setVoice(voice) {
+                this.voice = voice;
+            }
+        }
+
+        // Copy your Confirmations class
+        class Confirmations {
+            constructor(speaker) {
+                this.speaker = speaker;
+            }
+
+            async confirm(action, detail) {
+                const templates = {
+                    navigate: 'Navigated',
+                    scroll: 'Scrolled',
+                    open: 'Opened',
+                    submit: 'Submitted',
+                    save: 'Saved'
+                };
+                const text = templates[action] + (detail ? ` ${detail}` : '');
+                await this.speaker.speak(text);
+                return { text, action, success: true };
+            }
+        }
+
+        // Copy your Reader class
+        class Reader {
+            constructor(speaker) {
+                this.speaker = speaker;
+            }
+
+            async readPageSemantic(input) {
+                const sections = typeof input === 'string' 
+                    ? input.split(/\n\n+/).map(p => ({ role: 'paragraph', text: p.trim() }))
+                    : input;
+
+                for (const sec of sections.filter(s => s.text)) {
+                    let text = sec.text;
+                    if (sec.role === 'headline') text = `Headline. ${text}`;
+                    if (sec.role === 'byline') text = `Byline. ${text}`;
+                    await this.speaker.speak(text);
+                }
+                return { success: true };
+            }
+        }
+
+        // Initialize
+        const speaker = new Speaker();
+        const confirmations = new Confirmations(speaker);
+        const reader = new Reader(speaker);
+
+        // UI Functions
+        function log(message) {
+            const logEl = document.getElementById('log');
+            logEl.textContent += '\n' + message;
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function quickTest() {
+            log('🎯 Quick test...');
+            speaker.speak('Hello! If you can hear this, TTS is working perfectly!');
+        }
+
+        function speakCustom() {
+            const text = document.getElementById('customText').value;
+            if (text) {
+                speaker.speak(text);
+            }
+        }
+
+        function stopSpeaking() {
+            speaker.stop();
+        }
+
+        function updateRate(value) {
+            speaker.setRate(value);
+            document.getElementById('rateValue').textContent = value;
+            log(`⚡ Rate set to ${value}x`);
+        }
+
+        async function demoConfirmations() {
+            log('📢 Running confirmations demo...');
+            await confirmations.confirm('navigate', 'home');
+            await confirmations.confirm('save', 'document');
+            await confirmations.confirm('submit', 'form');
+            log('✅ Confirmations complete');
+        }
+
+        async function demoArticle() {
+            log('📰 Reading article...');
+            const article = [
+                { role: 'headline', text: 'Breaking News: Browser TTS Works!' },
+                { role: 'byline', text: 'Reported just now' },
+                { role: 'paragraph', text: 'In a stunning development, the text-to-speech system is now working in your browser.' },
+                { role: 'paragraph', text: 'Users report being able to actually hear the computer speaking.' }
+            ];
+            await reader.readPageSemantic(article);
+            log('✅ Article complete');
+        }
+
+        async function demoQueue() {
+            log('📦 Testing queue...');
+            speaker.policy = 'queue';
+            speaker.speak('First message', { policy: 'queue' });
+            speaker.speak('Second message', { policy: 'queue' });
+            speaker.speak('Third message', { policy: 'queue' });
+            log('✅ Queue started');
+        }
+
+        // Load voices
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            const select = document.getElementById('voiceSelect');
+            select.innerHTML = '<option value="">Default Voice</option>';
+            
+            voices.forEach(voice => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                select.appendChild(option);
+            });
+            
+            log(`📢 ${voices.length} voices available`);
+        }
+
+        // Handle voice selection
+        document.getElementById('voiceSelect').onchange = function() {
+            const voices = window.speechSynthesis.getVoices();
+            const selected = voices.find(v => v.name === this.value);
+            speaker.setVoice(selected);
+            log(`🎤 Voice changed to: ${this.value || 'Default'}`);
+        };
+
+        // Load voices when ready
+        if (window.speechSynthesis.onvoiceschanged !== undefined) {
+            window.speechSynthesis.onvoiceschanged = loadVoices;
+        }
+        loadVoices();
+
+        // Initial test
+        window.onload = () => {
+            log('🚀 TTS System Ready! Click "Test Sound" to hear it.');
+        };
+    </script>
+</body>
+</html>
