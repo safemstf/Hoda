@@ -1,60 +1,277 @@
-// Simple semantic reader
-// Accepts either a DOM-like structure (array of sections) or plain string.
-// For Node demo, plain strings will be used. In browser, pass DOM-extracted sections.
-
-class Reader {
+// services/tts/reader.js - Page content reader
+/**
+ * Reader - Reads page content aloud
+ */
+export class Reader {
   constructor(speaker) {
     this.speaker = speaker;
+    this.isPaused = false;
+    this.currentText = null;
+    this.currentPosition = 0;
+    
+    console.log('[Reader] Initialized');
   }
 
-  // readPageSemantic accepts either a string or an array of sections
-  // sections: [{ role: 'headline'|'byline'|'paragraph', text: '...' }, ...]
-  async readPageSemantic(input) {
-    const sections = this._normalize(input);
+  /**
+   * Read text content
+   */
+  async read(text, options = {}) {
+    if (!text || text.trim().length === 0) {
+      console.warn('[Reader] No text to read');
+      return false;
+    }
 
-    for (const sec of sections) {
-      const text = this._formatSection(sec);
-      // Prepare payload following webllm TTS_OUTPUT_SCHEMA
-      const payload = {
-        text,
-        action: 'read',
-        success: true,
-        intent: { intent: 'read', slots: { role: sec.role }, confidence: 0.95 },
-        confidence: 0.95,
-        requiresConfirmation: false
-      };
+    this.currentText = text;
+    this.currentPosition = 0;
 
-      // Speak each section synchronously to preserve order
-      try {
-        await this.speaker.speak(text);
-      } catch (err) {
-        // On error, return failure payload for the section
-        return Object.assign({}, payload, { success: false, text: 'Error during read' });
+    // Clean up text for better speech
+    const cleanText = this.cleanText(text);
+    
+    try {
+      await this.speaker.speak(cleanText, {
+        rate: options.rate || 0.9, // Slightly slower for content reading
+        ...options
+      });
+      return true;
+    } catch (error) {
+      console.error('[Reader] Failed to read:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Read selected text on page
+   */
+  async readSelection() {
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+
+    if (!selectedText) {
+      await this.speaker.speak('No text selected', { rate: 1.2 });
+      return false;
+    }
+
+    return await this.read(selectedText);
+  }
+
+  /**
+   * Read heading from page
+   */
+  async readHeading(level = 1) {
+    const heading = document.querySelector(`h${level}`);
+    
+    if (!heading) {
+      await this.speaker.speak(`No heading ${level} found`, { rate: 1.2 });
+      return false;
+    }
+
+    const text = heading.textContent.trim();
+    await this.speaker.speak(`Heading ${level}: ${text}`, { rate: 1.0 });
+    return true;
+  }
+
+  /**
+   * Read all headings on page
+   */
+  async readHeadings(options = {}) {
+    const maxLevel = options.maxLevel || 3;
+    const headings = [];
+
+    for (let level = 1; level <= maxLevel; level++) {
+      const elements = document.querySelectorAll(`h${level}`);
+      elements.forEach(el => {
+        headings.push({
+          level,
+          text: el.textContent.trim()
+        });
+      });
+    }
+
+    if (headings.length === 0) {
+      await this.speaker.speak('No headings found', { rate: 1.2 });
+      return false;
+    }
+
+    // Read count first
+    await this.speaker.speak(`Found ${headings.length} headings`, { rate: 1.2 });
+    
+    // Read each heading
+    for (const heading of headings) {
+      await this.speaker.speak(
+        `Heading ${heading.level}: ${heading.text}`,
+        { rate: 1.0 }
+      );
+    }
+
+    return true;
+  }
+
+  /**
+   * Read paragraph
+   */
+  async readParagraph(index = 0) {
+    const paragraphs = document.querySelectorAll('p');
+    
+    if (index >= paragraphs.length) {
+      await this.speaker.speak('No more paragraphs', { rate: 1.2 });
+      return false;
+    }
+
+    const text = paragraphs[index].textContent.trim();
+    return await this.read(text);
+  }
+
+  /**
+   * Read list items
+   */
+  async readList(selector = 'ul, ol') {
+    const lists = document.querySelectorAll(selector);
+    
+    if (lists.length === 0) {
+      await this.speaker.speak('No lists found', { rate: 1.2 });
+      return false;
+    }
+
+    for (const list of lists) {
+      const items = list.querySelectorAll('li');
+      
+      await this.speaker.speak(
+        `List with ${items.length} items`,
+        { rate: 1.2 }
+      );
+
+      for (let i = 0; i < items.length; i++) {
+        const text = items[i].textContent.trim();
+        await this.speaker.speak(
+          `Item ${i + 1}: ${text}`,
+          { rate: 0.95 }
+        );
       }
     }
 
-    return { success: true };
+    return true;
   }
 
-  _normalize(input) {
-    if (typeof input === 'string') {
-      // Split into paragraphs by double newlines
-      const paras = input.split(/\n\n+/).map(p => ({ role: 'paragraph', text: p.trim() }));
-      return paras.filter(p => p.text);
+  /**
+   * Read table
+   */
+  async readTable(index = 0) {
+    const tables = document.querySelectorAll('table');
+    
+    if (index >= tables.length) {
+      await this.speaker.speak('No table found', { rate: 1.2 });
+      return false;
     }
 
-    if (Array.isArray(input)) {
-      return input.map(s => ({ role: s.role || 'paragraph', text: String(s.text || '').trim() })).filter(s => s.text);
+    const table = tables[index];
+    const rows = table.querySelectorAll('tr');
+    
+    await this.speaker.speak(
+      `Table with ${rows.length} rows`,
+      { rate: 1.2 }
+    );
+
+    for (let i = 0; i < Math.min(rows.length, 5); i++) { // Limit to first 5 rows
+      const cells = rows[i].querySelectorAll('th, td');
+      const cellTexts = Array.from(cells).map(cell => cell.textContent.trim());
+      
+      await this.speaker.speak(
+        `Row ${i + 1}: ${cellTexts.join(', ')}`,
+        { rate: 0.9 }
+      );
     }
 
-    return [];
+    if (rows.length > 5) {
+      await this.speaker.speak(
+        `And ${rows.length - 5} more rows`,
+        { rate: 1.2 }
+      );
+    }
+
+    return true;
   }
 
-  _formatSection(sec) {
-    if (sec.role === 'headline') return `Headline. ${sec.text}`;
-    if (sec.role === 'byline') return `Byline. ${sec.text}`;
-    return sec.text;
+  /**
+   * Read page title
+   */
+  async readTitle() {
+    const title = document.title;
+    
+    if (!title) {
+      await this.speaker.speak('No page title', { rate: 1.2 });
+      return false;
+    }
+
+    await this.speaker.speak(`Page title: ${title}`, { rate: 1.0 });
+    return true;
+  }
+
+  /**
+   * Read page summary (title + first paragraph)
+   */
+  async readSummary() {
+    await this.readTitle();
+    
+    const firstParagraph = document.querySelector('p');
+    if (firstParagraph) {
+      const text = firstParagraph.textContent.trim();
+      const summary = text.substring(0, 200); // First 200 chars
+      await this.read(summary);
+    }
+
+    return true;
+  }
+
+  /**
+   * Clean text for better speech synthesis
+   */
+  cleanText(text) {
+    return text
+      // Remove extra whitespace
+      .replace(/\s+/g, ' ')
+      // Remove URLs
+      .replace(/https?:\/\/[^\s]+/g, '')
+      // Clean up punctuation spacing
+      .replace(/\s+([.,!?;:])/g, '$1')
+      .trim();
+  }
+
+  /**
+   * Stop reading
+   */
+  stop() {
+    this.speaker.stop();
+    this.currentText = null;
+    this.currentPosition = 0;
+    console.log('[Reader] Stopped');
+  }
+
+  /**
+   * Pause reading
+   */
+  pause() {
+    this.speaker.pause();
+    this.isPaused = true;
+    console.log('[Reader] Paused');
+  }
+
+  /**
+   * Resume reading
+   */
+  resume() {
+    this.speaker.resume();
+    this.isPaused = false;
+    console.log('[Reader] Resumed');
+  }
+
+  /**
+   * Get reading status
+   */
+  getStatus() {
+    return {
+      reading: this.speaker.isSpeaking,
+      paused: this.isPaused,
+      hasContent: this.currentText !== null
+    };
   }
 }
-
-module.exports = Reader;
