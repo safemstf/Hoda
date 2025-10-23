@@ -1,17 +1,13 @@
-﻿// popup.js - IntentResolver PRIMARY + Safe Optional Enhancements
+﻿// popup.js - Clean Architecture: IntentResolver handles all routing
 // NO top-level await - everything loads properly!
-
 import { IntentResolver } from './services/stt/src/intentResolver.js';
 
 // ============================================================================
 // OPTIONAL ENHANCEMENT LOADERS (Called After DOM Ready)
 // ============================================================================
-let webllmService = null;
-let ttsService = null;
-
 async function tryLoadWebLLM() {
   try {
-    const { createService } = await import('./services/webllm/src/integration.js');
+    const { createService } = await import('./services/webllm/src/index.js');
     console.log('[Import] ✅ WebLLM module loaded');
     return createService;
   } catch (error) {
@@ -152,12 +148,14 @@ const RATE_LIMIT = {
     this.checkDailyReset();
     const now = Date.now();
     this.requests = this.requests.filter(time => now - time < 60000);
+
     if (this.requests.length >= this.maxRequestsPerMinute) {
       return { ok: false, reason: 'minute_limit' };
     }
     if (this.dailyCount >= this.maxRequestsPerDay) {
       return { ok: false, reason: 'daily_limit' };
     }
+
     this.requests.push(now);
     this.dailyCount++;
     chrome.storage.local.set({ dailyUsage: this.dailyCount });
@@ -205,6 +203,26 @@ const UI = {
 };
 
 // ============================================================================
+// CORE SYSTEM (Always Works)
+// ============================================================================
+const resolver = new IntentResolver({
+  useNormalizerFirst: true,
+  llmFallback: true,
+  enableLLM: false,  // Will be enabled when WebLLM loads
+  enableLogging: true
+});
+
+const wakeWordDetector = new WakeWordDetector({
+  wakeWords: ['hoda', 'hey hoda'],
+  requireWakeWord: false,
+  commandTimeout: 5000
+});
+
+let ttsService = null;
+
+console.log('[Popup] Core systems initialized');
+
+// ============================================================================
 // TTS HELPERS (Safe - Only Work If TTS Loaded)
 // ============================================================================
 async function speak(message, isError = false) {
@@ -226,24 +244,6 @@ async function confirmCommand(intentResult) {
     return false;
   }
 }
-
-// ============================================================================
-// CORE SYSTEM (Always Works)
-// ============================================================================
-const resolver = new IntentResolver({
-  useNormalizerFirst: true,
-  llmFallback: true,
-  enableLLM: false,
-  enableLogging: true
-});
-
-const wakeWordDetector = new WakeWordDetector({
-  wakeWords: ['hoda', 'hey hoda'],
-  requireWakeWord: false,
-  commandTimeout: 5000
-});
-
-console.log('[Popup] Core systems initialized');
 
 // ============================================================================
 // SPEECH RECOGNITION
@@ -285,7 +285,6 @@ function startListening() {
       state.recognition.onresult = async (event) => {
         const transcript = event.results[0][0].transcript;
         const confidence = event.results[0][0].confidence;
-
         console.log('[Speech] Transcript:', transcript);
 
         if (UI.transcript) {
@@ -312,7 +311,6 @@ function startListening() {
         }
 
         const commandText = wakeResult.command || transcript;
-
         if (!commandText || commandText.trim().length === 0) {
           stopListening();
           return;
@@ -325,25 +323,15 @@ function startListening() {
           confidence
         });
 
-        // COMMAND PROCESSING: IntentResolver PRIMARY → WebLLM FALLBACK
-        let result;
+        // ✨ CLEAN COMMAND PROCESSING: IntentResolver handles everything
         try {
           console.log('[Command] Processing with IntentResolver');
-          result = await resolver.resolve(commandText);
-
-          // If unknown AND WebLLM available → Try fallback
-          if ((!result || result.intent === 'unknown') && state.isLLMReady && webllmService) {
-            console.log('[Command] Trying WebLLM fallback');
-            const currentUrl = await getCurrentTabUrl();
-            
-            result = await webllmService.processCommand(commandText, {
-              url: currentUrl,
-              context: {
-                previousCommand: state.lastCommand,
-                recentTranscripts: await getRecentTranscripts(3)
-              }
-            });
-          }
+          
+          const result = await resolver.resolve(commandText, {
+            url: await getCurrentTabUrl(),
+            previousCommand: state.lastCommand,
+            recentTranscripts: await getRecentTranscripts(3)
+          });
 
           if (result && result.intent && result.intent !== 'unknown') {
             state.stats.recognizedCommands++;
@@ -355,7 +343,12 @@ function startListening() {
 
             await confirmCommand(result);
             await executeCommand(result);
-            showCommandResult(`✓ ${result.intent}`, false);
+            
+            // Show which system handled it
+            const sourceEmoji = result.source === 'llm' ? '🤖' : '⚡';
+            showCommandResult(`${sourceEmoji} ${result.intent}`, false);
+            
+            console.log(`[Command] ✅ Resolved by ${result.source}`);
           } else {
             const msg = 'Command not recognized';
             showCommandResult(msg, true);
@@ -364,7 +357,6 @@ function startListening() {
 
           updateStatsUI();
           await saveStats();
-
         } catch (error) {
           console.error('[Command] Error:', error);
           showCommandResult('Error processing', true);
@@ -387,7 +379,6 @@ function startListening() {
       };
 
       state.recognition.start();
-
     } catch (err) {
       console.error('[Speech] Setup failed:', err);
       updateStatus('❌ Failed to start');
@@ -407,9 +398,10 @@ function stopListening() {
 
   state.isListening = false;
   UI.micBtn.classList.remove('listening');
-
+  
   const status = RATE_LIMIT.getStatus();
-  updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
+  const aiStatus = state.isLLMReady ? ' ✨' : '';
+  updateStatus(`Ready${aiStatus} - ${status.remaining}/${status.dailyLimit} left`);
   updateQuotaUI();
 }
 
@@ -451,7 +443,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (stored.rateLimitReset) {
     RATE_LIMIT.lastReset = stored.rateLimitReset;
   }
-
   if (stored.dailyUsage !== undefined) {
     RATE_LIMIT.dailyCount = stored.dailyUsage;
   } else {
@@ -482,15 +473,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const status = RATE_LIMIT.getStatus();
     updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
     UI.micBtn.disabled = false;
-
     console.log('[Popup] ✅ Ready');
-    console.log('[Popup] Stats:', resolver.getStats());
+    console.log('[Popup] IntentResolver stats:', resolver.getStats());
 
     if (status.remaining < 5) {
       showCommandResult(`⚠️ Only ${status.remaining} left!`, true);
     }
 
-    // Try to load optional enhancements (non-blocking)
+    // ✨ Load TTS (non-blocking)
     tryLoadTTS().then(async (createTTSService) => {
       if (createTTSService) {
         try {
@@ -502,32 +492,46 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           });
           state.isTTSReady = true;
-          console.log('[Popup] ✨ TTS enabled');
+          console.log('[Popup] ✅ TTS enabled');
         } catch (err) {
           console.log('[Popup] TTS init failed:', err.message);
         }
       }
     });
 
+    // ✨ Load WebLLM and inject into IntentResolver (non-blocking)
     tryLoadWebLLM().then(async (createWebLLMService) => {
       if (createWebLLMService) {
         try {
-          webllmService = await createWebLLMService({
+          console.log('[Popup] 🔄 Loading AI model (10-30 seconds)...');
+          updateStatus('⏳ Loading AI model...');
+          showCommandResult('Basic commands work now', false);
+
+          const webllmService = await createWebLLMService({
             privacy: {
               enableAnalytics: false,
               enableLogging: true,
               allowRemoteModels: false
             }
           });
+
+          // Inject WebLLM into IntentResolver
+          await resolver.initializeLLM(webllmService);
+
           state.isLLMReady = true;
-          console.log('[Popup] ✨ WebLLM fallback ready');
-          showCommandResult('🤖 AI fallback loaded', false);
+          const status = RATE_LIMIT.getStatus();
+          updateStatus(`Ready ✨ - ${status.remaining}/${status.dailyLimit} left`);
+          showCommandResult('🤖 AI commands ready', false);
+          
+          console.log('[Popup] ✅ WebLLM injected into IntentResolver');
+          console.log('[Popup] IntentResolver stats:', resolver.getStats());
         } catch (err) {
           console.log('[Popup] WebLLM init failed:', err.message);
+          const status = RATE_LIMIT.getStatus();
+          updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
         }
       }
     });
-
   } else {
     updateStatus('⚠️ Speech not supported');
     UI.micBtn.disabled = true;
@@ -539,11 +543,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================================
 function updateQuotaUI() {
   const status = RATE_LIMIT.getStatus();
-
   if (UI.quotaBar) {
     const percent = (status.remaining / status.dailyLimit) * 100;
     UI.quotaBar.style.width = percent + '%';
-
     if (percent < 25) {
       UI.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
     } else if (percent < 50) {
@@ -552,7 +554,6 @@ function updateQuotaUI() {
       UI.quotaBar.style.background = 'linear-gradient(90deg, #10b981, rgba(255, 255, 255, 0.9))';
     }
   }
-
   if (UI.quotaText) {
     UI.quotaText.textContent = `${status.remaining}/${status.dailyLimit} requests left`;
   }
@@ -581,11 +582,13 @@ async function checkActiveTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab) throw new Error('No active tab');
+
     if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
       updateStatus('⚠️ Navigate to a webpage');
       state.currentTabId = null;
       return false;
     }
+
     state.currentTabId = tab.id;
     return true;
   } catch (err) {
@@ -705,13 +708,15 @@ function setupEventListeners() {
   });
 }
 
-// Debug
+// ============================================================================
+// DEBUG
+// ============================================================================
 window.__hoda_popup = {
   resolver,
   wakeWordDetector,
   state,
   showStats() {
-    console.log('Resolver:', resolver.getStats());
+    console.log('IntentResolver:', resolver.getStats());
     console.log('State:', state);
   },
   async testResolver() {
@@ -721,4 +726,4 @@ window.__hoda_popup = {
   }
 };
 
-console.log('[Popup] ✅ Loaded - IntentResolver + Optional Enhancements');
+console.log('[Popup] ✅ Loaded - Clean Architecture');
