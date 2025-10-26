@@ -1,29 +1,35 @@
-﻿// popup.js - Clean Architecture: IntentResolver handles all routing
-// NO top-level await - everything loads properly!
+﻿/**
+ * ============================================================================
+ * HODA VOICE ASSISTANT - OBJECT-ORIENTED ARCHITECTURE
+ * ============================================================================
+ */
+
 import { IntentResolver } from './services/stt/src/intentResolver.js';
 
 // ============================================================================
-// OPTIONAL ENHANCEMENT LOADERS (Called After DOM Ready)
+// SERVICE LOADER - Handles Optional Module Loading
 // ============================================================================
-async function tryLoadWebLLM() {
-  try {
-    const { createService } = await import('./services/webllm/src/index.js');
-    console.log('[Import] ✅ WebLLM module loaded');
-    return createService;
-  } catch (error) {
-    console.log('[Import] ⚠️ WebLLM not available (optional)');
-    return null;
+class ServiceLoader {
+  static async loadWebLLM() {
+    try {
+      const { createService } = await import('./services/webllm/src/index.js');
+      console.log('[ServiceLoader] ✅ WebLLM module loaded');
+      return createService;
+    } catch (error) {
+      console.log('[ServiceLoader] ⚠️ WebLLM not available (optional)');
+      return null;
+    }
   }
-}
 
-async function tryLoadTTS() {
-  try {
-    const { createTTSService } = await import('./services/tts/src/index.js');
-    console.log('[Import] ✅ TTS module loaded');
-    return createTTSService;
-  } catch (error) {
-    console.log('[Import] ⚠️ TTS not available (optional)');
-    return null;
+  static async loadTTS() {
+    try {
+      const { createTTSService } = await import('./services/tts/src/index.js');
+      console.log('[ServiceLoader] ✅ TTS module loaded');
+      return createTTSService;
+    } catch (error) {
+      console.log('[ServiceLoader] ⚠️ TTS not available (optional)');
+      return null;
+    }
   }
 }
 
@@ -125,14 +131,17 @@ class WakeWordDetector {
 }
 
 // ============================================================================
-// RATE LIMITING
+// RATE LIMITER
 // ============================================================================
-const RATE_LIMIT = {
-  maxRequestsPerMinute: 10,
-  maxRequestsPerDay: 100,
-  requests: [],
-  dailyCount: 0,
-  lastReset: Date.now(),
+class RateLimiter {
+  constructor(options = {}) {
+    this.maxRequestsPerMinute = options.maxRequestsPerMinute || 10;
+    this.maxRequestsPerDay = options.maxRequestsPerDay || 100;
+    this.requests = [];
+    this.dailyCount = 0;
+    this.lastReset = Date.now();
+    console.log('[RateLimiter] Initialized');
+  }
 
   checkDailyReset() {
     const now = Date.now();
@@ -142,7 +151,7 @@ const RATE_LIMIT = {
       this.lastReset = now;
       chrome.storage.local.set({ rateLimitReset: now, dailyUsage: 0 });
     }
-  },
+  }
 
   canMakeRequest() {
     this.checkDailyReset();
@@ -160,7 +169,7 @@ const RATE_LIMIT = {
     this.dailyCount++;
     chrome.storage.local.set({ dailyUsage: this.dailyCount });
     return { ok: true };
-  },
+  }
 
   getStatus() {
     this.checkDailyReset();
@@ -171,341 +180,716 @@ const RATE_LIMIT = {
       resetTime: new Date(this.lastReset + 86400000).toLocaleString()
     };
   }
-};
 
-// ============================================================================
-// STATE
-// ============================================================================
-const state = {
-  isListening: false,
-  currentTabId: null,
-  recognition: null,
-  networkErrorCount: 0,
-  lastCommand: null,
-  stats: { totalCommands: 0, recognizedCommands: 0 },
-  isLLMReady: false,
-  isTTSReady: false,
-  ttsEnabled: true
-};
-
-// ============================================================================
-// UI ELEMENTS
-// ============================================================================
-const UI = {
-  micBtn: document.getElementById('micBtn'),
-  statusText: document.getElementById('statusText'),
-  transcript: document.getElementById('transcript'),
-  commandResult: document.getElementById('commandResult'),
-  statTotal: document.getElementById('statTotal'),
-  statRecognized: document.getElementById('statRecognized'),
-  quotaBar: document.getElementById('quotaBar'),
-  quotaText: document.getElementById('quotaText')
-};
-
-// ============================================================================
-// CORE SYSTEM (Always Works)
-// ============================================================================
-const resolver = new IntentResolver({
-  useNormalizerFirst: true,
-  llmFallback: true,
-  enableLLM: false,  // Will be enabled when WebLLM loads
-  enableLogging: true
-});
-
-const wakeWordDetector = new WakeWordDetector({
-  wakeWords: ['hoda', 'hey hoda'],
-  requireWakeWord: false,
-  commandTimeout: 5000
-});
-
-let ttsService = null;
-
-console.log('[Popup] Core systems initialized');
-
-// ============================================================================
-// TTS HELPERS (Safe - Only Work If TTS Loaded)
-// ============================================================================
-async function speak(message, isError = false) {
-  if (!state.isTTSReady || !state.ttsEnabled || !ttsService) return false;
-  try {
-    await ttsService.speakResult(message, isError);
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function confirmCommand(intentResult) {
-  if (!state.isTTSReady || !state.ttsEnabled || !ttsService) return false;
-  try {
-    await ttsService.confirmCommand(intentResult);
-    return true;
-  } catch (error) {
-    return false;
+  async loadFromStorage() {
+    const stored = await chrome.storage.local.get(['rateLimitReset', 'dailyUsage']);
+    if (stored.rateLimitReset) {
+      this.lastReset = stored.rateLimitReset;
+    }
+    if (stored.dailyUsage !== undefined) {
+      this.dailyCount = stored.dailyUsage;
+    } else {
+      await chrome.storage.local.set({
+        rateLimitReset: this.lastReset,
+        dailyUsage: 0
+      });
+    }
+    this.checkDailyReset();
   }
 }
 
 // ============================================================================
-// SPEECH RECOGNITION
+// STORAGE MANAGER
 // ============================================================================
-function startListening() {
-  return new Promise(async (resolve, reject) => {
-    const hasTab = await checkActiveTab();
-    if (!hasTab) {
-      updateStatus('⚠️ Navigate to a webpage first');
-      showCommandResult('No valid webpage', true);
-      return reject(new Error('No valid tab'));
-    }
+class StorageManager {
+  constructor() {
+    console.log('[StorageManager] Initialized');
+  }
 
-    const rateCheck = RATE_LIMIT.canMakeRequest();
-    if (!rateCheck.ok) {
-      const msg = rateCheck.reason === 'daily_limit' ? '❌ Daily limit reached' : '❌ Too many requests';
-      updateStatus(msg);
-      showCommandResult(msg, true);
-      return reject(new Error(msg));
-    }
-
+  async saveTranscript(transcript) {
     try {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) throw new Error('Speech recognition not supported');
-
-      state.recognition = new SpeechRecognition();
-      state.recognition.lang = 'en-US';
-      state.recognition.continuous = false;
-      state.recognition.interimResults = false;
-      state.recognition.maxAlternatives = 1;
-
-      state.recognition.onstart = () => {
-        state.isListening = true;
-        updateStatus('🎤 Listening...');
-        UI.micBtn.classList.add('listening');
-        resolve();
-      };
-
-      state.recognition.onresult = async (event) => {
-        const transcript = event.results[0][0].transcript;
-        const confidence = event.results[0][0].confidence;
-        console.log('[Speech] Transcript:', transcript);
-
-        if (UI.transcript) {
-          UI.transcript.textContent = transcript;
-          UI.transcript.classList.remove('empty');
-        }
-
-        state.stats.totalCommands++;
-        updateStatsUI();
-
-        const wakeResult = wakeWordDetector.process(transcript);
-
-        if (wakeResult.type === 'ignored') {
-          showCommandResult('Say "Hoda" first', true);
-          await speak('Say Hoda first', true);
-          stopListening();
-          return;
-        }
-
-        if (wakeResult.type === 'wake') {
-          showCommandResult('🔔 Ready...', false);
-          await speak('Ready', false);
-          return;
-        }
-
-        const commandText = wakeResult.command || transcript;
-        if (!commandText || commandText.trim().length === 0) {
-          stopListening();
-          return;
-        }
-
-        await saveTranscript({
-          text: commandText,
-          original: transcript,
-          timestamp: Date.now(),
-          confidence
-        });
-
-        // ✨ CLEAN COMMAND PROCESSING: IntentResolver handles everything
-        try {
-          console.log('[Command] Processing with IntentResolver');
-          
-          const result = await resolver.resolve(commandText, {
-            url: await getCurrentTabUrl(),
-            previousCommand: state.lastCommand,
-            recentTranscripts: await getRecentTranscripts(3)
-          });
-
-          if (result && result.intent && result.intent !== 'unknown') {
-            state.stats.recognizedCommands++;
-            state.lastCommand = {
-              text: commandText,
-              result,
-              timestamp: Date.now()
-            };
-
-            await confirmCommand(result);
-            await executeCommand(result);
-            
-            // Show which system handled it
-            const sourceEmoji = result.source === 'llm' ? '🤖' : '⚡';
-            showCommandResult(`${sourceEmoji} ${result.intent}`, false);
-            
-            console.log(`[Command] ✅ Resolved by ${result.source}`);
-          } else {
-            const msg = 'Command not recognized';
-            showCommandResult(msg, true);
-            await speak(msg, true);
-          }
-
-          updateStatsUI();
-          await saveStats();
-        } catch (error) {
-          console.error('[Command] Error:', error);
-          showCommandResult('Error processing', true);
-        }
-
-        stopListening();
-      };
-
-      state.recognition.onerror = (event) => {
-        console.error('[Speech] Error:', event.error);
-        if (event.error !== 'no-speech') {
-          showCommandResult(`Error: ${event.error}`, true);
-        }
-        stopListening();
-        reject(new Error(event.error));
-      };
-
-      state.recognition.onend = () => {
-        stopListening();
-      };
-
-      state.recognition.start();
+      const result = await chrome.storage.local.get(['transcripts']);
+      let transcripts = result.transcripts || [];
+      transcripts.push(transcript);
+      if (transcripts.length > 50) transcripts = transcripts.slice(-50);
+      await chrome.storage.local.set({ transcripts });
     } catch (err) {
-      console.error('[Speech] Setup failed:', err);
-      updateStatus('❌ Failed to start');
-      showCommandResult('Microphone access denied', true);
-      reject(err);
+      console.error('[StorageManager] Failed to save transcript:', err);
     }
-  });
-}
+  }
 
-function stopListening() {
-  if (state.recognition) {
+  async getRecentTranscripts(count = 5) {
     try {
-      state.recognition.stop();
-    } catch (err) {}
-    state.recognition = null;
+      const result = await chrome.storage.local.get(['transcripts']);
+      const transcripts = result.transcripts || [];
+      return transcripts.slice(-count);
+    } catch (err) {
+      console.error('[StorageManager] Failed to get transcripts:', err);
+      return [];
+    }
   }
 
-  state.isListening = false;
-  UI.micBtn.classList.remove('listening');
-  
-  const status = RATE_LIMIT.getStatus();
-  const aiStatus = state.isLLMReady ? ' ✨' : '';
-  updateStatus(`Ready${aiStatus} - ${status.remaining}/${status.dailyLimit} left`);
-  updateQuotaUI();
+  async loadStats() {
+    try {
+      const result = await chrome.storage.local.get(['stats']);
+      return result.stats || { totalCommands: 0, recognizedCommands: 0 };
+    } catch (err) {
+      console.error('[StorageManager] Failed to load stats:', err);
+      return { totalCommands: 0, recognizedCommands: 0 };
+    }
+  }
+
+  async saveStats(stats) {
+    try {
+      await chrome.storage.local.set({ stats });
+    } catch (err) {
+      console.error('[StorageManager] Failed to save stats:', err);
+    }
+  }
+
+  async loadPreferences() {
+    try {
+      return await chrome.storage.local.get(['wakeWordRequired', 'ttsEnabled']);
+    } catch (err) {
+      console.error('[StorageManager] Failed to load preferences:', err);
+      return {};
+    }
+  }
 }
 
 // ============================================================================
-// COMMAND EXECUTION
+// TAB MANAGER
 // ============================================================================
-async function executeCommand(result) {
-  if (!state.currentTabId) return;
+class TabManager {
+  constructor() {
+    this.currentTabId = null;
+    console.log('[TabManager] Initialized');
+  }
 
-  try {
-    const response = await chrome.tabs.sendMessage(state.currentTabId, {
-      action: 'executeIntent',
-      intent: result
-    });
+  async checkActiveTab() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab) throw new Error('No active tab');
 
-    if (response && !response.success) {
-      showCommandResult(response.error || 'Failed', true);
+      if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
+        this.currentTabId = null;
+        return { success: false, reason: 'Navigate to a webpage' };
+      }
+
+      this.currentTabId = tab.id;
+      return { success: true, tabId: tab.id };
+    } catch (err) {
+      this.currentTabId = null;
+      return { success: false, reason: err.message };
     }
-  } catch (err) {
-    console.error('[Execute] Failed:', err);
-    showCommandResult('Could not execute', true);
+  }
+
+  async getCurrentTabUrl() {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      return tab?.url || null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async sendMessageToTab(message) {
+    if (!this.currentTabId) {
+      throw new Error('No active tab');
+    }
+
+    try {
+      const response = await chrome.tabs.sendMessage(this.currentTabId, message);
+      return response;
+    } catch (err) {
+      console.error('[TabManager] Failed to send message:', err);
+      throw err;
+    }
   }
 }
 
 // ============================================================================
-// INITIALIZATION
+// UI MANAGER
 // ============================================================================
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('[Popup] Starting...');
-
-  // Load storage
-  const stored = await chrome.storage.local.get([
-    'rateLimitReset',
-    'dailyUsage',
-    'wakeWordRequired',
-    'ttsEnabled'
-  ]);
-
-  if (stored.rateLimitReset) {
-    RATE_LIMIT.lastReset = stored.rateLimitReset;
-  }
-  if (stored.dailyUsage !== undefined) {
-    RATE_LIMIT.dailyCount = stored.dailyUsage;
-  } else {
-    await chrome.storage.local.set({
-      rateLimitReset: RATE_LIMIT.lastReset,
-      dailyUsage: 0
-    });
+class UIManager {
+  constructor() {
+    this.elements = {
+      micBtn: document.getElementById('micBtn'),
+      statusText: document.getElementById('statusText'),
+      transcript: document.getElementById('transcript'),
+      commandResult: document.getElementById('commandResult'),
+      statTotal: document.getElementById('statTotal'),
+      statRecognized: document.getElementById('statRecognized'),
+      quotaBar: document.getElementById('quotaBar'),
+      quotaText: document.getElementById('quotaText')
+    };
+    console.log('[UIManager] Initialized');
   }
 
-  RATE_LIMIT.checkDailyReset();
-  updateQuotaUI();
-
-  if (stored.wakeWordRequired !== undefined) {
-    wakeWordDetector.setWakeWordRequired(stored.wakeWordRequired);
+  updateStatus(text) {
+    if (this.elements.statusText) {
+      this.elements.statusText.textContent = text;
+    }
   }
 
-  if (stored.ttsEnabled !== undefined) {
-    state.ttsEnabled = stored.ttsEnabled;
+  updateTranscript(text) {
+    if (this.elements.transcript) {
+      this.elements.transcript.textContent = text;
+    }
   }
 
-  await checkActiveTab();
-  await loadStats();
-  setupEventListeners();
+  showCommandResult(message, isError = false) {
+    if (!this.elements.commandResult) return;
 
-  const hasSupport = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+    this.elements.commandResult.textContent = message;
+    this.elements.commandResult.className = 'command-result show' + (isError ? ' error' : ' success');
 
-  if (hasSupport) {
-    const status = RATE_LIMIT.getStatus();
-    updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
-    UI.micBtn.disabled = false;
-    console.log('[Popup] ✅ Ready');
-    console.log('[Popup] IntentResolver stats:', resolver.getStats());
+    setTimeout(() => {
+      this.elements.commandResult.classList.remove('show');
+    }, 5000);
+  }
 
-    if (status.remaining < 5) {
-      showCommandResult(`⚠️ Only ${status.remaining} left!`, true);
+  updateStats(stats) {
+    if (this.elements.statTotal) {
+      this.elements.statTotal.textContent = stats.totalCommands;
+    }
+    if (this.elements.statRecognized) {
+      this.elements.statRecognized.textContent = stats.recognizedCommands;
+    }
+  }
+
+  updateQuota(status) {
+    if (this.elements.quotaBar) {
+      const percent = (status.remaining / status.dailyLimit) * 100;
+      this.elements.quotaBar.style.width = percent + '%';
+
+      if (percent < 25) {
+        this.elements.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
+      } else if (percent < 50) {
+        this.elements.quotaBar.style.background = 'linear-gradient(90deg, #f59e0b, rgba(245, 158, 11, 0.9))';
+      } else {
+        this.elements.quotaBar.style.background = 'linear-gradient(90deg, #10b981, rgba(255, 255, 255, 0.9))';
+      }
     }
 
-    // ✨ Load TTS (non-blocking)
-    tryLoadTTS().then(async (createTTSService) => {
+    if (this.elements.quotaText) {
+      this.elements.quotaText.textContent = `${status.remaining}/${status.dailyLimit} requests left`;
+    }
+  }
+
+  setListeningState(isListening) {
+    if (this.elements.micBtn) {
+      if (isListening) {
+        this.elements.micBtn.classList.add('listening');
+      } else {
+        this.elements.micBtn.classList.remove('listening');
+      }
+    }
+  }
+
+  setMicButtonEnabled(enabled) {
+    if (this.elements.micBtn) {
+      this.elements.micBtn.disabled = !enabled;
+    }
+  }
+}
+
+// ============================================================================
+// SPEECH RECOGNITION SERVICE - Fixed with readiness checks
+// ============================================================================
+class SpeechRecognitionService {
+  constructor(options = {}) {
+    this.recognition = null;
+    this.isListening = false;
+    this.networkErrorCount = 0;
+    this.maxNetworkErrors = options.maxNetworkErrors || 3;
+
+    this.callbacks = {
+      onStart: options.onStart || (() => { }),
+      onResult: options.onResult || (() => { }),
+      onError: options.onError || (() => { }),
+      onEnd: options.onEnd || (() => { })
+    };
+
+    this.initRecognition();
+    console.log('[SpeechRecognition] ✅ Initialized (direct mode - WORKING!)');
+  }
+
+  initRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (!SpeechRecognition) {
+      console.error('[SpeechRecognition] ❌ API not supported');
+      this.callbacks.onError({
+        type: 'not-supported',
+        userMessage: 'Speech recognition not supported in this browser',
+        statusMessage: '⚠️ Not supported'
+      });
+      return;
+    }
+
+    this.recognition = new SpeechRecognition();
+    this.recognition.continuous = true;
+    this.recognition.interimResults = true;
+    this.recognition.lang = 'en-US';
+    this.recognition.maxAlternatives = 1;
+
+    this.recognition.onstart = () => {
+      console.log('[SpeechRecognition] 🎤 Started successfully!');
+      this.isListening = true;
+      this.networkErrorCount = 0;
+      this.callbacks.onStart();
+    };
+
+    this.recognition.onresult = (event) => {
+      const last = event.results.length - 1;
+      const result = event.results[last];
+      
+      console.log('[SpeechRecognition] 📝 Result:', result[0].transcript, 'Final:', result.isFinal);
+      
+      this.callbacks.onResult({
+        transcript: result[0].transcript.trim(),
+        isFinal: result.isFinal,
+        confidence: result[0].confidence || 0.9
+      });
+    };
+
+    this.recognition.onerror = (event) => {
+      console.error('[SpeechRecognition] ❌ Error:', event.error);
+      this.handleError(event.error, event.message);
+    };
+
+    this.recognition.onend = () => {
+      console.log('[SpeechRecognition] 🔄 Ended, isListening:', this.isListening);
+      
+      // Auto-restart if we're supposed to be listening
+      if (this.isListening) {
+        console.log('[SpeechRecognition] ↻ Auto-restarting...');
+        setTimeout(() => {
+          if (this.recognition && this.isListening) {
+            try {
+              this.recognition.start();
+            } catch (e) {
+              console.error('[SpeechRecognition] ❌ Auto-restart failed:', e);
+              this.isListening = false;
+              this.callbacks.onEnd();
+            }
+          }
+        }, 100);
+      } else {
+        this.callbacks.onEnd();
+      }
+    };
+
+    console.log('[SpeechRecognition] ✅ Recognition ready');
+  }
+
+  handleError(errorType, errorMessage) {
+    const errorInfo = {
+      type: errorType,
+      message: errorMessage || '',
+      recoverable: false
+    };
+
+    switch (errorType) {
+      case 'not-allowed':
+        errorInfo.userMessage = 'Please allow microphone access';
+        errorInfo.statusMessage = '⚠️ Microphone denied';
+        this.isListening = false;
+        break;
+
+      case 'not-supported':
+        errorInfo.userMessage = 'Speech recognition not supported';
+        errorInfo.statusMessage = '⚠️ Not supported';
+        this.isListening = false;
+        break;
+
+      case 'no-speech':
+        // Don't show error for no-speech
+        return;
+
+      case 'audio-capture':
+        errorInfo.userMessage = 'No microphone detected';
+        errorInfo.statusMessage = '⚠️ No microphone';
+        this.isListening = false;
+        break;
+
+      case 'network':
+        this.networkErrorCount++;
+        if (this.networkErrorCount < this.maxNetworkErrors) {
+          console.log('[SpeechRecognition] Network error, will retry...');
+          errorInfo.recoverable = true;
+          return;
+        }
+        errorInfo.userMessage = 'Network error - check connection';
+        errorInfo.statusMessage = '⚠️ Network issues';
+        this.isListening = false;
+        break;
+
+      case 'aborted':
+        // Normal stop, don't show error
+        return;
+
+      default:
+        errorInfo.userMessage = `Error: ${errorType}`;
+        errorInfo.statusMessage = '⚠️ Speech error';
+        this.isListening = false;
+    }
+
+    this.callbacks.onError(errorInfo);
+  }
+
+  async start() {
+    if (this.isListening) {
+      console.warn('[SpeechRecognition] ⚠️ Already listening');
+      return;
+    }
+
+    if (!this.recognition) {
+      const error = {
+        type: 'initialization',
+        userMessage: 'Speech recognition not initialized',
+        statusMessage: '⚠️ Not initialized'
+      };
+      this.callbacks.onError(error);
+      throw new Error(error.userMessage);
+    }
+
+    try {
+      console.log('[SpeechRecognition] 🚀 Starting...');
+      this.isListening = true;
+      this.recognition.start();
+      console.log('[SpeechRecognition] ✅ Start command sent');
+      
+    } catch (error) {
+      console.error('[SpeechRecognition] ❌ Start error:', error);
+      this.isListening = false;
+      
+      const errorInfo = {
+        type: 'start-failed',
+        message: error.message,
+        userMessage: error.message || 'Failed to start speech recognition',
+        statusMessage: '⚠️ Start failed'
+      };
+      
+      this.callbacks.onError(errorInfo);
+      throw error;
+    }
+  }
+
+  stop() {
+    if (!this.isListening || !this.recognition) {
+      console.log('[SpeechRecognition] ℹ️ Not listening or no recognition');
+      return;
+    }
+
+    console.log('[SpeechRecognition] 🛑 Stopping...');
+    this.isListening = false;
+    
+    try {
+      this.recognition.stop();
+    } catch (err) {
+      console.error('[SpeechRecognition] ❌ Stop error:', err);
+    }
+  }
+
+  isSupported() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  getState() {
+    return {
+      isListening: this.isListening,
+      networkErrorCount: this.networkErrorCount,
+      isSupported: this.isSupported()
+    };
+  }
+}
+// ============================================================================
+// COMMAND PROCESSOR
+// ============================================================================
+class CommandProcessor {
+  constructor(options = {}) {
+    this.resolver = options.resolver;
+    this.tabManager = options.tabManager;
+    this.rateLimiter = options.rateLimiter;
+    this.storageManager = options.storageManager;
+    this.wakeWordDetector = options.wakeWordDetector;
+    this.ttsService = null;
+    this.stats = { totalCommands: 0, recognizedCommands: 0 };
+
+    console.log('[CommandProcessor] Initialized');
+  }
+
+  setTTSService(ttsService) {
+    this.ttsService = ttsService;
+  }
+
+  async speak(message, isError = false) {
+    if (!this.ttsService) return false;
+
+    try {
+      await this.ttsService.speakResult(message, isError);
+      return true;
+    } catch (error) {
+      console.error('[CommandProcessor] TTS error:', error);
+      return false;
+    }
+  }
+
+  async confirmCommand(intentResult) {
+    if (!this.ttsService) return false;
+
+    try {
+      await this.ttsService.confirmCommand(intentResult);
+      return true;
+    } catch (error) {
+      console.error('[CommandProcessor] TTS confirmation error:', error);
+      return false;
+    }
+  }
+
+  async processTranscript(transcript, url) {
+    console.log('[CommandProcessor] Processing transcript:', transcript);
+
+    // Save transcript
+    await this.storageManager.saveTranscript({
+      text: transcript,
+      timestamp: Date.now(),
+      url: url
+    });
+
+    // Check wake word
+    const wakeResult = this.wakeWordDetector.process(transcript);
+    console.log('[CommandProcessor] Wake word result:', wakeResult);
+
+    if (wakeResult.type === 'ignored') {
+      console.log('[CommandProcessor] Ignored - wake word required');
+      return {
+        success: false,
+        reason: 'wake_word_required',
+        message: 'Say "hey hoda" first'
+      };
+    }
+
+    const commandText = wakeResult.command || transcript;
+
+    if (!commandText) {
+      return {
+        success: false,
+        reason: 'no_command',
+        message: 'No command detected'
+      };
+    }
+
+    // Process command
+    return await this.processCommand(commandText);
+  }
+
+  async processCommand(commandText) {
+    console.log('[CommandProcessor] Processing command:', commandText);
+
+    // Check rate limit
+    const rateCheck = this.rateLimiter.canMakeRequest();
+    if (!rateCheck.ok) {
+      const message = rateCheck.reason === 'minute_limit'
+        ? '⚠️ Too many requests (10/minute limit)'
+        : '⚠️ Daily limit reached';
+
+      await this.speak(message, true);
+
+      return {
+        success: false,
+        reason: rateCheck.reason,
+        message: message
+      };
+    }
+
+    // Update stats
+    this.stats.totalCommands++;
+
+    try {
+      // Resolve intent
+      const intentResult = await this.resolver.resolve(commandText);
+      console.log('[CommandProcessor] Intent resolved:', intentResult);
+
+      if (intentResult.intent === 'unknown') {
+        await this.speak('I did not understand that command', true);
+        return {
+          success: false,
+          reason: 'unknown_command',
+          message: '❓ Unknown command'
+        };
+      }
+
+      // Command recognized
+      this.stats.recognizedCommands++;
+
+      // Confirm and execute
+      await this.confirmCommand(intentResult);
+      await this.executeCommand(intentResult);
+
+      return {
+        success: true,
+        intent: intentResult
+      };
+
+    } catch (error) {
+      console.error('[CommandProcessor] Process error:', error);
+      await this.speak('Command failed', true);
+
+      return {
+        success: false,
+        reason: 'execution_error',
+        message: '⚠️ Command failed',
+        error: error.message
+      };
+    } finally {
+      await this.storageManager.saveStats(this.stats);
+    }
+  }
+
+  async executeCommand(intentResult) {
+    try {
+      const response = await this.tabManager.sendMessageToTab({
+        action: 'executeIntent',
+        intent: intentResult
+      });
+
+      if (response && !response.success) {
+        throw new Error(response.error || 'Command execution failed');
+      }
+
+      return { success: true };
+    } catch (err) {
+      console.error('[CommandProcessor] Execute failed:', err);
+      throw err;
+    }
+  }
+
+  getStats() {
+    return { ...this.stats };
+  }
+
+  setStats(stats) {
+    this.stats = stats;
+  }
+}
+
+// ============================================================================
+// MAIN APPLICATION CLASS
+// ============================================================================
+class HodaVoiceAssistant {
+  constructor() {
+    console.log('[HodaVoiceAssistant] Initializing...');
+
+    // Initialize all managers
+    this.uiManager = new UIManager();
+    this.storageManager = new StorageManager();
+    this.tabManager = new TabManager();
+    this.rateLimiter = new RateLimiter();
+
+    // Initialize wake word detector
+    this.wakeWordDetector = new WakeWordDetector({
+      wakeWords: ['hoda', 'hey hoda'],
+      requireWakeWord: false,
+      commandTimeout: 5000
+    });
+
+    // Initialize intent resolver
+    this.resolver = new IntentResolver({
+      useNormalizerFirst: true,
+      llmFallback: true,
+      enableLLM: false,
+      enableLogging: true
+    });
+
+    // Initialize command processor
+    this.commandProcessor = new CommandProcessor({
+      resolver: this.resolver,
+      tabManager: this.tabManager,
+      rateLimiter: this.rateLimiter,
+      storageManager: this.storageManager,
+      wakeWordDetector: this.wakeWordDetector
+    });
+
+    // Initialize speech recognition
+    this.speechService = new SpeechRecognitionService({
+      maxNetworkErrors: 3,
+      retryDelay: 1000,
+      onStart: () => this.handleSpeechStart(),
+      onResult: (result) => this.handleSpeechResult(result),
+      onError: (error) => this.handleSpeechError(error),
+      onEnd: () => this.handleSpeechEnd()
+    });
+
+    // State
+    this.ttsService = null;
+    this.isLLMReady = false;
+    this.isTTSReady = false;
+    this.ttsEnabled = true;
+
+    console.log('[HodaVoiceAssistant] Core systems initialized');
+  }
+
+  async initialize() {
+    console.log('[HodaVoiceAssistant] Starting initialization...');
+
+    // Initialize speech service (NO initialize() call needed)
+    this.speechService = new SpeechRecognitionService({
+      onStart: () => this.handleSpeechStart(),
+      onResult: (result) => this.handleSpeechResult(result),
+      onError: (error) => this.handleSpeechError(error),
+      onEnd: () => this.handleSpeechEnd()
+    });
+
+    // Load rate limiter data
+    await this.rateLimiter.loadFromStorage();
+
+    // Update UI
+    this.updateQuotaDisplay();
+    const status = this.rateLimiter.getStatus();
+    this.uiManager.updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
+    this.uiManager.elements.micBtn.disabled = false;
+
+    // Setup event listeners
+    this.setupEventListeners();
+
+    console.log('[HodaVoiceAssistant] ✅ Ready');
+    console.log('[HodaVoiceAssistant] IntentResolver stats:', this.resolver.getStats());
+
+    // Load optional services (non-blocking)
+    this.loadOptionalServices();
+  }
+
+  async loadOptionalServices() {
+    // Load TTS
+    ServiceLoader.loadTTS().then(async (createTTSService) => {
       if (createTTSService) {
         try {
-          ttsService = await createTTSService({
+          this.ttsService = await createTTSService({
             speaker: {
-              enabled: state.ttsEnabled,
+              enabled: this.ttsEnabled,
               volume: 1.0,
               rate: 1.0
             }
           });
-          state.isTTSReady = true;
-          console.log('[Popup] ✅ TTS enabled');
+          this.isTTSReady = true;
+          this.commandProcessor.setTTSService(this.ttsService);
+          console.log('[HodaVoiceAssistant] ✅ TTS enabled');
         } catch (err) {
-          console.log('[Popup] TTS init failed:', err.message);
+          console.log('[HodaVoiceAssistant] TTS init failed:', err.message);
         }
       }
     });
 
-    // ✨ Load WebLLM and inject into IntentResolver (non-blocking)
-    tryLoadWebLLM().then(async (createWebLLMService) => {
+    // Load WebLLM
+    ServiceLoader.loadWebLLM().then(async (createWebLLMService) => {
       if (createWebLLMService) {
         try {
-          console.log('[Popup] 🔄 Loading AI model (10-30 seconds)...');
-          updateStatus('⏳ Loading AI model...');
-          showCommandResult('Basic commands work now', false);
+          console.log('[HodaVoiceAssistant] 🔄 Loading AI model (10-30 seconds)...');
+          this.uiManager.updateStatus('⏳ Loading AI model...');
+          this.uiManager.showCommandResult('Basic commands work now', false);
 
           const webllmService = await createWebLLMService({
             privacy: {
@@ -515,215 +899,204 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           });
 
-          // Inject WebLLM into IntentResolver
-          await resolver.initializeLLM(webllmService);
+          await this.resolver.initializeLLM(webllmService);
+          this.isLLMReady = true;
 
-          state.isLLMReady = true;
-          const status = RATE_LIMIT.getStatus();
-          updateStatus(`Ready ✨ - ${status.remaining}/${status.dailyLimit} left`);
-          showCommandResult('🤖 AI commands ready', false);
-          
-          console.log('[Popup] ✅ WebLLM injected into IntentResolver');
-          console.log('[Popup] IntentResolver stats:', resolver.getStats());
+          const status = this.rateLimiter.getStatus();
+          this.uiManager.updateStatus(`Ready ✨ - ${status.remaining}/${status.dailyLimit} left`);
+          this.uiManager.showCommandResult('🤖 AI commands ready', false);
+
+          console.log('[HodaVoiceAssistant] ✅ WebLLM injected into IntentResolver');
+          console.log('[HodaVoiceAssistant] IntentResolver stats:', this.resolver.getStats());
         } catch (err) {
-          console.log('[Popup] WebLLM init failed:', err.message);
-          const status = RATE_LIMIT.getStatus();
-          updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
+          console.log('[HodaVoiceAssistant] WebLLM init failed:', err.message);
+          const status = this.rateLimiter.getStatus();
+          this.uiManager.updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
         }
       }
     });
-  } else {
-    updateStatus('⚠️ Speech not supported');
-    UI.micBtn.disabled = true;
+  }
+
+  setupEventListeners() {
+    // Microphone button
+    this.uiManager.elements.micBtn?.addEventListener('click', async () => {
+      if (!this.speechService.isListening) {
+        await this.startListening();
+      } else {
+        this.stopListening();
+      }
+    });
+
+    // Keyboard shortcut
+    document.addEventListener('keydown', async (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
+        e.preventDefault();
+        if (!this.speechService.isListening) {
+          await this.startListening();
+        } else {
+          this.stopListening();
+        }
+      }
+    });
+
+    // Quick action buttons
+    document.getElementById('btnScrollDown')?.addEventListener('click', () =>
+      this.executeQuickAction({ intent: 'navigate', slots: { direction: 'down' }, original: 'scroll down' })
+    );
+
+    document.getElementById('btnScrollUp')?.addEventListener('click', () =>
+      this.executeQuickAction({ intent: 'navigate', slots: { direction: 'up' }, original: 'scroll up' })
+    );
+
+    document.getElementById('btnListLinks')?.addEventListener('click', () =>
+      this.executeQuickAction({ intent: 'link_action', slots: { action: 'list' }, original: 'list links' })
+    );
+
+    document.getElementById('btnHelp')?.addEventListener('click', () =>
+      this.executeQuickAction({ intent: 'help', original: 'help' })
+    );
+
+    document.getElementById('openTests')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('tests/index.html') });
+    });
+  }
+
+  async startListening() {
+    // Check active tab
+    const tabCheck = await this.tabManager.checkActiveTab();
+    if (!tabCheck.success) {
+      this.uiManager.updateStatus('⚠️ ' + tabCheck.reason);
+      this.uiManager.showCommandResult(tabCheck.reason, true);
+      return;
+    }
+
+    try {
+      this.speechService.start();
+    } catch (error) {
+      console.error('[HodaVoiceAssistant] Failed to start listening:', error);
+      this.uiManager.updateStatus('⚠️ Failed to start');
+      this.uiManager.showCommandResult('Could not start speech recognition', true);
+
+      if (error.name === 'NotAllowedError') {
+        this.uiManager.showCommandResult('Microphone permission denied', true);
+        await this.commandProcessor.speak('Please allow microphone access', true);
+      }
+    }
+  }
+
+  stopListening() {
+    this.speechService.stop();
+  }
+
+  handleSpeechStart() {
+    this.uiManager.updateStatus('🎤 Listening...');
+    this.uiManager.setListeningState(true);
+  }
+
+  async handleSpeechResult(result) {
+    this.uiManager.updateTranscript(result.transcript);
+
+    if (result.isFinal) {
+      const url = await this.tabManager.getCurrentTabUrl();
+      const processResult = await this.commandProcessor.processTranscript(result.transcript, url);
+
+      if (!processResult.success) {
+        this.uiManager.showCommandResult(processResult.message, true);
+      }
+
+      // Update stats and quota
+      this.uiManager.updateStats(this.commandProcessor.getStats());
+      this.updateQuotaDisplay();
+      this.uiManager.updateStatus('🎤 Listening...');
+    }
+  }
+
+  handleSpeechError(error) {
+    if (error.statusMessage) {
+      this.uiManager.updateStatus(error.statusMessage);
+    }
+    if (error.userMessage) {
+      this.uiManager.showCommandResult(error.userMessage, true);
+      this.commandProcessor.speak(error.userMessage, true);
+    }
+  }
+
+  handleSpeechEnd() {
+    this.uiManager.setListeningState(false);
+    this.uiManager.updateStatus('Ready');
+    this.uiManager.updateTranscript('Click mic or press Ctrl+Shift+H');
+  }
+
+  updateQuotaDisplay() {
+    const status = this.rateLimiter.getStatus();
+    this.uiManager.updateQuota(status);
+  }
+
+  async executeQuickAction(intent) {
+    const tabCheck = await this.tabManager.checkActiveTab();
+    if (tabCheck.success) {
+      await this.commandProcessor.confirmCommand(intent);
+      const result = await this.commandProcessor.executeCommand(intent);
+      if (result.success) {
+        this.uiManager.showCommandResult('✓ Done', false);
+      }
+    }
+  }
+
+  // Debug interface
+  getDebugInfo() {
+    return {
+      speech: this.speechService.getState(),
+      wakeWord: this.wakeWordDetector.getState(),
+      stats: this.commandProcessor.getStats(),
+      quota: this.rateLimiter.getStatus(),
+      resolver: this.resolver.getStats(),
+      isLLMReady: this.isLLMReady,
+      isTTSReady: this.isTTSReady
+    };
+  }
+}
+
+// ============================================================================
+// APPLICATION STARTUP
+// ============================================================================
+let app = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    app = new HodaVoiceAssistant();
+    await app.initialize();
+
+    // Expose debug interface
+    window.__hoda = {
+      app,
+      showStats() {
+        console.log('Debug Info:', app.getDebugInfo());
+      },
+      async testCommand(text) {
+        const result = await app.resolver.resolve(text);
+        console.log('Test Result:', result);
+        return result;
+      }
+    };
+
+    console.log('[HodaVoiceAssistant] ✅ Loaded - OOP Architecture');
+  } catch (error) {
+    console.error('[HodaVoiceAssistant] Initialization failed:', error);
   }
 });
 
-// ============================================================================
-// UI UPDATES
-// ============================================================================
-function updateQuotaUI() {
-  const status = RATE_LIMIT.getStatus();
-  if (UI.quotaBar) {
-    const percent = (status.remaining / status.dailyLimit) * 100;
-    UI.quotaBar.style.width = percent + '%';
-    if (percent < 25) {
-      UI.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
-    } else if (percent < 50) {
-      UI.quotaBar.style.background = 'linear-gradient(90deg, #f59e0b, rgba(245, 158, 11, 0.9))';
-    } else {
-      UI.quotaBar.style.background = 'linear-gradient(90deg, #10b981, rgba(255, 255, 255, 0.9))';
-    }
-  }
-  if (UI.quotaText) {
-    UI.quotaText.textContent = `${status.remaining}/${status.dailyLimit} requests left`;
-  }
+// Export for testing
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    HodaVoiceAssistant,
+    SpeechRecognitionService,
+    CommandProcessor,
+    RateLimiter,
+    StorageManager,
+    TabManager,
+    UIManager,
+    WakeWordDetector
+  };
 }
-
-function updateStatus(text) {
-  if (UI.statusText) UI.statusText.textContent = text;
-}
-
-function showCommandResult(message, isError) {
-  if (!UI.commandResult) return;
-  UI.commandResult.textContent = message;
-  UI.commandResult.className = 'command-result show' + (isError ? ' error' : ' success');
-  setTimeout(() => UI.commandResult.classList.remove('show'), 5000);
-}
-
-function updateStatsUI() {
-  if (UI.statTotal) UI.statTotal.textContent = state.stats.totalCommands;
-  if (UI.statRecognized) UI.statRecognized.textContent = state.stats.recognizedCommands;
-}
-
-// ============================================================================
-// STORAGE
-// ============================================================================
-async function checkActiveTab() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab) throw new Error('No active tab');
-
-    if (!tab.url || !/^https?:\/\//i.test(tab.url)) {
-      updateStatus('⚠️ Navigate to a webpage');
-      state.currentTabId = null;
-      return false;
-    }
-
-    state.currentTabId = tab.id;
-    return true;
-  } catch (err) {
-    state.currentTabId = null;
-    return false;
-  }
-}
-
-async function getCurrentTabUrl() {
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    return tab?.url || null;
-  } catch (err) {
-    return null;
-  }
-}
-
-async function saveTranscript(transcript) {
-  try {
-    const result = await chrome.storage.local.get(['transcripts']);
-    let transcripts = result.transcripts || [];
-    transcripts.push(transcript);
-    if (transcripts.length > 50) transcripts = transcripts.slice(-50);
-    await chrome.storage.local.set({ transcripts });
-  } catch (err) {}
-}
-
-async function getRecentTranscripts(count = 5) {
-  try {
-    const result = await chrome.storage.local.get(['transcripts']);
-    const transcripts = result.transcripts || [];
-    return transcripts.slice(-count);
-  } catch (err) {
-    return [];
-  }
-}
-
-async function loadStats() {
-  try {
-    const result = await chrome.storage.local.get(['stats']);
-    if (result.stats) {
-      state.stats = result.stats;
-      updateStatsUI();
-    }
-  } catch (err) {}
-}
-
-async function saveStats() {
-  try {
-    await chrome.storage.local.set({ stats: state.stats });
-  } catch (err) {}
-}
-
-// ============================================================================
-// EVENT LISTENERS
-// ============================================================================
-function setupEventListeners() {
-  UI.micBtn?.addEventListener('click', async () => {
-    if (!state.isListening) {
-      await startListening();
-    } else {
-      stopListening();
-    }
-  });
-
-  document.addEventListener('keydown', async (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'H') {
-      e.preventDefault();
-      if (!state.isListening) {
-        await startListening();
-      } else {
-        stopListening();
-      }
-    }
-  });
-
-  document.getElementById('btnScrollDown')?.addEventListener('click', async () => {
-    await checkActiveTab();
-    if (state.currentTabId) {
-      const intent = { intent: 'navigate', slots: { direction: 'down' }, original: 'scroll down' };
-      await confirmCommand(intent);
-      executeCommand(intent);
-      showCommandResult('✓ Scrolled down', false);
-    }
-  });
-
-  document.getElementById('btnScrollUp')?.addEventListener('click', async () => {
-    await checkActiveTab();
-    if (state.currentTabId) {
-      const intent = { intent: 'navigate', slots: { direction: 'up' }, original: 'scroll up' };
-      await confirmCommand(intent);
-      executeCommand(intent);
-      showCommandResult('✓ Scrolled up', false);
-    }
-  });
-
-  document.getElementById('btnListLinks')?.addEventListener('click', async () => {
-    await checkActiveTab();
-    if (state.currentTabId) {
-      const intent = { intent: 'link_action', slots: { action: 'list' }, original: 'list links' };
-      await confirmCommand(intent);
-      executeCommand(intent);
-      showCommandResult('✓ Listing links', false);
-    }
-  });
-
-  document.getElementById('btnHelp')?.addEventListener('click', async () => {
-    await checkActiveTab();
-    if (state.currentTabId) {
-      executeCommand({ intent: 'help', original: 'help' });
-    }
-  });
-
-  document.getElementById('openTests')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    chrome.tabs.create({ url: chrome.runtime.getURL('tests/index.html') });
-  });
-}
-
-// ============================================================================
-// DEBUG
-// ============================================================================
-window.__hoda_popup = {
-  resolver,
-  wakeWordDetector,
-  state,
-  showStats() {
-    console.log('IntentResolver:', resolver.getStats());
-    console.log('State:', state);
-  },
-  async testResolver() {
-    const result = await resolver.resolve('scroll down');
-    console.log('Result:', result);
-    return result;
-  }
-};
-
-console.log('[Popup] ✅ Loaded - Clean Architecture');

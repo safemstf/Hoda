@@ -1,8 +1,259 @@
-﻿// content.js - With Command Queue System + COOLDOWN FIX
-console.log('[Content] Loading with command queue and cooldown...');
+﻿// content.js - COMPLETE FINAL VERSION
+// Handles: WebSpeech + Command Queue + Feedback + Execution
+console.log('[Content] Loading - Complete final version...');
 
 (function () {
   'use strict';
+
+  // ============================================================================
+  // WEBSPEECH MANAGER - Handles speech recognition in page context
+  // ============================================================================
+  // Internal logic: Speech must run in page context (not content script context)
+  // to avoid CSP restrictions and maintain stable network connection
+
+  let speechInjected = false;
+  let speechReady = false;
+  let isListening = false;
+  let pendingStart = null;
+
+  /**
+   * Inject WebSpeech recognition into page context
+   * Why: Page context has unrestricted access to WebSpeech API and stable network
+   */
+  function injectSpeechIntoPage() {
+    if (speechInjected) {
+      console.log('[Content] Speech already injected');
+      return;
+    }
+
+    speechInjected = true;
+    console.log('[Content] Injecting WebSpeech into page context...');
+
+    const script = document.createElement('script');
+    script.textContent = `
+      (function() {
+        console.log('[Page] Initializing WebSpeech in page context...');
+        
+        let recognition = null;
+        let isListening = false;
+
+        function initSpeech() {
+          if (recognition) {
+            console.log('[Page] Speech already initialized');
+            return true;
+          }
+
+          const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+          if (!SpeechRecognition) {
+            console.error('[Page] WebSpeech API not supported');
+            window.postMessage({ type: 'HODA_SPEECH_ERROR', error: 'not-supported' }, '*');
+            return false;
+          }
+
+          try {
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+              console.log('[Page] 🎤 Recognition started');
+              isListening = true;
+              window.postMessage({ type: 'HODA_SPEECH_STARTED' }, '*');
+            };
+
+            recognition.onresult = (event) => {
+              const last = event.results.length - 1;
+              const result = event.results[last];
+              
+              window.postMessage({
+                type: 'HODA_SPEECH_RESULT',
+                transcript: result[0].transcript.trim(),
+                isFinal: result.isFinal,
+                confidence: result[0].confidence || 0.9
+              }, '*');
+            };
+
+            recognition.onerror = (event) => {
+              console.error('[Page] Recognition error:', event.error);
+              
+              if (event.error !== 'no-speech') {
+                window.postMessage({
+                  type: 'HODA_SPEECH_ERROR',
+                  error: event.error,
+                  message: event.message || ''
+                }, '*');
+              }
+            };
+
+            recognition.onend = () => {
+              console.log('[Page] Recognition ended, isListening:', isListening);
+              
+              if (isListening) {
+                console.log('[Page] Auto-restarting recognition...');
+                setTimeout(() => {
+                  if (recognition && isListening) {
+                    try {
+                      recognition.start();
+                    } catch(e) {
+                      console.error('[Page] Auto-restart failed:', e);
+                      window.postMessage({
+                        type: 'HODA_SPEECH_ERROR',
+                        error: 'restart-failed',
+                        message: e.message
+                      }, '*');
+                    }
+                  }
+                }, 100);
+              } else {
+                window.postMessage({ type: 'HODA_SPEECH_ENDED' }, '*');
+              }
+            };
+
+            console.log('[Page] ✅ WebSpeech initialized successfully');
+            window.postMessage({ type: 'HODA_SPEECH_READY' }, '*');
+            return true;
+
+          } catch (error) {
+            console.error('[Page] Failed to initialize WebSpeech:', error);
+            window.postMessage({ 
+              type: 'HODA_SPEECH_ERROR', 
+              error: 'initialization-failed',
+              message: error.message 
+            }, '*');
+            return false;
+          }
+        }
+
+        function startSpeech() {
+          console.log('[Page] Start requested');
+          
+          if (!recognition && !initSpeech()) {
+            console.error('[Page] Cannot start - initialization failed');
+            return;
+          }
+
+          if (isListening) {
+            console.log('[Page] Already listening');
+            return;
+          }
+
+          try {
+            isListening = true;
+            recognition.start();
+            console.log('[Page] ✅ Recognition start() called');
+          } catch(e) {
+            console.error('[Page] Start failed:', e);
+            isListening = false;
+            window.postMessage({ 
+              type: 'HODA_SPEECH_ERROR', 
+              error: 'start-failed',
+              message: e.message 
+            }, '*');
+          }
+        }
+
+        function stopSpeech() {
+          console.log('[Page] Stop requested');
+          
+          if (!recognition) {
+            console.log('[Page] No recognition instance');
+            return;
+          }
+
+          if (!isListening) {
+            console.log('[Page] Not listening');
+            return;
+          }
+
+          isListening = false;
+          try {
+            recognition.stop();
+            console.log('[Page] ✅ Recognition stop() called');
+          } catch(e) {
+            console.error('[Page] Stop failed:', e);
+          }
+        }
+
+        window.addEventListener('message', (event) => {
+          if (event.source !== window) return;
+          
+          if (event.data.type === 'HODA_START_SPEECH') {
+            console.log('[Page] 📥 Received START command');
+            startSpeech();
+          }
+          
+          if (event.data.type === 'HODA_STOP_SPEECH') {
+            console.log('[Page] 📥 Received STOP command');
+            stopSpeech();
+          }
+
+          if (event.data.type === 'HODA_CHECK_READY') {
+            console.log('[Page] 📥 Received CHECK_READY');
+            if (recognition) {
+              window.postMessage({ type: 'HODA_SPEECH_READY' }, '*');
+            } else {
+              initSpeech();
+            }
+          }
+        });
+
+        console.log('[Page] Setting up WebSpeech...');
+        initSpeech();
+        console.log('[Page] ✅ Speech bridge ready');
+      })();
+    `;
+
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
+
+    console.log('[Content] ✅ WebSpeech script injected into page');
+  }
+
+  // Inject immediately or on DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectSpeechIntoPage);
+  } else {
+    injectSpeechIntoPage();
+  }
+
+  /**
+   * Listen for messages from page context
+   */
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+
+    const data = event.data;
+
+    if (data.type === 'HODA_SPEECH_READY') {
+      console.log('[Content] ✅ WebSpeech ready in page context');
+      speechReady = true;
+
+      if (pendingStart) {
+        console.log('[Content] Executing pending start request');
+        window.postMessage({ type: 'HODA_START_SPEECH' }, '*');
+        pendingStart = null;
+      }
+      return;
+    }
+
+    // Forward all speech events to popup
+    if (data.type && data.type.startsWith('HODA_SPEECH_')) {
+      const message = {
+        type: data.type.replace('HODA_', ''),
+        error: data.error,
+        message: data.message,
+        transcript: data.transcript,
+        isFinal: data.isFinal,
+        confidence: data.confidence
+      };
+
+      chrome.runtime.sendMessage(message).catch((err) => {
+        console.warn('[Content] Failed to forward message to popup:', err);
+      });
+    }
+  });
 
   // ============================================================================
   // COMMAND QUEUE (Sequential Processing + COOLDOWN)
@@ -13,11 +264,9 @@ console.log('[Content] Loading with command queue and cooldown...');
       this.isProcessing = false;
       this.currentCommand = null;
       this.interruptRequested = false;
-
       // COOLDOWN SYSTEM to prevent echo loops
       this.cooldownActive = false;
       this.cooldownDuration = 2000; // 2 seconds default
-
       console.log('[Queue] Initialized with cooldown protection');
     }
 
@@ -40,7 +289,6 @@ console.log('[Content] Loading with command queue and cooldown...');
       if (priority) {
         console.log('[Queue] 🚨 Priority command:', command.intent);
         this.queue.unshift(queueItem);
-
         if (this.isProcessing) {
           this.interruptRequested = true;
         }
@@ -80,7 +328,6 @@ console.log('[Content] Loading with command queue and cooldown...');
 
         // Execute command
         await this.executeCommand(item.command);
-
         console.log('[Queue] ✅ Completed:', item.command.intent);
       } catch (err) {
         console.error('[Queue] ❌ Error:', err);
@@ -132,15 +379,15 @@ console.log('[Content] Loading with command queue and cooldown...');
     interrupt() {
       console.log('[Queue] 🛑 Interrupt requested');
       this.interruptRequested = true;
-
-      // Clear queue
       this.queue = [];
 
-      // Stop speech via feedback manager
+      // Stop speech
       try {
         if (window.__hoda && window.__hoda.feedback && typeof window.__hoda.feedback.stopSpeech === 'function') {
           window.__hoda.feedback.stopSpeech();
-          window.__hoda.feedback.showStop && typeof window.__hoda.feedback.showStop === 'function' && window.__hoda.feedback.showStop();
+          if (window.__hoda.feedback.showStop && typeof window.__hoda.feedback.showStop === 'function') {
+            window.__hoda.feedback.showStop();
+          }
           console.log('[Queue] Requested feedback.stopSpeech()');
         } else if (window.speechSynthesis && window.speechSynthesis.speaking) {
           window.speechSynthesis.cancel();
@@ -240,7 +487,6 @@ console.log('[Content] Loading with command queue and cooldown...');
   class FeedbackManager {
     constructor() {
       this.audioContext = null;
-
       this.settings = {
         audioEnabled: true,
         visualEnabled: true,
@@ -248,7 +494,6 @@ console.log('[Content] Loading with command queue and cooldown...');
         ttsRate: 1.0,
         ttsPitch: 1.0
       };
-
       this.voices = [];
       this._tts = {
         chunks: [],
@@ -257,20 +502,15 @@ console.log('[Content] Loading with command queue and cooldown...');
         stopped: false,
         utterance: null
       };
-
       this._speechCallbacks = {
         onStart: null,
         onEnd: null
       };
-
       this.isSpeaking = false;
-
       this.initAudioContext();
       this.loadSettings();
       this.initVoices();
       this._autoRegisterCommonMicManagers();
-
-      // CLEANUP ON PAGE UNLOAD
       this._setupCleanup();
     }
 
@@ -283,12 +523,10 @@ console.log('[Content] Loading with command queue and cooldown...');
         this.stopSpeech();
       };
 
-      // Multiple events to catch all cases
       window.addEventListener('beforeunload', cleanup);
       window.addEventListener('unload', cleanup);
       window.addEventListener('pagehide', cleanup);
 
-      // Also cleanup on visibility change (tab hidden)
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           console.log('[Feedback] Tab hidden, stopping TTS');
@@ -356,7 +594,6 @@ console.log('[Content] Loading with command queue and cooldown...');
           gain.gain.value = 0.25;
           osc.start();
           osc.stop(this.audioContext.currentTime + 0.08);
-
           setTimeout(() => {
             const osc2 = this.audioContext.createOscillator();
             const gain2 = this.audioContext.createGain();
@@ -377,7 +614,6 @@ console.log('[Content] Loading with command queue and cooldown...');
       if (!this.settings.visualEnabled) return;
 
       let overlay = document.getElementById('hoda-feedback-overlay');
-
       if (!overlay) {
         overlay = document.createElement('div');
         overlay.id = 'hoda-feedback-overlay';
@@ -464,12 +700,16 @@ console.log('[Content] Loading with command queue and cooldown...');
           const mm = window.__hoda.microphoneManager;
           const pauseFn = mm.pauseListening || mm.pause || mm.stopListening || mm.stop;
           const resumeFn = mm.resumeListening || mm.resume || mm.startListening || mm.start;
+
           if (pauseFn && resumeFn) {
-            this.registerSpeechCallbacks(() => {
-              try { pauseFn.call(mm); } catch (e) { console.warn('[Feedback] auto pause mic failed', e); }
-            }, () => {
-              try { resumeFn.call(mm); } catch (e) { console.warn('[Feedback] auto resume mic failed', e); }
-            });
+            this.registerSpeechCallbacks(
+              () => {
+                try { pauseFn.call(mm); } catch (e) { console.warn('[Feedback] auto pause mic failed', e); }
+              },
+              () => {
+                try { resumeFn.call(mm); } catch (e) { console.warn('[Feedback] auto resume mic failed', e); }
+              }
+            );
             console.log('[Feedback] Auto-registered mic pause/resume');
             return;
           }
@@ -479,11 +719,15 @@ console.log('[Content] Loading with command queue and cooldown...');
         if (maybeRecognition && (typeof maybeRecognition.stop === 'function' || typeof maybeRecognition.abort === 'function')) {
           const stopFn = maybeRecognition.stop || maybeRecognition.abort;
           const startFn = maybeRecognition.start;
-          this.registerSpeechCallbacks(() => {
-            try { stopFn.call(maybeRecognition); } catch (e) { console.warn('[Feedback] auto stop recognition failed', e); }
-          }, () => {
-            try { if (typeof startFn === 'function') startFn.call(maybeRecognition); } catch (e) { console.warn('[Feedback] auto start recognition failed', e); }
-          });
+
+          this.registerSpeechCallbacks(
+            () => {
+              try { stopFn.call(maybeRecognition); } catch (e) { console.warn('[Feedback] auto stop recognition failed', e); }
+            },
+            () => {
+              try { if (typeof startFn === 'function') startFn.call(maybeRecognition); } catch (e) { console.warn('[Feedback] auto start recognition failed', e); }
+            }
+          );
           console.log('[Feedback] Auto-registered recognition stop/start');
         }
       } catch (e) {
@@ -531,6 +775,7 @@ console.log('[Content] Loading with command queue and cooldown...');
 
       const localEn = this.voices.find(v => v.localService && v.lang && v.lang.startsWith('en'));
       if (localEn) return localEn.voiceObj;
+
       return (this.voices[0] && this.voices[0].voiceObj) || null;
     }
 
@@ -554,18 +799,16 @@ console.log('[Content] Loading with command queue and cooldown...');
 
     speakShort(text, opts = {}) {
       if (!text) return;
+
       try {
         const shouldInterruptLongReads = opts.interruptLongReads ?? true;
-
         if (shouldInterruptLongReads && this._tts.utterance && (window.speechSynthesis.speaking || window.speechSynthesis.paused)) {
           this.stopSpeech();
         }
 
         const u = new SpeechSynthesisUtterance(text);
-
         const voice = this.getPreferredVoice();
         if (voice) u.voice = voice;
-
         u.rate = opts.rate ?? this.settings.ttsRate ?? 1.0;
         u.pitch = opts.pitch ?? this.settings.ttsPitch ?? 1.0;
         u.volume = opts.volume ?? 0.95;
@@ -575,6 +818,7 @@ console.log('[Content] Loading with command queue and cooldown...');
         u.onend = () => {
           this._setSpeaking(false);
         };
+
         u.onerror = (e) => {
           console.warn('[Feedback] speakShort error', e);
           this._setSpeaking(false);
@@ -588,6 +832,7 @@ console.log('[Content] Loading with command queue and cooldown...');
 
     speakLong(text) {
       if (!text) return;
+
       this.stopSpeech();
 
       const chunks = this._chunkTextToSentences(text, 1600);
@@ -599,7 +844,6 @@ console.log('[Content] Loading with command queue and cooldown...');
       this._tts.stopped = false;
 
       this._setSpeaking(true);
-
       this._speakNextChunk();
     }
 
@@ -624,11 +868,13 @@ console.log('[Content] Loading with command queue and cooldown...');
           console.log('[Feedback] resumed speech');
           return true;
         }
+
         if (!window.speechSynthesis.speaking && this._tts.chunks && this._tts.chunkIndex < this._tts.chunks.length) {
           this._tts.autoContinue = true;
           this._speakNextChunk();
           return true;
         }
+
         return false;
       } catch (e) {
         console.warn('[Feedback] resumeSpeech error', e);
@@ -648,12 +894,9 @@ console.log('[Content] Loading with command queue and cooldown...');
         this._tts.chunks = [];
         this._tts.chunkIndex = 0;
 
-        // Cancel ALL speech synthesis
         if (window.speechSynthesis) {
           try {
             window.speechSynthesis.cancel();
-
-            // Force cancel again after brief delay (browser quirk)
             setTimeout(() => {
               if (window.speechSynthesis.speaking || window.speechSynthesis.paused) {
                 window.speechSynthesis.cancel();
@@ -667,13 +910,11 @@ console.log('[Content] Loading with command queue and cooldown...');
         this._tts.utterance = null;
         this._tts.readingText = '';
 
-        // Resume mic
         this._setSpeaking(false);
 
         console.log('[Feedback] ✅ TTS stopped and cleared');
       } catch (e) {
         console.error('[Feedback] stopSpeech error', e);
-        // Last resort fallback
         try {
           if (window.speechSynthesis) window.speechSynthesis.cancel();
         } catch (inner) { /* ignore */ }
@@ -682,6 +923,7 @@ console.log('[Content] Loading with command queue and cooldown...');
 
     _speakNextChunk() {
       if (this._tts.stopped) return;
+
       const idx = this._tts.chunkIndex;
       if (!this._tts.chunks || idx >= this._tts.chunks.length) {
         this._tts.utterance = null;
@@ -711,8 +953,10 @@ console.log('[Content] Loading with command queue and cooldown...');
           this._setSpeaking(false);
           return;
         }
+
         this._tts.chunkIndex += 1;
         this._tts.utterance = null;
+
         if (this._tts.autoContinue && this._tts.chunkIndex < this._tts.chunks.length) {
           setTimeout(() => {
             if (!this._tts.stopped) this._speakNextChunk();
@@ -732,6 +976,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       };
 
       this._tts.utterance = u;
+
       try {
         window.speechSynthesis.speak(u);
       } catch (e) {
@@ -742,14 +987,17 @@ console.log('[Content] Loading with command queue and cooldown...');
 
     _chunkTextToSentences(text, maxChunkChars = 1600) {
       if (!text) return [];
+
       const sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
       const chunks = [];
       let current = '';
+
       for (const s of sentences) {
         if ((current + s).length <= maxChunkChars) {
           current += s + ' ';
         } else {
           if (current.trim()) chunks.push(current.trim());
+
           if (s.length > maxChunkChars) {
             for (let i = 0; i < s.length; i += maxChunkChars) {
               chunks.push(s.substring(i, i + maxChunkChars).trim());
@@ -760,13 +1008,14 @@ console.log('[Content] Loading with command queue and cooldown...');
           }
         }
       }
+
       if (current.trim()) chunks.push(current.trim());
       return chunks;
     }
   }
 
   // ============================================================================
-  // COMMAND EXECUTOR (Rest of code unchanged - using FeedbackManager methods)
+  // COMMAND EXECUTOR
   // ============================================================================
   class CommandExecutor {
     constructor(feedback) {
@@ -834,7 +1083,6 @@ console.log('[Content] Loading with command queue and cooldown...');
         try { window.__hoda_queue.interrupt(); } catch (e) { }
       }
 
-      // Use feedback manager's stopSpeech
       if (this.feedback) {
         this.feedback.stopSpeech();
       }
@@ -848,7 +1096,6 @@ console.log('[Content] Loading with command queue and cooldown...');
       const target = slots.target;
 
       if (action === 'list' || !action) {
-        // Store both element and href for reliability
         this.linkList = Array.from(document.querySelectorAll('a[href]'))
           .filter(a => a.offsetParent !== null)
           .map(a => ({
@@ -880,21 +1127,15 @@ console.log('[Content] Loading with command queue and cooldown...');
 
           console.log('[Executor] Navigating to:', href);
 
-          // Dismiss overlay first
           this.dismissLinkOverlay();
-
-          // Speak and then navigate
           this.speakShort(`Opening link ${linkNumber}: ${linkText}`);
 
-          // Use setTimeout to ensure speech starts before navigation
           setTimeout(() => {
             try {
-              // Try element click first
               if (linkData.element && linkData.element.parentNode) {
                 linkData.element.focus();
                 linkData.element.click();
               } else {
-                // Fallback to direct navigation
                 window.location.href = href;
               }
             } catch (e) {
@@ -905,6 +1146,7 @@ console.log('[Content] Loading with command queue and cooldown...');
 
           return { success: true, message: `Opening link ${linkNumber}` };
         }
+
         return { success: false, message: `Link ${linkNumber} not found` };
       }
 
@@ -913,6 +1155,7 @@ console.log('[Content] Loading with command queue and cooldown...');
         const found = Array.from(document.querySelectorAll('a[href]')).find(a =>
           ((a.textContent || a.getAttribute('aria-label') || a.href) || '').toLowerCase().includes(q)
         );
+
         if (found) {
           this.speakShort(`Opening ${target}`);
           setTimeout(() => {
@@ -920,6 +1163,7 @@ console.log('[Content] Loading with command queue and cooldown...');
           }, 100);
           return { success: true, message: `Opening ${target}` };
         }
+
         return { success: false, message: `Link "${target}" not found` };
       }
 
@@ -933,7 +1177,6 @@ console.log('[Content] Loading with command queue and cooldown...');
 
       console.log('[Executor] doNavigate:', { dir, target, amount });
 
-      // Stop reading when navigating
       if (this.feedback) {
         this.feedback.stopSpeech();
       }
@@ -997,10 +1240,8 @@ console.log('[Content] Loading with command queue and cooldown...');
       const linkDescriptions = links.map((linkData, i) => {
         return `Link ${i + 1}: ${linkData.text}`;
       }).join('. ');
-
       const fullText = intro + linkDescriptions + '. Say "open link" followed by a number to open it.';
 
-      // Use feedback manager's speakLong
       if (this.feedback) {
         this.feedback.speakLong(fullText);
       }
@@ -1011,6 +1252,7 @@ console.log('[Content] Loading with command queue and cooldown...');
       if (text && text.length > 0) {
         return text.substring(0, 100);
       }
+
       try {
         const url = new URL(link.href);
         return url.pathname.split('/').filter(p => p).pop() || 'link';
@@ -1061,7 +1303,7 @@ console.log('[Content] Loading with command queue and cooldown...');
           overlay.style.opacity = '0';
           setTimeout(() => overlay.remove(), 500);
         }
-      }, 20000); // Longer timeout since user needs time to choose
+      }, 20000);
     }
 
     createLinkOverlay() {
@@ -1072,10 +1314,9 @@ console.log('[Content] Loading with command queue and cooldown...');
       const overlay = document.createElement('div');
       overlay.id = id;
 
-      // Position at center-bottom with margin from edges
       Object.assign(overlay.style, {
         position: 'fixed',
-        bottom: '80px', // Higher up to avoid voice UI
+        bottom: '80px',
         left: '50%',
         transform: 'translateX(-50%)',
         maxWidth: '500px',
@@ -1088,7 +1329,7 @@ console.log('[Content] Loading with command queue and cooldown...');
         color: 'white',
         fontFamily: 'system-ui, sans-serif',
         fontSize: '14px',
-        zIndex: '2147483645', // Below voice feedback
+        zIndex: '2147483645',
         boxShadow: '0 12px 40px rgba(0, 0, 0, 0.6)',
         border: '2px solid rgba(16, 185, 129, 0.4)',
         opacity: '1',
@@ -1096,7 +1337,6 @@ console.log('[Content] Loading with command queue and cooldown...');
         backdropFilter: 'blur(10px)'
       });
 
-      // Add custom scrollbar styling
       overlay.style.cssText += `
       scrollbar-width: thin;
       scrollbar-color: rgba(16, 185, 129, 0.5) rgba(255, 255, 255, 0.1);
@@ -1138,9 +1378,11 @@ console.log('[Content] Loading with command queue and cooldown...');
 
       const lowerQuery = query.toLowerCase();
       let node;
+
       while ((node = walker.nextNode())) {
         const text = node.nodeValue.toLowerCase();
         const idx = text.indexOf(lowerQuery);
+
         if (idx !== -1) {
           const range = document.createRange();
           range.setStart(node, idx);
@@ -1197,6 +1439,7 @@ console.log('[Content] Loading with command queue and cooldown...');
     async doFindContent(slots) {
       const q = (slots.query || '').trim();
       if (!q) return { success: false, message: 'No search query provided' };
+
       try { return this.findAndHighlight(q); } catch (err) { return { success: false, message: 'Search error' }; }
     }
 
@@ -1235,7 +1478,6 @@ console.log('[Content] Loading with command queue and cooldown...');
 
       if (!text) return { success: false, message: 'No text found' };
 
-      // Use feedback manager's speakLong
       if (this.feedback) {
         this.feedback.speakLong(text);
       }
@@ -1271,10 +1513,12 @@ console.log('[Content] Loading with command queue and cooldown...');
 
         const parts = [];
         let n;
+
         while ((n = walker.nextNode())) {
           parts.push(n.nodeValue.trim());
           if (parts.length >= 200) break;
         }
+
         return parts.join(' ').replace(/\s+/g, ' ').trim();
       } catch (e) {
         return '';
@@ -1329,103 +1573,164 @@ console.log('[Content] Loading with command queue and cooldown...');
   }
 
   // ============================================================================
-  // INITIALIZE
+  // MESSAGE HANDLER - Handles messages from popup
   // ============================================================================
-  const feedback = new FeedbackManager();
-  const executor = new CommandExecutor(feedback);
-  const queue = new CommandQueue();
+  // Internal logic: ALWAYS respond immediately to prevent Chrome from closing channel
 
-  window.__hoda_executor = executor;
-  window.__hoda_queue = queue;
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[Content] 📨 Received message:', message.type);
 
-  // ============================================================================
-  // MESSAGE LISTENER
-  // ============================================================================
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-    if (!msg || !msg.type) return;
-
-    console.log('[Content] 📨 Received:', msg.type);
-
-    if (msg.type === 'PING') {
-      sendResponse({ ok: true, url: location.href });
-      return true;
-    }
-
-    if (msg.type === 'EXECUTE_COMMAND') {
-      console.log('[Content] Adding to queue:', msg.command.intent);
-
-      const isPriority = queue.isPriorityCommand(msg.command.intent);
-      const commandId = queue.enqueue(msg.command, isPriority);
-
+    // PING
+    if (message.type === 'PING') {
       sendResponse({
         ok: true,
-        queued: true,
-        commandId: commandId,
-        queueStatus: queue.getStatus()
+        speechReady: speechReady,
+        speechInjected: speechInjected,
+        url: location.href
       });
-
-      return true;
+      return false;
     }
 
-    if (msg.type === 'GET_QUEUE_STATUS') {
-      sendResponse({ ok: true, status: queue.getStatus() });
-      return true;
+    // START_SPEECH
+    if (message.type === 'START_SPEECH') {
+      console.log('[Content] START_SPEECH requested');
+
+      sendResponse({ success: true });
+
+      if (!speechInjected) {
+        console.log('[Content] Speech not injected, injecting now...');
+        injectSpeechIntoPage();
+      }
+
+      if (speechReady) {
+        console.log('[Content] Speech ready, starting now');
+        isListening = true;
+        window.postMessage({ type: 'HODA_START_SPEECH' }, '*');
+      } else {
+        console.log('[Content] Speech not ready, queueing start...');
+        pendingStart = true;
+        window.postMessage({ type: 'HODA_CHECK_READY' }, '*');
+
+        setTimeout(() => {
+          if (!speechReady && pendingStart) {
+            console.error('[Content] Speech not ready after timeout');
+            pendingStart = null;
+
+            chrome.runtime.sendMessage({
+              type: 'SPEECH_ERROR',
+              error: 'not-ready',
+              message: 'Speech recognition not initialized. Please reload the page.'
+            }).catch(() => { });
+          }
+        }, 1000);
+      }
+
+      return false;
     }
 
-    if (msg.type === 'CLEAR_QUEUE') {
-      queue.clear();
+    // STOP_SPEECH
+    if (message.type === 'STOP_SPEECH') {
+      console.log('[Content] STOP_SPEECH requested');
+
+      sendResponse({ success: true });
+
+      isListening = false;
+      window.postMessage({ type: 'HODA_STOP_SPEECH' }, '*');
+
+      return false;
+    }
+
+    // CHECK_SPEECH_READY
+    if (message.type === 'CHECK_SPEECH_READY') {
+      sendResponse({
+        success: true,
+        ready: speechReady,
+        injected: speechInjected
+      });
+      return false;
+    }
+
+    // EXECUTE_COMMAND
+    if (message.type === 'EXECUTE_COMMAND') {
+      console.log('[Content] EXECUTE_COMMAND:', message.command.intent);
+
       sendResponse({ ok: true });
-      return true;
+
+      // Queue command
+      if (window.__hoda_queue) {
+        const priority = window.__hoda_queue.isPriorityCommand(message.command.intent);
+        window.__hoda_queue.enqueue(message.command, priority);
+      } else {
+        console.warn('[Content] Queue not initialized, cannot execute command');
+      }
+
+      return false;
     }
 
-    if (msg.type === 'TEST_FEEDBACK') {
-      feedback.playBeep('success');
-      feedback.showOverlay('✓ Working!', 'success');
-      sendResponse({ ok: true });
-      return true;
-    }
-
-    if (msg.type === 'RELOAD_SETTINGS') {
-      feedback.loadSettings();
-      sendResponse({ ok: true });
-      return true;
+    // GET_QUEUE_STATUS
+    if (message.type === 'GET_QUEUE_STATUS') {
+      if (window.__hoda_queue) {
+        sendResponse({ ok: true, status: window.__hoda_queue.getStatus() });
+      } else {
+        sendResponse({ ok: true, status: { queueLength: 0, isProcessing: false } });
+      }
+      return false;
     }
 
     return false;
   });
 
   // ============================================================================
-  // DEBUG INTERFACE
+  // INITIALIZATION
   // ============================================================================
-  window.__hoda = {
-    feedback,
-    executor,
-    queue,
 
-    test() {
-      console.log('[Content] Testing...');
-      feedback.playBeep('success');
-      feedback.showOverlay('✓ Queue system working!', 'success');
-    },
+  // Initialize feedback and executor
+  const feedback = new FeedbackManager();
+  const executor = new CommandExecutor(feedback);
+  const queue = new CommandQueue();
 
-    testQueue() {
-      console.log('[Content] Testing queue...');
-      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 1' });
-      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 2' });
-      queue.enqueue({ intent: 'navigate', slots: { direction: 'down' }, original: 'test 3' });
-      console.log('Queue status:', queue.getStatus());
-    },
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[content.js] 📩 Received message:', message);
 
-    testStop() {
-      console.log('[Content] Testing stop...');
-      queue.enqueue({ intent: 'stop', original: 'stop' }, true);
-    },
+    if (message.action === 'executeIntent') {
+      const intent = message.intent;
 
-    // NEW: Adjust cooldown duration
-    setCooldown(ms) {
-      queue.setCooldownDuration(ms);
+      console.log('[content.js] 🎯 Executing:', intent.intent, intent.slots);
+
+      try {
+        // ✅ FIXED: Use "executor" (matches line 1689)
+        const result = executor.execute(intent);
+
+        console.log('[content.js] ✅ Success');
+        sendResponse({ success: true, result });
+      } catch (error) {
+        console.error('[content.js] ❌ Failed:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+
+      return true; // Keep channel open
     }
-  };
 
-  console.log('[Content] ✅ Ready with cooldown & cleanup');
+    if (message.action === 'ping') {
+      sendResponse({ success: true, status: 'ready' });
+      return true;
+    }
+
+    sendResponse({ success: false, error: 'Unknown action' });
+    return false;
+  });
+
+  console.log('[content.js] 📡 Message listener active');
+
+  // Expose globally for queue to access
+  window.__hoda = window.__hoda || {};
+  window.__hoda.feedback = feedback;
+  window.__hoda_executor = executor;
+  window.__hoda_queue = queue;
+
+  console.log('[Content] ✅ Content script ready');
+  console.log('[Content] Speech injected:', speechInjected);
+  console.log('[Content] Speech ready:', speechReady);
+  console.log('[Content] Queue, Feedback, Executor initialized');
+
 })();
