@@ -321,20 +321,41 @@ class UIManager {
       statTotal: document.getElementById('statTotal'),
       statRecognized: document.getElementById('statRecognized'),
       quotaBar: document.getElementById('quotaBar'),
-      quotaText: document.getElementById('quotaText')
+      quotaText: document.getElementById('quotaText'),
+      // NEW: Status badge elements
+      listeningBadge: document.getElementById('listeningBadge'),
+      ttsBadge: document.getElementById('ttsBadge')
     };
-    console.log('[UIManager] Initialized');
+    console.log('[UIManager] Initialized with new UI elements');
   }
 
   updateStatus(text) {
     if (this.elements.statusText) {
       this.elements.statusText.textContent = text;
+
+      // Remove all state classes
+      this.elements.statusText.classList.remove('active', 'paused', 'error');
+
+      // Add appropriate class based on status
+      if (text.includes('Listening') || text.includes('🎤')) {
+        this.elements.statusText.classList.add('active');
+      } else if (text.includes('Paused') || text.includes('Muted') || text.includes('🔇')) {
+        this.elements.statusText.classList.add('paused');
+      } else if (text.includes('⚠️') || text.includes('Error') || text.includes('Failed')) {
+        this.elements.statusText.classList.add('error');
+      }
     }
   }
 
   updateTranscript(text) {
-    if (this.elements.transcript) {
-      this.elements.transcript.textContent = text;
+    if (!this.elements.transcript) return;
+
+    this.elements.transcript.textContent = text;
+
+    if (text && text !== 'Click mic or press Ctrl+Shift+H' && text !== 'Click the mic and start speaking...') {
+      this.elements.transcript.classList.remove('empty');
+    } else {
+      this.elements.transcript.classList.add('empty');
     }
   }
 
@@ -363,6 +384,7 @@ class UIManager {
       const percent = (status.remaining / status.dailyLimit) * 100;
       this.elements.quotaBar.style.width = percent + '%';
 
+      // Update gradient based on percentage
       if (percent < 25) {
         this.elements.quotaBar.style.background = 'linear-gradient(90deg, #ef4444, rgba(239, 68, 68, 0.9))';
       } else if (percent < 50) {
@@ -381,8 +403,45 @@ class UIManager {
     if (this.elements.micBtn) {
       if (isListening) {
         this.elements.micBtn.classList.add('listening');
+        this.elements.micBtn.classList.remove('paused');
       } else {
+        this.elements.micBtn.classList.remove('listening', 'paused');
+      }
+    }
+
+    // NEW: Update listening badge
+    if (this.elements.listeningBadge) {
+      if (isListening) {
+        this.elements.listeningBadge.classList.add('active');
+      } else {
+        this.elements.listeningBadge.classList.remove('active');
+      }
+    }
+  }
+
+  // NEW: Set paused/muted state
+  setPausedState(isPaused) {
+    if (this.elements.micBtn) {
+      if (isPaused) {
+        this.elements.micBtn.classList.add('paused');
         this.elements.micBtn.classList.remove('listening');
+      } else {
+        this.elements.micBtn.classList.remove('paused');
+      }
+    }
+
+    if (isPaused) {
+      this.updateStatus('🔇 Muted (TTS Speaking)');
+    }
+  }
+
+  // NEW: Set TTS speaking state
+  setTTSState(isSpeaking) {
+    if (this.elements.ttsBadge) {
+      if (isSpeaking) {
+        this.elements.ttsBadge.classList.add('active');
+      } else {
+        this.elements.ttsBadge.classList.remove('active');
       }
     }
   }
@@ -401,6 +460,7 @@ class SpeechRecognitionService {
   constructor(options = {}) {
     this.recognition = null;
     this.isListening = false;
+    this.isPaused = false;
     this.networkErrorCount = 0;
     this.maxNetworkErrors = options.maxNetworkErrors || 3;
 
@@ -417,7 +477,7 @@ class SpeechRecognitionService {
 
   initRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       console.error('[SpeechRecognition] ❌ API not supported');
       this.callbacks.onError({
@@ -444,9 +504,9 @@ class SpeechRecognitionService {
     this.recognition.onresult = (event) => {
       const last = event.results.length - 1;
       const result = event.results[last];
-      
+
       console.log('[SpeechRecognition] 📝 Result:', result[0].transcript, 'Final:', result.isFinal);
-      
+
       this.callbacks.onResult({
         transcript: result[0].transcript.trim(),
         isFinal: result.isFinal,
@@ -460,13 +520,15 @@ class SpeechRecognitionService {
     };
 
     this.recognition.onend = () => {
-      console.log('[SpeechRecognition] 🔄 Ended, isListening:', this.isListening);
-      
-      // Auto-restart if we're supposed to be listening
-      if (this.isListening) {
+      // Add isPaused to log
+      console.log('[SpeechRecognition] 🔄 Ended, isListening:', this.isListening, 'isPaused:', this.isPaused);
+
+      // Check BOTH conditions
+      if (this.isListening && !this.isPaused) {
         console.log('[SpeechRecognition] ↻ Auto-restarting...');
         setTimeout(() => {
-          if (this.recognition && this.isListening) {
+          // Check BOTH conditions again
+          if (this.recognition && this.isListening && !this.isPaused) {
             try {
               this.recognition.start();
             } catch (e) {
@@ -475,7 +537,7 @@ class SpeechRecognitionService {
               this.callbacks.onEnd();
             }
           }
-        }, 100);
+        }, 1000);
       } else {
         this.callbacks.onEnd();
       }
@@ -560,18 +622,19 @@ class SpeechRecognitionService {
       this.isListening = true;
       this.recognition.start();
       console.log('[SpeechRecognition] ✅ Start command sent');
-      
+
     } catch (error) {
       console.error('[SpeechRecognition] ❌ Start error:', error);
       this.isListening = false;
-      
+      this.isPaused = false;
+
       const errorInfo = {
         type: 'start-failed',
         message: error.message,
         userMessage: error.message || 'Failed to start speech recognition',
         statusMessage: '⚠️ Start failed'
       };
-      
+
       this.callbacks.onError(errorInfo);
       throw error;
     }
@@ -585,7 +648,8 @@ class SpeechRecognitionService {
 
     console.log('[SpeechRecognition] 🛑 Stopping...');
     this.isListening = false;
-    
+    this.isPaused = false;
+
     try {
       this.recognition.stop();
     } catch (err) {
@@ -604,7 +668,36 @@ class SpeechRecognitionService {
       isSupported: this.isSupported()
     };
   }
+
+  pause() {
+    if (!this.isListening || this.isPaused) return;
+
+    console.log('[SpeechRecognition] 🔇 Pausing (muting for TTS)');
+    this.isPaused = true;
+
+    try {
+      this.recognition.stop();
+    } catch (error) {
+      console.error('[SpeechRecognition] Pause failed:', error);
+    }
+  }
+
+  resume() {
+    if (!this.isPaused) return;
+
+    console.log('[SpeechRecognition] 🔊 Resuming (unmuting after TTS)');
+    this.isPaused = false;
+
+    if (this.isListening) {
+      try {
+        this.recognition.start();
+      } catch (error) {
+        console.error('[SpeechRecognition] Resume failed:', error);
+      }
+    }
+  }
 }
+
 // ============================================================================
 // COMMAND PROCESSOR
 // ============================================================================
@@ -616,6 +709,10 @@ class CommandProcessor {
     this.storageManager = options.storageManager;
     this.wakeWordDetector = options.wakeWordDetector;
     this.ttsService = null;
+    this.speechService = null;
+    this.uiManager = null;
+
+
     this.stats = { totalCommands: 0, recognizedCommands: 0 };
 
     console.log('[CommandProcessor] Initialized');
@@ -629,10 +726,29 @@ class CommandProcessor {
     if (!this.ttsService) return false;
 
     try {
+      // THIS LINE MUST BE HERE:
+      if (this.speechService && this.speechService.isListening) {
+        this.speechService.pause();  // ← IS THIS LINE THERE?
+      }
+
       await this.ttsService.speakResult(message, isError);
+
+      // THIS LINE MUST BE HERE:
+      if (this.speechService && this.speechService.isListening) {
+        setTimeout(() => {
+          this.speechService.resume();  // ← IS THIS LINE THERE?
+        }, 300);
+      }
+
       return true;
     } catch (error) {
       console.error('[CommandProcessor] TTS error:', error);
+
+      // Resume on error
+      if (this.speechService && this.speechService.isListening) {
+        this.speechService.resume();
+      }
+
       return false;
     }
   }
@@ -641,12 +757,54 @@ class CommandProcessor {
     if (!this.ttsService) return false;
 
     try {
+      // NEW: Update UI to show TTS is speaking
+      if (this.uiManager) {
+        this.uiManager.setTTSState(true);
+        this.uiManager.setPausedState(true);
+      }
+
+      // Pause mic before TTS speaks
+      if (this.speechService && this.speechService.isListening) {
+        this.speechService.pause();
+      }
+
       await this.ttsService.confirmCommand(intentResult);
+
+      // Resume mic after TTS finishes
+      if (this.speechService && this.speechService.isListening) {
+        setTimeout(() => {
+          this.speechService.resume();
+
+          // NEW: Update UI to show mic resumed
+          if (this.uiManager) {
+            this.uiManager.setTTSState(false);
+            this.uiManager.setPausedState(false);
+            this.uiManager.setListeningState(true);
+            this.uiManager.updateStatus('🎤 Listening...');
+          }
+        }, 300);
+      }
+
       return true;
     } catch (error) {
       console.error('[CommandProcessor] TTS confirmation error:', error);
+
+      // Make sure to resume and update UI even on error
+      if (this.speechService && this.speechService.isListening) {
+        this.speechService.resume();
+      }
+
+      if (this.uiManager) {
+        this.uiManager.setTTSState(false);
+        this.uiManager.setPausedState(false);
+      }
+
       return false;
     }
+  }
+
+  setUIManager(uiManager) {
+    this.uiManager = uiManager;
   }
 
   async processTranscript(transcript, url) {
@@ -767,6 +925,11 @@ class CommandProcessor {
     }
   }
 
+  setSpeechService(speechService) {
+    this.speechService = speechService;
+    console.log('[CommandProcessor] Speech service connected');
+  }
+
   getStats() {
     return { ...this.stats };
   }
@@ -812,6 +975,9 @@ class HodaVoiceAssistant {
       storageManager: this.storageManager,
       wakeWordDetector: this.wakeWordDetector
     });
+
+    this.commandProcessor.setSpeechService(this.speechService);
+    this.commandProcessor.setUIManager(this.uiManager);
 
     // Initialize speech recognition
     this.speechService = new SpeechRecognitionService({

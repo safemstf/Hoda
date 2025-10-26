@@ -2,7 +2,7 @@
 <html>
   <head>
     <meta charset="utf-8" />
-    <title>Hoda Voice Navigation</title>
+    <title>Hoda Voice Assistant</title>
     <style>
       * {
         margin: 0;
@@ -18,26 +18,28 @@
         --success: #10b981;
         --warning: #f59e0b;
         --error: #ef4444;
-        --bg-main: #f8fafc;
-        --bg-card: #ffffff;
-        --text-primary: #0f172a;
-        --text-secondary: #64748b;
+        --muted-color: #94a3b8;
+        --bg-main: #0f172a;
+        --bg-card: #1e293b;
+        --bg-elevated: #334155;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
         --text-muted: #94a3b8;
-        --border: #e2e8f0;
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-        --radius-sm: 6px;
-        --radius-md: 10px;
+        --border: #334155;
+        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+        --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.5);
+        --radius-sm: 8px;
+        --radius-md: 12px;
         --radius-lg: 16px;
         --radius-full: 9999px;
       }
 
       body { 
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
-        width: 400px;
-        min-height: 500px;
+        width: 420px;
+        min-height: 580px;
         background: var(--bg-main);
         color: var(--text-primary);
         padding: 0;
@@ -49,7 +51,7 @@
       .header {
         background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
         color: white;
-        padding: 20px 20px 24px;
+        padding: 24px 24px 28px;
         position: relative;
         overflow: hidden;
       }
@@ -61,8 +63,13 @@
         right: -20%;
         width: 300px;
         height: 300px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.15), transparent);
+        animation: float 10s infinite ease-in-out;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-20px) scale(1.05); }
       }
 
       .header-content {
@@ -73,83 +80,114 @@
       .logo {
         display: flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
+        gap: 12px;
+        margin-bottom: 16px;
       }
 
       .logo-icon {
-        font-size: 28px;
+        font-size: 32px;
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
       }
 
       .logo-text {
-        font-size: 22px;
+        font-size: 24px;
         font-weight: 700;
         letter-spacing: -0.5px;
+      }
+
+      .quota-section {
+        margin-top: 16px;
       }
 
       .quota-bar-container {
         background: rgba(255, 255, 255, 0.2);
         border-radius: var(--radius-full);
-        height: 6px;
+        height: 8px;
         overflow: hidden;
         backdrop-filter: blur(10px);
+        position: relative;
       }
 
       .quota-bar {
         height: 100%;
         background: linear-gradient(90deg, var(--success), rgba(255, 255, 255, 0.9));
         border-radius: var(--radius-full);
-        transition: width 0.3s ease;
+        transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .quota-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+        animation: shimmer 2s infinite;
+      }
+
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
       }
 
       .quota-text {
-        font-size: 11px;
-        opacity: 0.9;
-        margin-top: 6px;
+        font-size: 12px;
+        opacity: 0.95;
+        margin-top: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-weight: 500;
       }
 
       /* Main Content */
       .content {
-        padding: 20px;
+        padding: 24px;
       }
 
-      /* Mic Section */
+      /* Mic Section with State Indicators */
       .mic-section {
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 28px;
+        position: relative;
+      }
+
+      .mic-container {
+        position: relative;
+        display: inline-block;
+        margin-bottom: 20px;
       }
 
       .mic-button {
-        width: 100px;
-        height: 100px;
+        width: 120px;
+        height: 120px;
         border-radius: var(--radius-full);
         border: none;
         background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
         color: white;
-        font-size: 40px;
+        font-size: 48px;
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
-        margin: 0 auto 16px;
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: var(--shadow-md);
+        box-shadow: var(--shadow-lg);
         position: relative;
+        z-index: 2;
       }
 
       .mic-button::before {
         content: '';
         position: absolute;
-        inset: -4px;
+        inset: -6px;
         border-radius: var(--radius-full);
-        padding: 4px;
+        padding: 6px;
         background: linear-gradient(135deg, var(--primary-light), var(--secondary));
         -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
         mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-
         -webkit-mask-composite: xor;
         mask-composite: exclude;
         opacity: 0;
@@ -157,7 +195,7 @@
       }
 
       .mic-button:hover:not(:disabled) {
-        transform: scale(1.05);
+        transform: scale(1.08);
         box-shadow: var(--shadow-glow);
       }
 
@@ -166,15 +204,16 @@
       }
 
       .mic-button:active:not(:disabled) {
-        transform: scale(0.95);
+        transform: scale(0.98);
       }
 
       .mic-button:disabled {
-        opacity: 0.5;
+        opacity: 0.4;
         cursor: not-allowed;
         background: var(--text-muted);
       }
 
+      /* Listening State */
       .mic-button.listening {
         animation: pulse 2s infinite;
         box-shadow: var(--shadow-glow);
@@ -182,50 +221,138 @@
 
       @keyframes pulse {
         0%, 100% { 
-          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.6);
+          transform: scale(1);
         }
         50% { 
-          box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
+          box-shadow: 0 0 0 30px rgba(99, 102, 241, 0);
+          transform: scale(1.02);
         }
+      }
+
+      /* Paused/Muted State */
+      .mic-button.paused {
+        background: linear-gradient(135deg, var(--muted-color) 0%, var(--text-muted) 100%);
+        animation: none;
+        opacity: 0.7;
+      }
+
+      .mic-button.paused::after {
+        content: '🔇';
+        position: absolute;
+        bottom: -8px;
+        right: -8px;
+        width: 40px;
+        height: 40px;
+        background: var(--warning);
+        border-radius: var(--radius-full);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        box-shadow: var(--shadow-md);
+        border: 3px solid var(--bg-main);
+      }
+
+      /* Status Display */
+      .status-container {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        align-items: center;
       }
 
       .status-text {
-        font-size: 14px;
+        font-size: 16px;
         color: var(--text-secondary);
-        font-weight: 500;
-        transition: color 0.3s;
+        font-weight: 600;
+        transition: all 0.3s;
+        padding: 8px 20px;
+        border-radius: var(--radius-full);
+        background: var(--bg-card);
+        border: 2px solid transparent;
       }
 
       .status-text.active {
-        color: var(--primary);
-        font-weight: 600;
+        color: var(--success);
+        background: rgba(16, 185, 129, 0.1);
+        border-color: var(--success);
+      }
+
+      .status-text.paused {
+        color: var(--warning);
+        background: rgba(245, 158, 11, 0.1);
+        border-color: var(--warning);
       }
 
       .status-text.error {
         color: var(--error);
+        background: rgba(239, 68, 68, 0.1);
+        border-color: var(--error);
+      }
+
+      .status-badges {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: var(--radius-full);
+        font-size: 12px;
+        font-weight: 600;
+        background: var(--bg-card);
+        color: var(--text-secondary);
+        border: 1px solid var(--border);
+        transition: all 0.2s;
+      }
+
+      .status-badge.active {
+        background: rgba(99, 102, 241, 0.15);
+        color: var(--primary-light);
+        border-color: var(--primary);
+      }
+
+      .status-badge .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: var(--radius-full);
+        background: currentColor;
+        animation: blink 2s infinite;
+      }
+
+      @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
       }
 
       .keyboard-hint {
-        margin-top: 8px;
-        font-size: 11px;
+        margin-top: 12px;
+        font-size: 12px;
         color: var(--text-muted);
         text-align: center;
       }
 
       kbd {
-        padding: 2px 6px;
+        padding: 3px 8px;
         background: var(--bg-card);
         border: 1px solid var(--border);
-        border-radius: 3px;
+        border-radius: 4px;
         font-family: 'SF Mono', 'Consolas', monospace;
-        font-size: 10px;
+        font-size: 11px;
+        box-shadow: 0 2px 0 var(--border);
       }
 
-      /* Transcript Card */
+      /* Card */
       .card {
         background: var(--bg-card);
         border-radius: var(--radius-md);
-        padding: 16px;
+        padding: 20px;
         margin-bottom: 16px;
         box-shadow: var(--shadow-sm);
         border: 1px solid var(--border);
@@ -234,31 +361,34 @@
 
       .card:hover {
         box-shadow: var(--shadow-md);
+        border-color: var(--primary);
       }
 
       .card-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--text-primary);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 10px;
+        letter-spacing: 1px;
+        margin-bottom: 14px;
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
       }
 
+      /* Transcript */
       .transcript-box {
         background: var(--bg-main);
-        border: 2px dashed var(--border);
+        border: 2px solid var(--border);
         border-radius: var(--radius-sm);
-        padding: 14px;
-        min-height: 70px;
+        padding: 16px;
+        min-height: 80px;
         font-size: 14px;
         color: var(--text-primary);
         font-family: 'SF Mono', 'Consolas', monospace;
-        line-height: 1.6;
+        line-height: 1.7;
         transition: all 0.3s;
+        position: relative;
       }
 
       .transcript-box.empty {
@@ -270,18 +400,30 @@
       .transcript-box:not(.empty) {
         border-color: var(--primary);
         border-style: solid;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.08), rgba(139, 92, 246, 0.08));
+      }
+
+      .transcript-box:not(.empty)::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 4px;
+        height: 100%;
+        background: linear-gradient(180deg, var(--primary), var(--secondary));
+        border-radius: 4px 0 0 4px;
       }
 
       /* Command Result */
       .command-result {
-        padding: 12px 14px;
+        padding: 14px 16px;
         border-radius: var(--radius-sm);
         font-size: 13px;
-        margin-top: 12px;
+        margin-top: 14px;
         display: none;
         animation: slideIn 0.3s ease;
-        font-weight: 500;
+        font-weight: 600;
+        border: 2px solid transparent;
       }
 
       @keyframes slideIn {
@@ -298,77 +440,97 @@
       .command-result.show {
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 10px;
       }
 
       .command-result.success {
-        background: rgba(16, 185, 129, 0.1);
+        background: rgba(16, 185, 129, 0.15);
         color: var(--success);
-        border: 1px solid rgba(16, 185, 129, 0.3);
+        border-color: var(--success);
       }
 
       .command-result.error {
-        background: rgba(239, 68, 68, 0.1);
+        background: rgba(239, 68, 68, 0.15);
         color: var(--error);
-        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-color: var(--error);
       }
 
       .command-result.warning {
-        background: rgba(245, 158, 11, 0.1);
+        background: rgba(245, 158, 11, 0.15);
         color: var(--warning);
-        border: 1px solid rgba(245, 158, 11, 0.3);
+        border-color: var(--warning);
       }
 
       /* Stats */
       .stats-grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        gap: 14px;
       }
 
       .stat-item {
-        background: linear-gradient(135deg, var(--bg-main), var(--bg-card));
-        padding: 16px;
+        background: var(--bg-main);
+        padding: 20px;
         border-radius: var(--radius-md);
         text-align: center;
-        border: 1px solid var(--border);
-        transition: all 0.2s;
+        border: 2px solid var(--border);
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .stat-item::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        opacity: 0;
+        transition: opacity 0.3s;
       }
 
       .stat-item:hover {
-        transform: translateY(-2px);
+        transform: translateY(-4px);
         box-shadow: var(--shadow-md);
+        border-color: var(--primary);
+      }
+
+      .stat-item:hover::before {
+        opacity: 1;
       }
 
       .stat-value {
-        font-size: 28px;
-        font-weight: 700;
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        font-size: 32px;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--primary-light), var(--secondary));
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
-        margin-bottom: 4px;
+        margin-bottom: 6px;
+        line-height: 1;
       }
 
       .stat-label {
-        font-size: 11px;
+        font-size: 12px;
         color: var(--text-secondary);
         text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 600;
+        letter-spacing: 0.8px;
+        font-weight: 700;
       }
 
       /* Quick Actions */
       .quick-actions {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 10px;
+        gap: 12px;
       }
 
       .quick-btn {
-        padding: 12px;
-        border: 1px solid var(--border);
-        background: var(--bg-card);
+        padding: 14px 16px;
+        border: 2px solid var(--border);
+        background: var(--bg-main);
         border-radius: var(--radius-sm);
         font-size: 13px;
         cursor: pointer;
@@ -376,13 +538,30 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        font-weight: 500;
+        gap: 8px;
+        font-weight: 600;
         color: var(--text-primary);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .quick-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent);
+        transition: left 0.5s;
+      }
+
+      .quick-btn:hover::before {
+        left: 100%;
       }
 
       .quick-btn:hover {
-        background: var(--primary);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
         color: white;
         border-color: var(--primary);
         transform: translateY(-2px);
@@ -393,55 +572,64 @@
         transform: translateY(0);
       }
 
+      .quick-btn .icon {
+        font-size: 18px;
+      }
+
       /* Footer */
       .footer {
-        padding: 16px 20px;
+        padding: 20px 24px;
         border-top: 1px solid var(--border);
         background: var(--bg-card);
       }
 
       .link {
-        color: var(--primary);
+        color: var(--primary-light);
         text-decoration: none;
         font-size: 13px;
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        font-weight: 500;
-        transition: color 0.2s;
+        gap: 8px;
+        font-weight: 600;
+        transition: all 0.2s;
+        padding: 8px;
+        border-radius: var(--radius-sm);
       }
 
       .link:hover {
-        color: var(--primary-dark);
-        text-decoration: underline;
+        color: white;
+        background: rgba(99, 102, 241, 0.1);
       }
 
       /* Badge */
       .badge {
         display: inline-flex;
         align-items: center;
-        padding: 4px 8px;
+        padding: 4px 10px;
         border-radius: var(--radius-full);
         font-size: 11px;
-        font-weight: 600;
-        background: rgba(99, 102, 241, 0.1);
-        color: var(--primary);
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(10px);
       }
 
-      .badge.success {
-        background: rgba(16, 185, 129, 0.1);
-        color: var(--success);
+      /* Scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
       }
 
-      .badge.warning {
-        background: rgba(245, 158, 11, 0.1);
-        color: var(--warning);
+      ::-webkit-scrollbar-track {
+        background: var(--bg-main);
       }
 
-      .badge.error {
-        background: rgba(239, 68, 68, 0.1);
-        color: var(--error);
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: var(--radius-full);
+      }
+
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--primary);
       }
 
       /* Accessibility */
@@ -454,19 +642,21 @@
     </style>
   </head>
   <body>
-    <!-- Header with quota -->
+    <!-- Header -->
     <div class="header">
       <div class="header-content">
         <div class="logo">
           <span class="logo-icon">🎤</span>
           <span class="logo-text">Hoda Voice</span>
         </div>
-        <div class="quota-bar-container">
-          <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
-        </div>
-        <div class="quota-text">
-          <span id="quotaText">40/40 requests left</span>
-          <span id="quotaReset" class="badge">Resets in 24h</span>
+        <div class="quota-section">
+          <div class="quota-bar-container">
+            <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
+          </div>
+          <div class="quota-text">
+            <span id="quotaText">100/100 requests left</span>
+            <span class="badge">Resets in 24h</span>
+          </div>
         </div>
       </div>
     </div>
@@ -475,17 +665,34 @@
     <div class="content">
       <!-- Mic Section -->
       <div class="mic-section">
-        <button class="mic-button" id="micBtn" disabled>🎤</button>
-        <div class="status-text" id="statusText">Initializing...</div>
+        <div class="mic-container">
+          <button class="mic-button" id="micBtn" disabled>🎤</button>
+        </div>
+        
+        <div class="status-container">
+          <div class="status-text" id="statusText">Initializing...</div>
+          <div class="status-badges">
+            <div class="status-badge" id="listeningBadge">
+              <span class="dot"></span>
+              <span>Listening</span>
+            </div>
+            <div class="status-badge" id="ttsBadge">
+              <span>🔊</span>
+              <span>TTS</span>
+            </div>
+          </div>
+        </div>
+
         <div class="keyboard-hint">
-          Press <kbd>Ctrl+Shift+H</kbd> to toggle
+          Press <kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>H</kbd> to toggle
         </div>
       </div>
 
       <!-- Transcript Card -->
       <div class="card">
         <div class="card-title">
-          💬 Transcript
+          <span>💬</span>
+          <span>Transcript</span>
         </div>
         <div class="transcript-box empty" id="transcript">
           Click the mic and start speaking...
@@ -496,7 +703,8 @@
       <!-- Stats Card -->
       <div class="card">
         <div class="card-title">
-          📊 Session Stats
+          <span>📊</span>
+          <span>Session Stats</span>
         </div>
         <div class="stats-grid">
           <div class="stat-item">
@@ -513,23 +721,24 @@
       <!-- Quick Actions Card -->
       <div class="card">
         <div class="card-title">
-          ⚡ Quick Actions
+          <span>⚡</span>
+          <span>Quick Actions</span>
         </div>
         <div class="quick-actions">
           <button class="quick-btn" id="btnScrollDown">
-            <span>⬇️</span>
+            <span class="icon">⬇️</span>
             <span>Scroll Down</span>
           </button>
           <button class="quick-btn" id="btnScrollUp">
-            <span>⬆️</span>
+            <span class="icon">⬆️</span>
             <span>Scroll Up</span>
           </button>
           <button class="quick-btn" id="btnListLinks">
-            <span>🔗</span>
+            <span class="icon">🔗</span>
             <span>List Links</span>
           </button>
           <button class="quick-btn" id="btnHelp">
-            <span>❓</span>
+            <span class="icon">❓</span>
             <span>Help</span>
           </button>
         </div>
@@ -539,7 +748,7 @@
     <!-- Footer -->
     <div class="footer">
       <a href="#" class="link" id="openTests">
-        <span>🧪</span>
+        <span>⚙️</span>
         <span>Open Settings</span>
       </a>
     </div>
