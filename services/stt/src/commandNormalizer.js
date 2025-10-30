@@ -338,6 +338,63 @@ export class CommandNormalizer {
         }
 
         // ========================================================================
+        // FORM ACTIONS
+        // ========================================================================
+
+        // Fill/Enter field
+        if (lowerExample.includes('fill') || lowerExample.includes('enter') ||
+            lowerExample.includes('type')) {
+            variations.push(
+                'fill (.+)',
+                'fill in (.+)',
+                'fill out (.+)',
+                'enter (.+)',
+                'type (.+)',
+                'type in (.+)',
+                'input (.+)',
+                'complete (.+)'
+            );
+        }
+
+        // Submit form
+        if (lowerExample.includes('submit') || lowerExample.includes('send')) {
+            variations.push(
+                'submit form',
+                'submit',
+                'send form',
+                'send',
+                'post form',
+                'submit the form'
+            );
+        }
+
+        // Check/Select/Choose
+        if (lowerExample.includes('check') || lowerExample.includes('select') ||
+            lowerExample.includes('choose')) {
+            variations.push(
+                'check (.+)',
+                'uncheck (.+)',
+                'select (.+)',
+                'choose (.+)',
+                'pick (.+)',
+                'check box (.+)',
+                'check the (.+)',
+                'select option (.+)'
+            );
+        }
+
+        // List fields
+        if (lowerExample.includes('list') && lowerExample.includes('field')) {
+            variations.push(
+                'list fields',
+                'show fields',
+                'what fields',
+                'show form fields',
+                'list form fields'
+            );
+        }
+
+        // ========================================================================
         // HELP
         // ========================================================================
 
@@ -385,7 +442,12 @@ export class CommandNormalizer {
             home: ['homepage', 'main page', 'start'],
             // Link-related synonyms
             open: ['go to', 'navigate to', 'visit', 'access'],
-            link: ['url', 'hyperlink', 'connection']
+            link: ['url', 'hyperlink', 'connection'],
+            // Form-related synonyms
+            fill: ['complete', 'enter', 'type', 'input'],
+            submit: ['send', 'post'],
+            check: ['select', 'choose', 'pick', 'mark'],
+            field: ['input', 'box', 'form field']
         };
     }
 
@@ -575,6 +637,100 @@ export class CommandNormalizer {
             }
             else if (matchedText.includes('open') || matchedText.includes('click')) {
                 slots.action = 'open';
+            }
+        }
+
+        // ========================================================================
+        // STEP 6: Extract form action slots
+        // ========================================================================
+        if (actionName.toLowerCase().includes('fill') ||
+            actionName.toLowerCase().includes('enter') ||
+            actionName.toLowerCase().includes('type') ||
+            actionName.toLowerCase().includes('input') ||
+            actionName.toLowerCase().includes('complete') ||
+            actionName.toLowerCase().includes('submit') ||
+            actionName.toLowerCase().includes('check') ||
+            actionName.toLowerCase().includes('select') ||
+            actionName.toLowerCase().includes('choose') ||
+            actionName.toLowerCase().includes('field')) {
+
+            // Fill/Enter/Type actions
+            if (matchedText.includes('fill') ||
+                matchedText.includes('enter') ||
+                matchedText.includes('type') ||
+                matchedText.includes('input') ||
+                matchedText.includes('complete')) {
+                slots.action = 'fill';
+
+                // Extract field name from captured group or text
+                if (match.length > 1 && match[1]) {
+                    const captured = String(match[1]).trim();
+                    // If it looks like "fieldname value", split it
+                    const parts = captured.split(/\s+/);
+                    if (parts.length > 1) {
+                        slots.field = parts[0];
+                        slots.value = parts.slice(1).join(' ');
+                    } else {
+                        slots.field = captured;
+                    }
+                }
+                // Try to extract from the matched text
+                else {
+                    const fieldMatch = matchedText.match(/(?:fill|enter|type|input|complete)\s+(?:in\s+)?(?:the\s+)?(.+)/);
+                    if (fieldMatch && fieldMatch[1]) {
+                        const extracted = fieldMatch[1].trim();
+                        const parts = extracted.split(/\s+/);
+                        if (parts.length > 1) {
+                            slots.field = parts[0];
+                            slots.value = parts.slice(1).join(' ');
+                        } else {
+                            slots.field = extracted;
+                        }
+                    }
+                }
+
+                console.log('[Normalizer] → FILL field:', slots.field, 'value:', slots.value);
+            }
+
+            // Submit actions
+            else if (matchedText.includes('submit') || matchedText.includes('send') || matchedText.includes('post')) {
+                slots.action = 'submit';
+                console.log('[Normalizer] → SUBMIT form');
+            }
+
+            // Check/Select/Choose actions
+            else if (matchedText.includes('check') ||
+                     matchedText.includes('uncheck') ||
+                     matchedText.includes('select') ||
+                     matchedText.includes('choose') ||
+                     matchedText.includes('pick')) {
+
+                if (matchedText.includes('uncheck')) {
+                    slots.action = 'uncheck';
+                } else {
+                    slots.action = 'select';
+                }
+
+                // Extract field/target name
+                if (match.length > 1 && match[1]) {
+                    slots.target = String(match[1]).trim();
+                    slots.field = slots.target; // Also set field for consistency
+                } else {
+                    const targetMatch = matchedText.match(/(?:check|select|choose|pick)\s+(?:the\s+)?(?:box\s+)?(?:option\s+)?(.+)/);
+                    if (targetMatch && targetMatch[1]) {
+                        slots.target = targetMatch[1].trim();
+                        slots.field = slots.target;
+                    }
+                }
+
+                console.log('[Normalizer] → SELECT/CHECK:', slots.target || slots.field);
+            }
+
+            // List fields action
+            else if (matchedText.includes('list') && matchedText.includes('field')) {
+                slots.action = 'list';
+                slots.field = 'fields';
+                console.log('[Normalizer] → LIST fields');
             }
         }
 

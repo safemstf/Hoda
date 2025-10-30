@@ -170,15 +170,43 @@ export const INTENT_SCHEMAS = {
   },
 
   // ============================================================================
-  // FORM: Form interactions (future)
+  // FORM: Form interactions
   // ============================================================================
   form_action: {
     description: 'Form interaction commands',
     slots: ['action', 'field', 'value'],
     examples: [
+      // Fill/Enter commands
+      'fill username',
       'fill in username',
+      'fill email',
+      'enter password',
+      'enter name',
+      'type address',
+      'type in message',
+      'fill out form',
+      'complete username',
+      // Submit commands
+      'submit',
       'submit form',
-      'check the box'
+      'send form',
+      'send',
+      'post form',
+      'submit the form',
+      // Check/Select commands
+      'check terms',
+      'check the box',
+      'check remember me',
+      'uncheck subscribe',
+      'select country',
+      'select option',
+      'choose shipping',
+      'pick option',
+      // List fields
+      'list fields',
+      'show fields',
+      'what fields',
+      'show form fields'
     ],
     requiresConfirmation: true
   }
