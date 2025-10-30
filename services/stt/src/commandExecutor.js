@@ -341,13 +341,432 @@ Say "Hoda" + command, or just the command directly.
   async executeFormAction(slots) {
     const action = slots.action;
     const field = slots.field;
+    const value = slots.value;
+    const target = slots.target;
 
-    // This would need more sophisticated form handling
-    // For now, just a placeholder
+    console.log('[Executor] Form action:', { action, field, value, target });
+
+    try {
+      // Detect all forms on page
+      const forms = this.detectForms();
+
+      if (forms.length === 0) {
+        return {
+          success: false,
+          message: 'No forms found on page'
+        };
+      }
+
+      // Get all form fields
+      const allFields = this.getAllFormFields(forms);
+
+      // Handle "list fields" command
+      if (action === 'list' || (field && field.toLowerCase() === 'fields')) {
+        this.showFieldList(allFields);
+        return {
+          success: true,
+          message: `Found ${allFields.length} form fields`
+        };
+      }
+
+      // Handle form submission
+      if (action === 'submit') {
+        return await this.handleFormSubmission(forms[0]);
+      }
+
+      // Handle field filling
+      if ((action === 'fill' || action === 'enter' || action === 'type') && field) {
+        return await this.handleFieldFill(allFields, field, value);
+      }
+
+      // Handle selection controls (checkbox, radio, dropdown)
+      if ((action === 'select' || action === 'check' || action === 'choose') && (field || target)) {
+        return await this.handleFieldSelection(allFields, field || target);
+      }
+
+      return {
+        success: false,
+        message: 'Invalid form action'
+      };
+
+    } catch (err) {
+      console.error('[Executor] Form action error:', err);
+      return {
+        success: false,
+        message: err.message || 'Form action failed'
+      };
+    }
+  }
+
+  /**
+   * Detect all forms on the page
+   */
+  detectForms() {
+    const forms = Array.from(document.querySelectorAll('form'));
+    console.log(`[Executor] Found ${forms.length} forms`);
+    return forms;
+  }
+
+  /**
+   * Get all form fields from all forms
+   */
+  getAllFormFields(forms) {
+    const fields = [];
+
+    forms.forEach(form => {
+      const inputs = form.querySelectorAll(
+        'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), select, textarea'
+      );
+
+      inputs.forEach(input => {
+        // Skip hidden or disabled fields
+        if (input.offsetParent === null || input.disabled) return;
+
+        const label = this.getFieldLabel(input);
+        const fieldInfo = {
+          element: input,
+          label: label,
+          name: input.name || input.id || '',
+          type: input.type || input.tagName.toLowerCase(),
+          id: input.id
+        };
+
+        fields.push(fieldInfo);
+      });
+    });
+
+    console.log(`[Executor] Found ${fields.length} visible fields`);
+    return fields;
+  }
+
+  /**
+   * Get label text for a form field
+   */
+  getFieldLabel(input) {
+    // Try to find associated label
+    if (input.id) {
+      const label = document.querySelector(`label[for="${input.id}"]`);
+      if (label) return label.textContent.trim();
+    }
+
+    // Try parent label
+    const parentLabel = input.closest('label');
+    if (parentLabel) {
+      return parentLabel.textContent.replace(input.value, '').trim();
+    }
+
+    // Try aria-label
+    if (input.getAttribute('aria-label')) {
+      return input.getAttribute('aria-label');
+    }
+
+    // Try placeholder
+    if (input.placeholder) {
+      return input.placeholder;
+    }
+
+    // Try name/id as fallback
+    return input.name || input.id || 'Unknown field';
+  }
+
+  /**
+   * Find form field by name/label
+   */
+  findFormField(fields, fieldName) {
+    const lowerName = fieldName.toLowerCase();
+
+    // Try exact match first
+    let field = fields.find(f =>
+      f.label.toLowerCase() === lowerName ||
+      f.name.toLowerCase() === lowerName ||
+      f.id.toLowerCase() === lowerName
+    );
+
+    if (field) return field;
+
+    // Try partial match
+    field = fields.find(f =>
+      f.label.toLowerCase().includes(lowerName) ||
+      f.name.toLowerCase().includes(lowerName) ||
+      f.id.toLowerCase().includes(lowerName)
+    );
+
+    return field || null;
+  }
+
+  /**
+   * Handle field filling
+   */
+  async handleFieldFill(fields, fieldName, value) {
+    const field = this.findFormField(fields, fieldName);
+
+    if (!field) {
+      return {
+        success: false,
+        message: `Field "${fieldName}" not found. Say "list fields" to see available fields.`
+      };
+    }
+
+    // Show field found overlay
+    this.showFieldFoundOverlay(field);
+
+    // If no value provided, wait for next command with the value
+    if (!value) {
+      return {
+        success: true,
+        message: `Found "${field.label}" field. Say the value to fill.`,
+        requiresValue: true,
+        pendingField: field
+      };
+    }
+
+    // Fill the field
+    field.element.value = value;
+    field.element.dispatchEvent(new Event('input', { bubbles: true }));
+    field.element.dispatchEvent(new Event('change', { bubbles: true }));
+
+    return {
+      success: true,
+      message: `Filled "${field.label}" with "${value}"`
+    };
+  }
+
+  /**
+   * Handle field selection (checkbox, radio, dropdown)
+   */
+  async handleFieldSelection(fields, fieldName) {
+    const field = this.findFormField(fields, fieldName);
+
+    if (!field) {
+      return {
+        success: false,
+        message: `Field "${fieldName}" not found. Say "list fields" to see available fields.`
+      };
+    }
+
+    const element = field.element;
+
+    // Handle checkbox
+    if (element.type === 'checkbox') {
+      element.checked = !element.checked;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+
+      return {
+        success: true,
+        message: `${element.checked ? 'Checked' : 'Unchecked'} "${field.label}"`
+      };
+    }
+
+    // Handle radio
+    if (element.type === 'radio') {
+      element.checked = true;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+
+      return {
+        success: true,
+        message: `Selected "${field.label}"`
+      };
+    }
+
+    // Handle select dropdown
+    if (element.tagName.toLowerCase() === 'select') {
+      // Show options
+      const options = Array.from(element.options).map((opt, i) => ({
+        index: i,
+        text: opt.text,
+        value: opt.value
+      }));
+
+      this.showSelectOptions(field, options);
+
+      return {
+        success: true,
+        message: `Showing options for "${field.label}". Say the option number.`,
+        requiresSelection: true,
+        pendingField: field,
+        options: options
+      };
+    }
+
     return {
       success: false,
-      message: 'Form actions not yet implemented'
+      message: `Cannot select field type: ${field.type}`
     };
+  }
+
+  /**
+   * Handle form submission
+   */
+  async handleFormSubmission(form) {
+    // Validate form first
+    const isValid = form.checkValidity();
+
+    if (!isValid) {
+      // Find first invalid field
+      const invalidFields = Array.from(form.querySelectorAll(':invalid'));
+
+      if (invalidFields.length > 0) {
+        const firstInvalid = invalidFields[0];
+        const label = this.getFieldLabel(firstInvalid);
+        const validationMsg = firstInvalid.validationMessage;
+
+        this.showValidationError(label, validationMsg);
+
+        return {
+          success: false,
+          message: `Validation error: ${label} - ${validationMsg}`
+        };
+      }
+    }
+
+    // Show confirmation overlay
+    this.showSubmitConfirmation(form);
+
+    return {
+      success: true,
+      message: 'Ready to submit form. Say "confirm" to proceed or "cancel" to abort.',
+      requiresConfirmation: true,
+      pendingForm: form
+    };
+  }
+
+  /**
+   * Show list of form fields
+   */
+  showFieldList(fields) {
+    const overlay = this.createOverlay('hoda-field-list');
+
+    const fieldsByType = {
+      text: fields.filter(f => ['text', 'email', 'password', 'tel', 'textarea'].includes(f.type)),
+      checkbox: fields.filter(f => f.type === 'checkbox'),
+      radio: fields.filter(f => f.type === 'radio'),
+      select: fields.filter(f => f.type === 'select')
+    };
+
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+        📋 Form Fields (${fields.length} total)
+      </div>
+      ${fieldsByType.text.length > 0 ? `
+        <div style="margin: 10px 0;">
+          <strong>Text Fields:</strong>
+          <ul style="margin: 5px 0; padding-left: 20px;">
+            ${fieldsByType.text.map(f => `<li>${f.label}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+      ${fieldsByType.checkbox.length > 0 ? `
+        <div style="margin: 10px 0;">
+          <strong>Checkboxes:</strong>
+          <ul style="margin: 5px 0; padding-left: 20px;">
+            ${fieldsByType.checkbox.map(f => `<li>${f.label}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+      ${fieldsByType.select.length > 0 ? `
+        <div style="margin: 10px 0;">
+          <strong>Dropdowns:</strong>
+          <ul style="margin: 5px 0; padding-left: 20px;">
+            ${fieldsByType.select.map(f => `<li>${f.label}</li>`).join('')}
+          </ul>
+        </div>
+      ` : ''}
+      <div style="font-size: 12px; opacity: 0.8; margin-top: 10px;">
+        Say "fill [field name]" to enter data
+      </div>
+    `;
+  }
+
+  /**
+   * Show field found overlay
+   */
+  showFieldFoundOverlay(field) {
+    const overlay = this.createOverlay('hoda-field-found');
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px;">
+        📋 Field Found
+      </div>
+      <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+        <strong>${field.label}</strong>
+        <div style="font-size: 12px; opacity: 0.7; margin-top: 5px;">
+          Type: ${field.type}
+        </div>
+      </div>
+      <div style="font-size: 12px; opacity: 0.8;">
+        Say the value to fill, or "cancel"
+      </div>
+    `;
+
+    // Highlight the field
+    field.element.style.outline = '3px solid #4CAF50';
+    field.element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Remove highlight after 3 seconds
+    setTimeout(() => {
+      field.element.style.outline = '';
+    }, 3000);
+  }
+
+  /**
+   * Show select dropdown options
+   */
+  showSelectOptions(field, options) {
+    const overlay = this.createOverlay('hoda-select-options');
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px;">
+        📋 ${field.label} Options
+      </div>
+      <ul style="margin: 10px 0; padding-left: 20px; max-height: 300px; overflow-y: auto;">
+        ${options.slice(0, 10).map(opt =>
+          `<li><strong>${opt.index + 1}.</strong> ${opt.text}</li>`
+        ).join('')}
+      </ul>
+      <div style="font-size: 12px; opacity: 0.8;">
+        Say the option number (1-${Math.min(options.length, 10)})
+      </div>
+    `;
+  }
+
+  /**
+   * Show submit confirmation overlay
+   */
+  showSubmitConfirmation(form) {
+    const overlay = this.createOverlay('hoda-submit-confirm');
+
+    // Count filled fields
+    const fields = form.querySelectorAll('input, select, textarea');
+    const filledCount = Array.from(fields).filter(f => f.value).length;
+
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px; font-size: 16px;">
+        ✅ Ready to Submit
+      </div>
+      <div style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.1); border-radius: 4px;">
+        <div>${filledCount} fields filled</div>
+      </div>
+      <div style="font-size: 12px; opacity: 0.8;">
+        Say "confirm" to submit, or "cancel"
+      </div>
+    `;
+  }
+
+  /**
+   * Show validation error overlay
+   */
+  showValidationError(fieldLabel, message) {
+    const overlay = this.createOverlay('hoda-validation-error');
+    overlay.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 10px; color: #ff6b6b;">
+        ❌ Validation Error
+      </div>
+      <div style="margin: 10px 0; padding: 10px; background: rgba(255,107,107,0.2); border-radius: 4px;">
+        <strong>${fieldLabel}</strong>
+        <div style="margin-top: 5px;">${message}</div>
+      </div>
+      <div style="font-size: 12px; opacity: 0.8;">
+        Say "fill ${fieldLabel}" to correct
+      </div>
+    `;
   }
 
   /**
