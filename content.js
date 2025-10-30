@@ -1575,6 +1575,111 @@ console.log('[Content] Loading - Complete final version...');
   // ============================================================================
   // MESSAGE HANDLER - Handles messages from popup
   // ============================================================================
+  // Internal logic: ALWAYS respond immediately to prevent Chrome from closing channel
+
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('[Content] 📨 Received message:', message.type);
+
+    // PING
+    if (message.type === 'PING') {
+      sendResponse({
+        ok: true,
+        speechReady: speechReady,
+        speechInjected: speechInjected,
+        url: location.href
+      });
+      return false;
+    }
+
+    // START_SPEECH
+    if (message.type === 'START_SPEECH') {
+      console.log('[Content] START_SPEECH requested');
+
+      sendResponse({ success: true });
+
+      if (!speechInjected) {
+        console.log('[Content] Speech not injected, injecting now...');
+        injectSpeechIntoPage();
+      }
+
+      if (speechReady) {
+        console.log('[Content] Speech ready, starting now');
+        isListening = true;
+        window.postMessage({ type: 'HODA_START_SPEECH' }, '*');
+      } else {
+        console.log('[Content] Speech not ready, queueing start...');
+        pendingStart = true;
+        window.postMessage({ type: 'HODA_CHECK_READY' }, '*');
+
+        setTimeout(() => {
+          if (!speechReady && pendingStart) {
+            console.error('[Content] Speech not ready after timeout');
+            pendingStart = null;
+
+            chrome.runtime.sendMessage({
+              type: 'SPEECH_ERROR',
+              error: 'not-ready',
+              message: 'Speech recognition not initialized. Please reload the page.'
+            }).catch(() => { });
+          }
+        }, 1000);
+      }
+
+      return false;
+    }
+
+    // STOP_SPEECH
+    if (message.type === 'STOP_SPEECH') {
+      console.log('[Content] STOP_SPEECH requested');
+
+      sendResponse({ success: true });
+
+      isListening = false;
+      window.postMessage({ type: 'HODA_STOP_SPEECH' }, '*');
+
+      return false;
+    }
+
+    // CHECK_SPEECH_READY
+    if (message.type === 'CHECK_SPEECH_READY') {
+      sendResponse({
+        success: true,
+        ready: speechReady,
+        injected: speechInjected
+      });
+      return false;
+    }
+
+    // EXECUTE_COMMAND
+    if (message.type === 'EXECUTE_COMMAND') {
+      console.log('[Content] EXECUTE_COMMAND:', message.command.intent);
+
+      sendResponse({ ok: true });
+
+      // Queue command
+      if (window.__hoda_queue) {
+        const priority = window.__hoda_queue.isPriorityCommand(message.command.intent);
+        window.__hoda_queue.enqueue(message.command, priority);
+      } else {
+        console.warn('[Content] Queue not initialized, cannot execute command');
+      }
+
+      return false;
+    }
+
+    // GET_QUEUE_STATUS
+    if (message.type === 'GET_QUEUE_STATUS') {
+      if (window.__hoda_queue) {
+        sendResponse({ ok: true, status: window.__hoda_queue.getStatus() });
+      } else {
+        sendResponse({ ok: true, status: { queueLength: 0, isProcessing: false } });
+      }
+      return false;
+    }
+
+    return false;
+  });
+
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
@@ -1583,10 +1688,6 @@ console.log('[Content] Loading - Complete final version...');
   const feedback = new FeedbackManager();
   const executor = new CommandExecutor(feedback);
   const queue = new CommandQueue();
-
-  // ============================================================================
-  // MESSAGE LISTENER - Bridge to popup.js
-  // ============================================================================
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[content.js] 📩 Received message:', message);
@@ -1597,7 +1698,7 @@ console.log('[Content] Loading - Complete final version...');
       console.log('[content.js] 🎯 Executing:', intent.intent, intent.slots);
 
       try {
-        // CRITICAL: Use "executor" not "commandExecutor"
+        // ✅ FIXED: Use "executor" (matches line 1689)
         const result = executor.execute(intent);
 
         console.log('[content.js] ✅ Success');
@@ -1607,11 +1708,10 @@ console.log('[Content] Loading - Complete final version...');
         sendResponse({ success: false, error: error.message });
       }
 
-      return true;
+      return true; // Keep channel open
     }
 
     if (message.action === 'ping') {
-      console.log('[content.js] 🏓 Ping received');
       sendResponse({ success: true, status: 'ready' });
       return true;
     }
