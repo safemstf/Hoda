@@ -1046,6 +1046,9 @@ console.log('[Content] Loading - Complete final version...');
           case 'zoom':
             result = await this.doZoom(slots);
             break;
+          case 'text_scale':
+            result = await this.doTextScale(slots);
+            break;
           case 'link_action':
             result = await this.doLinkAction(slots);
             break;
@@ -1346,25 +1349,220 @@ console.log('[Content] Loading - Complete final version...');
       return overlay;
     }
 
+    // async doZoom(slots) {
+    //   const action = slots.action;
+    //   const amount = parseFloat(slots.amount) || 0.1;
+
+    //   let currentZoom = parseFloat(document.body.style.zoom) || 1.0;
+
+    //   if (action === 'in' || action === 'bigger') {
+    //     currentZoom += amount;
+    //   } else if (action === 'out' || action === 'smaller') {
+    //     currentZoom -= amount;
+    //   } else if (action === 'reset' || action === 'normal') {
+    //     currentZoom = 1.0;
+    //   }
+
+    //   currentZoom = Math.max(0.5, Math.min(3.0, currentZoom));
+    //   document.body.style.zoom = currentZoom;
+
+    //   return { success: true, message: `Zoom: ${Math.round(currentZoom * 100)}%` };
+    // }
+
+    applyZoom(zoomVal) {
+      const z = Math.max(0.5, Math.min(3.0, zoomVal || 1.0));
+      document.documentElement.style.zoom = z;
+
+      try {
+        const hadEffect =
+          Math.abs((parseFloat(getComputedStyle(document.documentElement).zoom) || 1) - z) < 0.001;
+
+        if (!hadEffect) {
+          document.documentElement.style.transformOrigin = '0 0';
+          document.documentElement.style.transform = `scale(${z})`;
+          document.documentElement.style.width = `${100 / z}%`;
+        } else {
+          document.documentElement.style.transform = '';
+          document.documentElement.style.width = '';
+        }
+      } catch (_) { /* ignore */ }
+
+      try {
+        if (chrome?.storage?.local) {
+          const key = 'hoda_voice_zoom_' + (location.origin || 'page');
+          chrome.storage.local.set({ [key]: z }).catch?.(() => {});
+        }
+      } catch (_) { /* ignore */ }
+
+      return z;
+    }
+
+    async restoreZoomIfAny() {
+      try {
+        if (chrome?.storage?.local) {
+          const key = 'hoda_voice_zoom_' + (location.origin || 'page');
+          const res = await chrome.storage.local.get([key]);
+          const saved = parseFloat(res?.[key]);
+          if (!isNaN(saved)) this.applyZoom(saved);
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+
     async doZoom(slots) {
-      const action = slots.action;
-      const amount = parseFloat(slots.amount) || 0.1;
+      const action = (slots?.action || '').toLowerCase();
 
-      let currentZoom = parseFloat(document.body.style.zoom) || 1.0;
+      let current =
+        parseFloat(document.documentElement.style.zoom) ||
+        parseFloat(getComputedStyle(document.documentElement).zoom) ||
+        1.0;
 
-      if (action === 'in' || action === 'bigger') {
-        currentZoom += amount;
-      } else if (action === 'out' || action === 'smaller') {
-        currentZoom -= amount;
-      } else if (action === 'reset' || action === 'normal') {
-        currentZoom = 1.0;
+      const raw = (slots?.amount ?? '').toString().trim();
+      let step = 0.1; // default 10%
+      if (raw) {
+        if (raw.endsWith('%')) {
+          const pct = parseFloat(raw.slice(0, -1));
+          if (!isNaN(pct)) step = pct / 100;
+        } else {
+          const num = parseFloat(raw);
+          if (!isNaN(num)) {
+            step = num > 1.5 ? num / 100 : num; // "20" -> 0.2, "0.2" -> 0.2
+          }
+        }
       }
 
-      currentZoom = Math.max(0.5, Math.min(3.0, currentZoom));
-      document.body.style.zoom = currentZoom;
+      let target = current;
 
-      return { success: true, message: `Zoom: ${Math.round(currentZoom * 100)}%` };
+      if (action === 'in' || action === 'bigger') {
+        target = current + step;
+      } else if (action === 'out' || action === 'smaller') {
+        target = current - step;
+      } else if (action === 'reset' || action === 'normal') {
+        target = 1.0;
+      } else if (action === 'set') {
+        // "set zoom to 120%" or "set zoom to 1.2"
+        target = raw
+          ? (raw.endsWith('%') ? parseFloat(raw) / 100
+                              : (parseFloat(raw) > 1.5 ? parseFloat(raw) / 100 : parseFloat(raw)))
+          : current;
+      } else {
+        // If no action provided, treat as toggle-in
+        target = current + step;
+      }
+
+      const applied = this.applyZoom(target);
+
+      if (this.feedback) {
+        this.feedback.speakShort(`Zoom ${Math.round(applied * 100)} percent`, { interruptLongReads: true });
+        this.feedback.showOverlay(`🔎 Zoom: ${Math.round(applied * 100)}%`, 'success');
+      }
+      return { success: true, message: `Zoom: ${Math.round(applied * 100)}%` };
     }
+
+
+    applyTextScale(scaleVal) {
+      const s = Math.max(0.5, Math.min(2.5, scaleVal || 1.0)); 
+      const html = document.documentElement;
+
+        if (!this._textScaleBasePx) {
+        try {
+          const cs = getComputedStyle(html).fontSize;
+          this._textScaleBasePx = parseFloat(cs) || 16; 
+        } catch (_) {
+          this._textScaleBasePx = 16;
+        }
+      }
+
+      const newPx = this._textScaleBasePx * s;
+      html.style.fontSize = `${newPx}px`;
+      html.setAttribute('data-hoda-text-scale', String(s));
+
+      try {
+        if (chrome?.storage?.local) {
+          const key = 'hoda_text_scale_' + (location.origin || 'page');
+          chrome.storage.local.set({ [key]: s }).catch?.(() => {});
+        }
+      } catch (_) { /* ignore */ }
+
+      return s;
+    }
+
+    async restoreTextScaleIfAny() {
+      try {
+        const cs = getComputedStyle(document.documentElement).fontSize;
+        this._textScaleBasePx = parseFloat(cs) || 16;
+      } catch (_) {
+        this._textScaleBasePx = 16;
+      }
+
+      try {
+        if (chrome?.storage?.local) {
+          const key = 'hoda_text_scale_' + (location.origin || 'page');
+          const res = await chrome.storage.local.get([key]);
+          const saved = parseFloat(res?.[key]);
+          if (!isNaN(saved)) this.applyTextScale(saved);
+        }
+      } catch (_) { /* ignore */ }
+    }
+
+    async doTextScale(slots) {
+      const action = (slots?.action || '').toLowerCase();
+
+      let current = 1.0;
+      const html = document.documentElement;
+      const attr = parseFloat(html.getAttribute('data-hoda-text-scale'));
+      if (!isNaN(attr) && attr > 0) {
+        current = attr;
+      } else {
+        try {
+          const cs = getComputedStyle(html).fontSize;
+          const px = parseFloat(cs) || 16;
+          const base = this._textScaleBasePx || 16;
+          current = px / base;
+        } catch (_) {
+          current = 1.0;
+        }
+      }
+
+      const raw = (slots?.amount ?? '').toString().trim();
+      let step = 0.1; // default 10%
+      if (raw) {
+        if (raw.endsWith('%')) {
+          const pct = parseFloat(raw.slice(0, -1));
+          if (!isNaN(pct)) step = pct / 100;
+        } else {
+          const num = parseFloat(raw);
+          if (!isNaN(num)) step = num > 1.5 ? num / 100 : num;
+        }
+      }
+
+      let target = current;
+
+      if (action === 'in' || action === 'bigger') {
+        target = current + step;
+      } else if (action === 'out' || action === 'smaller') {
+        target = current - step;
+      } else if (action === 'reset' || action === 'normal') {
+        target = 1.0;
+      } else if (action === 'set') {
+        target = raw
+          ? (raw.endsWith('%') ? parseFloat(raw) / 100
+                              : (parseFloat(raw) > 1.5 ? parseFloat(raw) / 100 : parseFloat(raw)))
+          : current;
+      } else {
+        target = current + step;
+      }
+
+      const applied = this.applyTextScale(target);
+
+      if (this.feedback) {
+        this.feedback.speakShort(`Text ${Math.round(applied * 100)} percent`, { interruptLongReads: true });
+        this.feedback.showOverlay(`🅰️ Text: ${Math.round(applied * 100)}%`, 'success');
+      }
+
+      return { success: true, message: `Text: ${Math.round(applied * 100)}%` };
+    }
+
 
     findAndHighlight(query) {
       if (!query) return { success: false, message: 'No search query provided' };
@@ -1688,6 +1886,9 @@ console.log('[Content] Loading - Complete final version...');
   const feedback = new FeedbackManager();
   const executor = new CommandExecutor(feedback);
   const queue = new CommandQueue();
+
+  executor.restoreZoomIfAny?.();
+  executor.restoreTextScaleIfAny?.();
 
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[content.js] 📩 Received message:', message);
