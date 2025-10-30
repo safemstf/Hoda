@@ -3,12 +3,14 @@
  * Executes normalized commands on the active page
  * Works with FeedbackManager for confirmations
  */
+import { ScalingManager } from './scalingManager.js';
 
 export class CommandExecutor {
   constructor(feedbackManager) {
     this.feedbackManager = feedbackManager;
     this.linkList = [];
     this.currentSearchIndex = 0;
+    this.scalingManager = new ScalingManager();
     
     console.log('[Executor] Initialized');
   }
@@ -179,27 +181,27 @@ export class CommandExecutor {
    */
   async executeZoom(slots) {
     const action = slots.action;
-    const amount = parseFloat(slots.amount) || 0.1;
 
-    // Get current zoom level
-    let currentZoom = parseFloat(document.body.style.zoom) || 1.0;
+    // Delegate to ScalingManager with graceful error handling
+    const result = await this.scalingManager.applyZoom(action);
 
-    if (action === 'in' || action === 'bigger') {
-      currentZoom += amount;
-    } else if (action === 'out' || action === 'smaller') {
-      currentZoom -= amount;
-    } else if (action === 'reset' || action === 'normal') {
-      currentZoom = 1.0;
+    if (!result.success) {
+      // Provide actionable recovery steps via feedback manager
+      if (this.feedbackManager) {
+        this.feedbackManager.showError(result.message);
+      }
+
+      return {
+        success: false,
+        message: result.message,
+        code: result.code
+      };
     }
-
-    // Clamp zoom level
-    currentZoom = Math.max(0.5, Math.min(3.0, currentZoom));
-
-    document.body.style.zoom = currentZoom;
 
     return {
       success: true,
-      message: `Zoom: ${Math.round(currentZoom * 100)}%`
+      message: result.message,
+      percent: result.percent
     };
   }
 

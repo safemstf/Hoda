@@ -122,6 +122,20 @@ export class FeedbackManager {
     if (opts.enableAudio) {
       this.playBeep('error');
     }
+
+    // Speak brief recovery guidance if enabled
+    if (opts.enableSpoken && this.speechSynth) {
+      try {
+        const utterance = new SpeechSynthesisUtterance(String(message || 'Error'));
+        utterance.voice = this.voice;
+        utterance.rate = 1.1;
+        utterance.volume = this.options.feedbackVolume;
+        utterance.pitch = 1.0;
+        this.speechSynth.speak(utterance);
+      } catch (e) {
+        // non-fatal
+      }
+    }
   }
 
   /**
