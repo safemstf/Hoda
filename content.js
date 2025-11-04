@@ -1410,20 +1410,45 @@ console.log('[Content] Loading - Complete final version...');
 
 
     async doZoom(slots) {
+      // ============================================================================
+      // BOUNDARY CONSTANTS - Define min/max zoom limits
+      // ============================================================================
+      // These constants match the values used in applyZoom() for consistency
+      // MIN_ZOOM: 0.5 = 50% - Minimum zoom level users can set
+      // MAX_ZOOM: 3.0 = 300% - Maximum zoom level users can set
+      const MIN_ZOOM = 0.5;  // 50%
+      const MAX_ZOOM = 3.0;  // 300%
+
+      // Extract action from slots (e.g., 'in', 'out', 'reset', 'set')
+      // Convert to lowercase for case-insensitive matching
       const action = (slots?.action || '').toLowerCase();
 
+      // ============================================================================
+      // GET CURRENT ZOOM LEVEL
+      // ============================================================================
+      // Try to get current zoom from:
+      // 1. Direct style attribute (if previously set)
+      // 2. Computed style (if browser applied it)
+      // 3. Default to 1.0 (100%) if not set
       let current =
         parseFloat(document.documentElement.style.zoom) ||
         parseFloat(getComputedStyle(document.documentElement).zoom) ||
         1.0;
 
+      // ============================================================================
+      // PARSE ZOOM AMOUNT/STEP FROM USER INPUT
+      // ============================================================================
+      // Extract the amount/step value from slots (e.g., "zoom in 20%" or "set zoom to 150%")
       const raw = (slots?.amount ?? '').toString().trim();
-      let step = 0.1; // default 10%
+      let step = 0.1; // default 10% increment/decrement
+      
       if (raw) {
+        // Handle percentage format: "20%" -> 0.2
         if (raw.endsWith('%')) {
           const pct = parseFloat(raw.slice(0, -1));
           if (!isNaN(pct)) step = pct / 100;
         } else {
+          // Handle numeric format: "20" -> 0.2, "0.2" -> 0.2
           const num = parseFloat(raw);
           if (!isNaN(num)) {
             step = num > 1.5 ? num / 100 : num; // "20" -> 0.2, "0.2" -> 0.2
@@ -1431,31 +1456,100 @@ console.log('[Content] Loading - Complete final version...');
         }
       }
 
+      // ============================================================================
+      // CALCULATE TARGET ZOOM LEVEL BASED ON ACTION
+      // ============================================================================
       let target = current;
 
       if (action === 'in' || action === 'bigger') {
+        // Zoom in: increase zoom by step amount
         target = current + step;
       } else if (action === 'out' || action === 'smaller') {
+        // Zoom out: decrease zoom by step amount
         target = current - step;
       } else if (action === 'reset' || action === 'normal') {
+        // Reset: set zoom back to default 100%
         target = 1.0;
       } else if (action === 'set') {
-        // "set zoom to 120%" or "set zoom to 1.2"
+        // Set to specific value: "set zoom to 120%" or "set zoom to 1.2"
         target = raw
           ? (raw.endsWith('%') ? parseFloat(raw) / 100
                               : (parseFloat(raw) > 1.5 ? parseFloat(raw) / 100 : parseFloat(raw)))
           : current;
       } else {
-        // If no action provided, treat as toggle-in
+        // If no action provided, treat as toggle-in (default behavior)
         target = current + step;
       }
 
+      // ============================================================================
+      // BOUNDARY DETECTION - Check if limits will be hit
+      // ============================================================================
+      // We check boundaries BEFORE applying to provide better user feedback
+      // This allows us to detect "already at limit" vs "just hit limit" scenarios
+      
+      // Check if user is already at minimum and trying to zoom out further
+      // Example: Current = 50%, User says "zoom out" -> atMinLimit = true
+      const atMinLimit = current <= MIN_ZOOM && (action === 'out' || action === 'smaller');
+      
+      // Check if user is already at maximum and trying to zoom in further
+      // Example: Current = 300%, User says "zoom in" -> atMaxLimit = true
+      const atMaxLimit = current >= MAX_ZOOM && (action === 'in' || action === 'bigger');
+      
+      // Check if target zoom would be below minimum (even if currently above)
+      // Example: Current = 60%, User says "set zoom to 30%" -> wouldHitMinLimit = true
+      const wouldHitMinLimit = target < MIN_ZOOM;
+      
+      // Check if target zoom would be above maximum (even if currently below)
+      // Example: Current = 250%, User says "set zoom to 350%" -> wouldHitMaxLimit = true
+      const wouldHitMaxLimit = target > MAX_ZOOM;
+
+      // ============================================================================
+      // APPLY ZOOM - Clamp to valid range
+      // ============================================================================
+      // applyZoom() will clamp the value to [MIN_ZOOM, MAX_ZOOM] range
+      // It returns the actual applied zoom value (may be clamped)
       const applied = this.applyZoom(target);
 
+      // ============================================================================
+      // PROVIDE FEEDBACK - TTS and visual overlay
+      // ============================================================================
+      // Give appropriate feedback based on whether limits were hit
       if (this.feedback) {
-        this.feedback.speakShort(`Zoom ${Math.round(applied * 100)} percent`, { interruptLongReads: true });
-        this.feedback.showOverlay(`🔎 Zoom: ${Math.round(applied * 100)}%`, 'success');
+        // CASE 1: Minimum limit hit
+        // User is at/below 50% and trying to zoom out, OR trying to set below 50%
+        if (atMinLimit || wouldHitMinLimit) {
+          // Speak TTS notification: "Already at minimum zoom"
+          // interruptLongReads: true ensures this interrupts any ongoing speech
+          this.feedback.speakShort('Already at minimum zoom', { interruptLongReads: true });
+          
+          // Show visual overlay with warning style (yellow/orange)
+          // Format: "🔎 Zoom: 50% (Minimum)" - shows current zoom and limit indicator
+          this.feedback.showOverlay(`🔎 Zoom: ${Math.round(applied * 100)}% (Minimum)`, 'warning');
+        } 
+        // CASE 2: Maximum limit hit
+        // User is at/above 300% and trying to zoom in, OR trying to set above 300%
+        else if (atMaxLimit || wouldHitMaxLimit) {
+          // Speak TTS notification: "Already at maximum zoom"
+          this.feedback.speakShort('Already at maximum zoom', { interruptLongReads: true });
+          
+          // Show visual overlay with warning style
+          // Format: "🔎 Zoom: 300% (Maximum)"
+          this.feedback.showOverlay(`🔎 Zoom: ${Math.round(applied * 100)}% (Maximum)`, 'warning');
+        } 
+        // CASE 3: Normal zoom change (no limits hit)
+        // Zoom is within valid range [50%, 300%]
+        else {
+          // Normal TTS feedback: "Zoom 110 percent" (for example)
+          this.feedback.speakShort(`Zoom ${Math.round(applied * 100)} percent`, { interruptLongReads: true });
+          
+          // Normal visual overlay with success style (green)
+          // Format: "🔎 Zoom: 110%"
+          this.feedback.showOverlay(`🔎 Zoom: ${Math.round(applied * 100)}%`, 'success');
+        }
       }
+      
+      // Return success result with current zoom percentage
+      // This is used by the command executor to log/track the action
       return { success: true, message: `Zoom: ${Math.round(applied * 100)}%` };
     }
 
@@ -1872,6 +1966,52 @@ console.log('[Content] Loading - Complete final version...');
       } else {
         sendResponse({ ok: true, status: { queueLength: 0, isProcessing: false } });
       }
+      return false;
+    }
+
+    // TEST_COMMAND - Direct execution for debugging (bypasses queue)
+    if (message.type === 'TEST_COMMAND') {
+      console.log('[Debug] 🧪 Testing command:', message.command);
+      
+      (async () => {
+        try {
+          // Validate command format
+          if (!message.command || typeof message.command !== 'object') {
+            throw new Error('Invalid command format. Use: {intent: "zoom", slots: {action: "in"}}');
+          }
+          
+          if (!message.command.intent) {
+            throw new Error('Command must have "intent" property');
+          }
+          
+          // Execute command directly (bypass queue for testing)
+          console.log('[Debug] ⚡ Executing command:', message.command.intent, message.command.slots || {});
+          const result = await executor.execute(message.command);
+          
+          console.log('[Debug] ✅ Command executed:', result);
+          
+          // Send response back to popup
+          chrome.runtime.sendMessage({
+            type: 'TEST_COMMAND_RESPONSE',
+            requestId: message.requestId,
+            success: true,
+            result: result
+          }).catch(() => {});
+          
+        } catch (error) {
+          console.error('[Debug] ❌ Command failed:', error);
+          
+          // Send error response back to popup
+          chrome.runtime.sendMessage({
+            type: 'TEST_COMMAND_RESPONSE',
+            requestId: message.requestId,
+            success: false,
+            error: error.message
+          }).catch(() => {});
+        }
+      })();
+      
+      sendResponse({ ok: true });
       return false;
     }
 

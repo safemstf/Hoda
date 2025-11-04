@@ -1074,10 +1074,108 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStats() {
         console.log('Debug Info:', app.getDebugInfo());
       },
-      async testCommand(text) {
-        const result = await app.resolver.resolve(text);
-        console.log('Test Result:', result);
-        return result;
+      /**
+       * Test command - Developer tool for testing commands without voice
+       * Usage: __hoda.testCommand({intent: "zoom", slots: {action: "in"}})
+       * 
+       * This sends the command to the content script for direct execution.
+       * Works from popup console only.
+       * 
+       * @param {Object} command - Command object with intent and slots
+       * @returns {Promise<Object>} Execution result
+       */
+      async testCommand(command) {
+        if (!command || typeof command !== 'object') {
+          console.error('[Debug] testCommand requires a command object');
+          console.log('Usage: __hoda.testCommand({intent: "zoom", slots: {action: "in"}})');
+          return { success: false, error: 'Invalid command format' };
+        }
+
+        if (!command.intent) {
+          console.error('[Debug] Command must have "intent" property');
+          return { success: false, error: 'Command must have "intent" property' };
+        }
+
+        console.log('[Debug] 🧪 Testing command:', command.intent, command.slots || {});
+
+        try {
+          // Get active tab
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (!tab?.id) {
+            throw new Error('No active tab found');
+          }
+
+          // Generate unique request ID
+          const requestId = 'test_' + Date.now() + '_' + Math.random();
+
+          // Set up response listener
+          const responsePromise = new Promise((resolve, reject) => {
+            const listener = (msg) => {
+              if (msg.type === 'TEST_COMMAND_RESPONSE' && msg.requestId === requestId) {
+                chrome.runtime.onMessage.removeListener(listener);
+                if (msg.success) {
+                  resolve(msg.result);
+                } else {
+                  reject(new Error(msg.error));
+                }
+              }
+            };
+            chrome.runtime.onMessage.addListener(listener);
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              chrome.runtime.onMessage.removeListener(listener);
+              reject(new Error('Command timeout'));
+            }, 5000);
+          });
+
+          // Send command to content script
+          await chrome.tabs.sendMessage(tab.id, {
+            type: 'TEST_COMMAND',
+            requestId: requestId,
+            command: command
+          });
+
+          // Wait for response
+          const result = await responsePromise;
+          console.log('[Debug] ✅ Command executed:', result);
+          return result;
+
+        } catch (error) {
+          console.error('[Debug] ❌ Command failed:', error);
+          return { success: false, error: error.message };
+        }
+      },
+      // Helper functions for common commands
+      zoomIn() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'in' } });
+      },
+      zoomOut() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'out' } });
+      },
+      zoomReset() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'reset' } });
+      },
+      scrollDown() {
+        return this.testCommand({ intent: 'navigate', slots: { direction: 'down' } });
+      },
+      scrollUp() {
+        return this.testCommand({ intent: 'navigate', slots: { direction: 'up' } });
+      },
+      scrollToTop() {
+        return this.testCommand({ intent: 'navigate', slots: { target: 'top' } });
+      },
+      readPage() {
+        return this.testCommand({ intent: 'read', slots: { action: 'start' } });
+      },
+      stopReading() {
+        return this.testCommand({ intent: 'read', slots: { action: 'stop' } });
+      },
+      listLinks() {
+        return this.testCommand({ intent: 'link_action', slots: { action: 'list' } });
+      },
+      help() {
+        return this.testCommand({ intent: 'help' });
       }
     };
 
