@@ -2,15 +2,16 @@
   "name": "unt-csce5430-tts",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "main": "src/index.js",
   "scripts": {
     "demo": "node src/demo.js",
-    "test": "jest --runInBand"
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand"
   },
   "devDependencies": {
-    "jest": "^29.0.0",
+    "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
-    "jsdom": "^27.0.0"
+    "jsdom": "^27.1.0"
   },
   "engines": {
     "node": ">=20"
@@ -19,6 +20,7 @@
     "testEnvironment": "jsdom",
     "testMatch": [
       "**/src/tests/**/*.test.js"
-    ]
+    ],
+    "transform": {}
   }
 }

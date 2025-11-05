@@ -1,4 +1,6 @@
-const { extractSections } = require('../dom-extractor');
+// Test file for DOM extractor - uses ES6 modules (import/export)
+// Note: Uses Node's native ESM support via --experimental-vm-modules flag
+import { extractSections } from '../dom-extractor.js';
 
 describe('DOM extractor', () => {
   test('extracts headline and paragraphs from article', () => {
