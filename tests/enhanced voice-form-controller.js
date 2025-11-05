@@ -1,10 +1,7 @@
 /* voice-form-controller.js
- * Features:
- * 1) Voice Feedback Overlay (+ SR live region)
- * 2) Global Field Mapper across all forms
- * 3) Auto-focus & Validation Narration on submit/errors
- * Plus: simple parser + demo STT/TTS you can replace with your STT→LLM→TTS pipeline.
- */
+
+
+ 
 
 /* ------------------ UI helpers ------------------ */
 const $ = (s, r = document) => r.querySelector(s);
