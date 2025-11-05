@@ -19,6 +19,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  // Handle restricted page zoom commands (chrome:// pages)
+  if (msg.type === 'RESTRICTED_PAGE_ZOOM') {
+    handleRestrictedPageZoom(msg, sender, sendResponse);
+    return true; // Keep channel open for async response
+  }
+
   // Handle other messages (future commands, etc.)
   return false;
 });
@@ -212,4 +218,71 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   }
   return true;
 });
+
+/**
+ * Handle zoom command on restricted pages (chrome://)
+ * Provides TTS feedback since content script cannot inject
+ * 
+ * @param {Object} msg - Message with tabId, intent, slots, and url
+ * @param {Object} sender - Message sender info
+ * @param {Function} sendResponse - Callback to send response
+ */
+async function handleRestrictedPageZoom(msg, sender, sendResponse) {
+  console.log('[Background] Handling restricted page zoom:', msg.url);
+  
+  const message = 'Zoom not available, try another command';
+  
+  // Try chrome.tts API first (most reliable, system-level)
+  try {
+    console.log('[Background] Attempting chrome.tts.speak...');
+    chrome.tts.speak(message, {
+      rate: 1.0,
+      pitch: 1.0,
+      volume: 0.9
+    });
+    console.log('[Background] TTS requested via chrome.tts');
+    sendResponse({ ok: true, method: 'chrome.tts' });
+    return;
+  } catch (ttsError) {
+    console.warn('[Background] chrome.tts failed, trying script injection:', ttsError);
+  }
+  
+  // Fallback: Try injecting minimal script into the page
+  try {
+    console.log('[Background] Attempting script injection...');
+    await chrome.scripting.executeScript({
+      target: { tabId: msg.tabId },
+      func: (text) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.9;
+        speechSynthesis.speak(utterance);
+      },
+      args: [message]
+    });
+    console.log('[Background] TTS successful via script injection');
+    sendResponse({ ok: true, method: 'script_injection' });
+    return;
+  } catch (scriptError) {
+    console.warn('[Background] Script injection failed:', scriptError);
+  }
+  
+  // Final fallback: Visual notification only (requires "notifications" permission)
+  console.log('[Background] Using notification fallback');
+  try {
+    await chrome.notifications.create({
+      type: 'basic',
+      iconUrl: 'icons/icon48.png',
+      title: 'Hoda',
+      message: message
+    });
+    sendResponse({ ok: true, method: 'notification' });
+  } catch (notifError) {
+    console.warn('[Background] Notification failed (may need permissions):', notifError);
+    // Still return success since TTS was attempted
+    sendResponse({ ok: true, method: 'none', warning: 'All feedback methods failed' });
+  }
+}
+
 console.log('[Background] Ready');

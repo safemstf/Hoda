@@ -28,7 +28,10 @@ This service provides intent recognition for visually impaired users, allowing t
 
 ```bash
 npm install
+npm run build:webllm  # Bundle WebLLM for Chrome extension use
 ```
+
+**Important for Chrome Extensions:** Chrome extensions cannot resolve npm module specifiers (`@mlc-ai/web-llm`) directly. You must run `npm run build:webllm` to create a bundled version (`src/bundled-webllm.js`) that can be imported using relative paths. This bundled file is automatically used by `parser.js`.
 
 ## Usage
 
@@ -106,7 +109,24 @@ npm test
 
 # Development mode
 npm run dev
+
+# Build WebLLM bundle for Chrome extension
+npm run build:webllm
 ```
+
+### Building for Chrome Extension
+
+When using this service in a Chrome extension, you must bundle WebLLM first:
+
+```bash
+cd services/webllm
+npm install
+npm run build:webllm
+```
+
+This creates `src/bundled-webllm.js` which is automatically imported by `parser.js`. The bundle is excluded from git (see `.gitignore`) as it's generated code.
+
+**Why bundling is needed:** Chrome extensions run in a sandboxed environment that doesn't support Node.js-style module resolution. The bundled file contains all WebLLM dependencies in a single ESM module that can be imported with relative paths.
 
 ## License
 

@@ -763,8 +763,59 @@ class CommandProcessor {
       return { success: true };
     } catch (err) {
       console.error('[CommandProcessor] Execute failed:', err);
+      
+      // Check if it's a restricted page error (content script not available)
+      const isRestrictedPageError = err.message?.includes('Receiving end does not exist') ||
+                                   err.message?.includes('Could not establish connection');
+      
+      // Only handle zoom commands on restricted pages
+      if (isRestrictedPageError && intentResult.intent === 'zoom') {
+        try {
+          // Get current tab to check URL
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          
+          // Check if it's a chrome:// page (content scripts can't inject)
+          if (tab?.url?.startsWith('chrome://')) {
+            console.log('[CommandProcessor] Detected chrome:// page for zoom command');
+            return await this.handleRestrictedPageZoom(intentResult, tab);
+          }
+        } catch (tabError) {
+          console.warn('[CommandProcessor] Failed to check tab URL:', tabError);
+        }
+      }
+      
       throw err;
     }
+  }
+
+  /**
+   * Handle zoom command on restricted pages (chrome://)
+   * Provides TTS feedback via background script since content script can't inject
+   * 
+   * @param {Object} intentResult - Command intent with intent and slots
+   * @param {Object} tab - Chrome tab object with URL and ID
+   * @returns {Promise<Object>} Failure result with user-friendly message
+   */
+  async handleRestrictedPageZoom(intentResult, tab) {
+    console.log('[CommandProcessor] Handling restricted page zoom on:', tab.url);
+    
+    // Send to background script for TTS/notification
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'RESTRICTED_PAGE_ZOOM',
+        tabId: tab.id,
+        intent: intentResult.intent,
+        slots: intentResult.slots,
+        url: tab.url
+      });
+    } catch (err) {
+      console.error('[CommandProcessor] Failed to send to background:', err);
+    }
+    
+    return {
+      success: false,
+      message: 'Zoom not available, try another command'
+    };
   }
 
   getStats() {
@@ -1074,10 +1125,139 @@ document.addEventListener('DOMContentLoaded', async () => {
       showStats() {
         console.log('Debug Info:', app.getDebugInfo());
       },
-      async testCommand(text) {
-        const result = await app.resolver.resolve(text);
-        console.log('Test Result:', result);
-        return result;
+      /**
+       * Test command - Developer tool for testing commands without voice
+       * Usage: __hoda.testCommand({intent: "zoom", slots: {action: "in"}})
+       * 
+       * This sends the command to the content script for direct execution.
+       * Works from popup console only.
+       * 
+       * @param {Object} command - Command object with intent and slots
+       * @returns {Promise<Object>} Execution result
+       */
+      async testCommand(command) {
+        if (!command || typeof command !== 'object') {
+          console.error('[Debug] testCommand requires a command object');
+          console.log('Usage: __hoda.testCommand({intent: "zoom", slots: {action: "in"}})');
+          return { success: false, error: 'Invalid command format' };
+        }
+
+        if (!command.intent) {
+          console.error('[Debug] Command must have "intent" property');
+          return { success: false, error: 'Command must have "intent" property' };
+        }
+
+        console.log('[Debug] 🧪 Testing command:', command.intent, command.slots || {});
+
+        let tab; // Declare outside try block for use in catch
+        try {
+          // Get active tab
+          tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
+          if (!tab?.id) {
+            throw new Error('No active tab found');
+          }
+
+          // Generate unique request ID
+          const requestId = 'test_' + Date.now() + '_' + Math.random();
+
+          // Set up response listener
+          const responsePromise = new Promise((resolve, reject) => {
+            const listener = (msg) => {
+              if (msg.type === 'TEST_COMMAND_RESPONSE' && msg.requestId === requestId) {
+                chrome.runtime.onMessage.removeListener(listener);
+                if (msg.success) {
+                  resolve(msg.result);
+                } else {
+                  reject(new Error(msg.error));
+                }
+              }
+            };
+            chrome.runtime.onMessage.addListener(listener);
+
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              chrome.runtime.onMessage.removeListener(listener);
+              reject(new Error('Command timeout'));
+            }, 5000);
+          });
+
+          // Send command to content script
+          await chrome.tabs.sendMessage(tab.id, {
+            type: 'TEST_COMMAND',
+            requestId: requestId,
+            command: command
+          });
+
+          // Wait for response
+          const result = await responsePromise;
+          console.log('[Debug] ✅ Command executed:', result);
+          return result;
+
+        } catch (error) {
+          console.error('[Debug] ❌ Command failed:', error);
+          
+          // Check if it's a restricted page error for zoom commands
+          const isRestrictedPageError = error.message?.includes('Receiving end does not exist') ||
+                                       error.message?.includes('Could not establish connection');
+          
+          if (isRestrictedPageError && command.intent === 'zoom') {
+            try {
+              // Get current tab to check URL (if not already available)
+              if (!tab) {
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                tab = tabs[0];
+              }
+              
+              // Check if it's a chrome:// page (content scripts can't inject)
+              if (tab?.url?.startsWith('chrome://')) {
+                console.log('[Debug] Detected chrome:// page for zoom command');
+                
+                // Use app's commandProcessor to handle restricted page zoom
+                if (app?.commandProcessor) {
+                  return await app.commandProcessor.handleRestrictedPageZoom(
+                    { intent: command.intent, slots: command.slots },
+                    tab
+                  );
+                }
+              }
+            } catch (tabError) {
+              console.warn('[Debug] Failed to check tab URL:', tabError);
+            }
+          }
+          
+          return { success: false, error: error.message };
+        }
+      },
+      // Helper functions for common commands
+      zoomIn() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'in' } });
+      },
+      zoomOut() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'out' } });
+      },
+      zoomReset() {
+        return this.testCommand({ intent: 'zoom', slots: { action: 'reset' } });
+      },
+      scrollDown() {
+        return this.testCommand({ intent: 'navigate', slots: { direction: 'down' } });
+      },
+      scrollUp() {
+        return this.testCommand({ intent: 'navigate', slots: { direction: 'up' } });
+      },
+      scrollToTop() {
+        return this.testCommand({ intent: 'navigate', slots: { target: 'top' } });
+      },
+      readPage() {
+        return this.testCommand({ intent: 'read', slots: { action: 'start' } });
+      },
+      stopReading() {
+        return this.testCommand({ intent: 'read', slots: { action: 'stop' } });
+      },
+      listLinks() {
+        return this.testCommand({ intent: 'link_action', slots: { action: 'list' } });
+      },
+      help() {
+        return this.testCommand({ intent: 'help' });
       }
     };
 

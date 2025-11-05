@@ -1,5 +1,9 @@
-const Reader = require('../reader');
-const Speaker = require('../speaker');
+// Test file for Reader class - uses ES6 modules (import/export)
+// Note: Uses Node's native ESM support via --experimental-vm-modules flag
+// Import Jest globals explicitly for ES modules
+import { jest } from '@jest/globals';
+import { Reader } from '../reader.js';
+import { Speaker } from '../speaker.js';
 
 describe('Reader.readPageSemantic', () => {
   test('reads array of sections and returns success', async () => {
