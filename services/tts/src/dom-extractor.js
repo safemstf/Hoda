@@ -41,4 +41,6 @@ function extractSections(root) {
   return sections;
 }
 
-module.exports = { extractSections };
+// Export using ES6 module syntax for consistency with other source files
+// This allows the test file to use ES6 import syntax
+export { extractSections };

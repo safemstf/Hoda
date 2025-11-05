@@ -274,4 +274,40 @@ export class Reader {
       hasContent: this.currentText !== null
     };
   }
+
+  /**
+   * Read page semantic sections (headlines, paragraphs, etc.)
+   * @param {Array} sections - Array of section objects with { role, text }
+   * @returns {Promise<{success: boolean, error?: string}>}
+   */
+  async readPageSemantic(sections) {
+    if (!sections || !Array.isArray(sections) || sections.length === 0) {
+      return { success: false, error: 'No sections provided' };
+    }
+
+    try {
+      for (const section of sections) {
+        const { role, text } = section;
+        
+        if (!text || text.trim().length === 0) {
+          continue; // Skip empty sections
+        }
+
+        // Read each section based on its role
+        if (role === 'headline' || role === 'heading') {
+          await this.speaker.speak(text, { rate: 1.0 });
+        } else if (role === 'byline') {
+          await this.speaker.speak(text, { rate: 1.1 });
+        } else {
+          // Default for paragraphs and other content
+          await this.speaker.speak(text, { rate: 0.9 });
+        }
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[Reader] Failed to read semantic sections:', error);
+      return { success: false, error: error.message };
+    }
+  }
 }
