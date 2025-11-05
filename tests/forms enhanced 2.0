@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hoda Voice - Form Filling Tests</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,-apple-system,sans-serif;
+      background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+      min-height:100vh;padding:20px}
+    .container{max-width:1200px;margin:0 auto}
+    .header{text-align:center;color:white;margin-bottom:30px}
+    .header h1{font-size:2.2rem;margin-bottom:6px}
+    .test-info{background:rgba(255,255,255,.95);border-radius:12px;padding:18px;margin-bottom:18px}
+    .test-commands{background:#f8f9fa;border-radius:8px;padding:12px;margin-top:8px}
+    .forms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:18px;margin-bottom:18px}
+    .form-card{background:white;border-radius:12px;padding:18px;box-shadow:0 4px 8px rgba(0,0,0,.08)}
+    .form-card h2{color:#667eea;margin-bottom:12px;font-size:1.2rem;border-bottom:2px solid #e6e8ff;padding-bottom:8px}
+    .form-group{margin-bottom:12px}
+    .form-group label{display:block;margin-bottom:6px;font-weight:600;color:#333}
+    .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px;border:2px solid #ddd;border-radius:6px;font-size:14px;transition:border-color .2s}
+    .checkbox-group{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+    .form-actions{margin-top:12px;display:flex;gap:8px}
+    button[type=submit],button[type=reset]{padding:10px 16px;border:none;border-radius:6px;cursor:pointer;font-weight:600}
+    button[type=submit]{background:#667eea;color:#fff}button[type=reset]{background:#e0e0e0;color:#333}
+    .required{color:red;margin-left:4px}
+    .form-success{background:#d4edda;border:1px solid #c3e6cb;color:#155724;padding:10px;border-radius:6px;margin-top:10px;display:none}
+    .form-error{background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:10px;border-radius:6px;margin-top:10px;display:none}
+    textarea{min-height:100px;resize:vertical}
+
+    /* Voice QA panel bottom right */
+    #voice-qa{position:fixed;right:18px;bottom:18px;width:340px;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:9999;font-size:13px}
+    #voice-qa header{padding:8px 12px;background:#667eea;color:#fff;border-radius:10px 10px 0 0;font-weight:700}
+    #voice-qa .body{padding:10px}
+    #voice-qa textarea{width:100%;height:68px;border:1px solid #e6e6e6;border-radius:6px;padding:6px;font-family:monospace;font-size:12px}
+    #voice-qa .mini-row{display:flex;gap:8px;margin-top:8px}
+    #voice-qa .btn-apply{flex:1;background:#28a745;color:#fff;border-radius:6px;border:none;padding:8px;font-weight:700;cursor:pointer}
+    #voice-qa .btn-clear{flex:1;background:#e0e0e0;border-radius:6px;border:none;padding:8px;cursor:pointer}
+    #voice-log-mini{max-height:140px;overflow:auto;margin-top:8px;font-family:monospace;font-size:12px;background:#fbfbff;padding:6px;border-radius:6px;border:1px solid #f0f0ff}
+
+    /* History sidebar left bottom */
+    #voice-history{position:fixed;left:18px;bottom:18px;width:300px;background:#fff;border-radius:10px;padding:10px;box-shadow:0 8px 20px rgba(0,0,0,.12);z-index:9998}
+    #voice-history h4{margin-bottom:8px;color:#667eea}
+    #history-list{list-style:none;max-height:180px;overflow:auto;padding:0;margin:0;font-family:monospace;font-size:12px}
+
+    /* Quick command dropdown style */
+    .quick-select{margin-top:8px;width:100%;padding:8px;border-radius:6px;border:1px solid #e6e6e6}
+
+    /* small helper */
+    .small{font-size:11px;color:#666;margin-top:6px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>📋 Form Filling Voice Tests</h1>
+      <p>Issue #5: Voice Form Filling Implementation Tests</p>
+    </div>
+
+    <div class="test-info">
+      <h2>🎯 Test Instructions</h2>
+      <p>Use voice commands to interact with the forms below. Use the QA panel to paste normalized JSON or quick commands.</p>
+      <div class="test-commands">
+        <strong>Essential Commands:</strong>
+        <ul>
+          <li>"list fields" - Show form fields</li>
+          <li>"fill [field] [value]" - Fill a field</li>
+          <li>"check [checkbox]" - Toggle checkbox</li>
+          <li>"select [dropdown] [option]" - Choose option</li>
+          <li>"submit form" - Submit</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="forms-grid">
+      <!-- Login -->
+      <div class="form-card">
+        <h2>🔐 Login Form</h2>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="login-email">Email<span class="required">*</span></label>
+            <input id="login-email" name="email" type="email" required placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label for="login-password">Password<span class="required">*</span></label>
+            <input id="login-password" name="password" type="password" required minlength="6">
+          </div>
+          <div class="form-group checkbox-group">
+            <input id="login-remember" name="remember" type="checkbox"><label for="login-remember">Remember me</label>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Login</button>
+            <button type="reset">Reset</button>
+          </div>
+          <div id="login-success" class="form-success">Login successful!</div>
+          <div id="login-error" class="form-error">Please check your input</div>
+        </form>
+      </div>
+
+      <!-- Signup -->
+      <div class="form-card">
+        <h2>📝 Signup Form</h2>
+        <form id="signup-form">
+          <div class="form-group">
+            <label for="signup-name">Full Name<span class="required">*</span></label>
+            <input id="signup-name" name="name" type="text" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label for="signup-email">Email<span class="required">*</span></label>
+            <input id="signup-email" name="email" type="email" required placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label for="signup-password">Password<span class="required">*</span></label>
+            <input id="signup-password" name="password" type="password" required minlength="8">
+          </div>
+          <div class="form-group">
+            <label for="signup-age">Age<span class="required">*</span></label>
+            <input id="signup-age" name="age" type="number" required min="13" max="120">
+          </div>
+          <div class="form-group">
+            <label for="signup-country">Country<span class="required">*</span></label>
+            <select id="signup-country" name="country" required>
+              <option value="">Select a country</option>
+              <option value="us">United States</option>
+              <option value="uk">United Kingdom</option>
+              <option value="ca">Canada</option>
+              <option value="au">Australia</option>
+              <option value="de">Germany</option>
+            </select>
+          </div>
+          <div class="form-group checkbox-group">
+            <input id="signup-terms" name="terms" type="checkbox" required><label for="signup-terms">I agree to the terms<span class="required">*</span></label>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Sign Up</button>
+            <button type="reset">Reset</button>
+          </div>
+          <div id="signup-success" class="form-success">Account created!</div>
+          <div id="signup-error" class="form-error">Please fill all required fields</div>
+        </form>
+      </div>
+
+      <!-- Contact -->
+      <div class="form-card">
+        <h2>📧 Contact Form</h2>
+        <form id="contact-form">
+          <div class="form-group">
+            <label for="contact-name">Name<span class="required">*</span></label>
+            <input id="contact-name" name="name" type="text" required placeholder="Your name">
+          </div>
+          <div class="form-group">
+            <label for="contact-email">Email<span class="required">*</span></label>
+            <input id="contact-email" name="email" type="email" required placeholder="your@email.com">
+          </div>
+          <div class="form-group">
+            <label for="contact-subject">Subject<span class="required">*</span></label>
+            <select id="contact-subject" name="subject" required>
+              <option value="">Choose a topic</option>
+              <option value="general">General Inquiry</option>
+              <option value="support">Technical Support</option>
+              <option value="feedback">Feedback</option>
+              <option value="bug">Bug Report</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="contact-message">Message<span class="required">*</span></label>
+            <textarea id="contact-message" name="message" required placeholder="Your message here..."></textarea>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Send Message</button>
+            <button type="reset">Reset</button>
+          </div>
+          <div id="contact-success" class="form-success">Message sent!</div>
+          <div id="contact-error" class="form-error">Please complete all fields</div>
+        </form>
+      </div>
+
+      <!-- Checkout -->
+      <div class="form-card">
+        <h2>🛒 Checkout Form</h2>
+        <form id="checkout-form">
+          <div class="form-group">
+            <label for="checkout-name">Full Name<span class="required">*</span></label>
+            <input id="checkout-name" name="name" type="text" required placeholder="John Doe">
+          </div>
+          <div class="form-group">
+            <label for="checkout-email">Email<span class="required">*</span></label>
+            <input id="checkout-email" name="email" type="email" required placeholder="john@example.com">
+          </div>
+          <div class="form-group">
+            <label for="checkout-address">Address<span class="required">*</span></label>
+            <input id="checkout-address" name="address" type="text" required placeholder="123 Main St">
+          </div>
+          <div class="form-group">
+            <label for="checkout-city">City<span class="required">*</span></label>
+            <input id="checkout-city" name="city" type="text" required placeholder="New York">
+          </div>
+          <div class="form-group">
+            <label for="checkout-zip">ZIP Code<span class="required">*</span></label>
+            <input id="checkout-zip" name="zip" type="text" required pattern="\d{5}" placeholder="12345">
+          </div>
+          <div class="form-group">
+            <label for="checkout-card">Card Number<span class="required">*</span></label>
+            <input id="checkout-card" name="card" type="text" required pattern="\d{16}" placeholder="1234567890123456">
+          </div>
+          <div class="form-group">
+            <label for="checkout-shipping">Shipping Method<span class="required">*</span></label>
+            <select id="checkout-shipping" name="shipping" required>
+              <option value="">Select shipping</option>
+              <option value="standard">Standard (5-7 days)</option>
+              <option value="express">Express (2-3 days)</option>
+              <option value="overnight">Overnight</option>
+            </select>
+          </div>
+          <div class="form-group checkbox-group">
+            <input id="checkout-subscribe" name="subscribe" type="checkbox"><label for="checkout-subscribe">Subscribe to newsletter</label>
+          </div>
+          <div class="form-group checkbox-group">
+            <input id="checkout-terms" name="terms" type="checkbox" required><label for="checkout-terms">I agree to terms and conditions<span class="required">*</span></label>
+          </div>
+          <div class="form-actions">
+            <button type="submit">Complete Purchase</button>
+            <button type="reset">Reset</button>
+          </div>
+          <div id="checkout-success" class="form-success">Order placed successfully!</div>
+          <div id="checkout-error" class="form-error">Please complete all required fields</div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice QA Panel -->
+  <div id="voice-qa" aria-live="polite">
+    <header>Voice QA Panel</header>
+    <div class="body">
+      <div class="small">Paste normalized JSON (or choose a quick command) and click Apply</div>
+      <textarea id="voice-json-input" placeholder='{"intent":"form_action","slots":{"action":"fill","field":"email","value":"john@example.com"}}'></textarea>
+
+      <select id="quick-command" class="quick-select" aria-label="Quick commands">
+        <option value="">-- Quick commands --</option>
+        <option value='fill email john@example.com'>Fill Email</option>
+        <option value='fill name John Doe'>Fill Name</option>
+        <option value='check remember me'>Check Remember</option>
+        <option value='select shipping express'>Select Shipping: Express</option>
+        <option value='submit'>Submit Form</option>
+        <option value='reset'>Reset Form</option>
+      </select>
+
+      <div class="mini-row">
+        <button id="btn-apply" class="btn-apply">Apply</button>
+        <button id="btn-clear" class="btn-clear">Clear</button>
+      </div>
+
+      <div class="small" style="margin-top:8px">Voice Log</div>
+      <div id="voice-log-mini">Ready.</div>
+    </div>
+  </div>
+
+  <!-- Voice History Sidebar -->
+  <div id="voice-history" aria-hidden="false">
+    <h4>Voice History</h4>
+    <ul id="history-list"></ul>
+  </div>
+
+  <script>
+    // Preserve original form submission behavior
+    const forms = ['login','signup','contact','checkout'];
+    forms.forEach(formType=>{
+      const form = document.getElementById(`${formType}-form`);
+      if (!form) return;
+      const successDiv = document.getElementById(`${formType}-success`);
+      const errorDiv = document.getElementById(`${formType}-error`);
+      form.addEventListener('submit', e=>{
+        e.preventDefault();
+        successDiv && (successDiv.style.display = 'none');
+        errorDiv && (errorDiv.style.display = 'none');
+        if (form.checkValidity()) {
+          successDiv && (successDiv.style.display = 'block');
+          console.log(`✅ ${formType} form submitted`, new FormData(form));
+          speakFeedback(`${formType} form submitted successfully`);
+          setTimeout(()=>{ form.reset(); successDiv && (successDiv.style.display='none') }, 1600);
+        } else {
+          errorDiv && (errorDiv.style.display='block');
+          form.reportValidity();
+          console.log(`❌ ${formType} validation failed`);
+          speakFeedback(`Please complete required fields`);
+        }
+      });
+      form.addEventListener('reset', ()=>{ successDiv && (successDiv.style.display='none'); errorDiv && (errorDiv.style.display='none') });
+    });
+
+    // FIELD MAP (spoken -> DOM ids)
+    const FIELD_MAP = {
+      'email': ['login-email','signup-email','contact-email','checkout-email'],
+      'password': ['login-password','signup-password'],
+      'name': ['signup-name','contact-name','checkout-name'],
+      'remember me': ['login-remember'],
+      'remember': ['login-remember'],
+      'terms': ['signup-terms','checkout-terms'],
+      'subscribe': ['checkout-subscribe'],
+      'country': ['signup-country'],
+      'shipping': ['checkout-shipping'],
+      'message': ['contact-message'],
+      'zip': ['checkout-zip'],
+      'card': ['checkout-card'],
+      'address': ['checkout-address'],
+      'city': ['checkout-city']
+    };
+
+    // TTS helper
+    function speakFeedback(text) {
+      if (!('speechSynthesis' in window) || !text) return;
+      try {
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(u);
+      } catch (e) { console.warn('TTS error', e) }
+    }
+
+    // highlight + scroll into view
+    function highlightField(id, success=true) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({behavior:'smooth',block:'center'});
+      const prev = el.style.boxShadow || '';
+      el.style.boxShadow = `0 0 0 4px ${ success ? 'rgba(40,167,69,0.18)' : 'rgba(220,53,69,0.18)' }`;
+      setTimeout(()=> el.style.boxShadow = prev, 1200);
+    }
+
+    // map spoken to id
+    function mapSpokenToId(spoken) {
+      if (!spoken) return null;
+      spoken = String(spoken).toLowerCase().trim();
+      if (FIELD_MAP[spoken]) return FIELD_MAP[spoken][0];
+      for (const key of Object.keys(FIELD_MAP)) if (spoken.includes(key)) return FIELD_MAP[key][0];
+      return null;
+    }
+
+    // mini log
+    function appendMiniLog(text) {
+      const box = document.getElementById('voice-log-mini');
+      const el = document.createElement('div');
+      el.style.marginBottom = '6px';
+      el.innerHTML = `<strong>»</strong> ${escapeHtml(text)}`;
+      box.prepend(el);
+    }
+    function escapeHtml(s){ return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+
+    // voice history
+    function updateHistory(cmd, status) {
+      const list = document.getElementById('history-list');
+      const li = document.createElement('li');
+      li.style.color = status === 'ok' ? '#28a745' : '#dc3545';
+      const now = new Date().toLocaleTimeString();
+      li.textContent = `${now} — ${cmd} → ${status}`;
+      list.prepend(li);
+      if (list.children.length > 10) list.removeChild(list.lastChild);
+    }
+
+    // applyNormalizedCommand (core adapter)
+    function applyNormalizedCommand(result = {}, rawText = '') {
+      // active-border flash
+      const body = document.body;
+      body.style.outline = '6px solid rgba(102,126,234,0.18)';
+      setTimeout(()=> body.style.outline = 'none', 400);
+
+      const slots = (result.slots || {});
+      const action = (slots.action || '').toString().toLowerCase();
+      const spokenField = (slots.field || slots.target || '').toString().toLowerCase();
+      const value = (slots.value || slots.target || '').toString();
+
+      appendMiniLog(`${rawText || JSON.stringify(result)} → handling`);
+
+      // FILL / SET / TYPE
+      if (['fill','set','type','enter','update'].includes(action)) {
+        if (!spokenField || !value) {
+          appendMiniLog('Missing field or value'); speakFeedback('Please say the field and the value'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'missing'};
+        }
+        const id = mapSpokenToId(spokenField);
+        if (!id) { appendMiniLog(`Field not found: ${spokenField}`); speakFeedback(`I couldn't find the field ${spokenField}`); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'not_found'}; }
+        const el = document.getElementById(id);
+        if (!el) { appendMiniLog(`Element missing: ${id}`); speakFeedback('Field not available'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'missing_el'}; }
+        el.value = value; el.dispatchEvent(new Event('change',{bubbles:true})); highlightField(id,true);
+        appendMiniLog(`Set ${id} = "${value}"`); speakFeedback(`${spokenField} set to ${value}`); updateHistory(rawText||JSON.stringify(result),'ok');
+        return {status:'ok',action:'filled',id,value};
+      }
+
+      // CHECK / UNCHECK / TOGGLE
+      if (['check','uncheck','toggle','select','deselect'].includes(action)) {
+        if (!spokenField) { appendMiniLog('Missing checkbox name'); speakFeedback('Which checkbox should I toggle?'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'missing'}; }
+        const id = mapSpokenToId(spokenField);
+        if (!id) { appendMiniLog(`Checkbox not found: ${spokenField}`); speakFeedback('Checkbox not found'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error'}; }
+        const el = document.getElementById(id);
+        if (!el || (el.type !== 'checkbox' && el.type !== 'radio')) { appendMiniLog('Target not checkbox/radio'); speakFeedback('Target is not a checkbox'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error'}; }
+        if (action === 'uncheck' || action === 'deselect') el.checked = false;
+        else if (action === 'toggle') el.checked = !el.checked;
+        else el.checked = true;
+        el.dispatchEvent(new Event('change',{bubbles:true})); highlightField(id, el.checked);
+        appendMiniLog(`${id} checked=${el.checked}`); speakFeedback(`${spokenField} ${el.checked ? 'checked' : 'unchecked'}`); updateHistory(rawText||JSON.stringify(result),'ok');
+        return {status:'ok',action:'toggled',id,checked:el.checked};
+      }
+
+      // SELECT / CHOOSE
+      if (['select','choose','pick'].includes(action)) {
+        const option = value || spokenField;
+        if (!option) { appendMiniLog('No option provided'); speakFeedback('Which option should I select?'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error'}; }
+        const id = mapSpokenToId(spokenField) || null;
+        if (id) {
+          const sel = document.getElementById(id);
+          if (sel && sel.tagName === 'SELECT') {
+            const opt = Array.from(sel.options).find(o => (o.text||o.value).toLowerCase().includes(option.toLowerCase()));
+            if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change',{bubbles:true})); highlightField(id,true); appendMiniLog(`Selected ${opt.text} on ${id}`); speakFeedback(`${opt.text} selected`); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok'} }
+          }
+        }
+        for (const sel of document.querySelectorAll('select')) {
+          const opt = Array.from(sel.options).find(o => (o.text||o.value).toLowerCase().includes(option.toLowerCase()));
+          if (opt) { sel.value = opt.value; sel.dispatchEvent(new Event('change',{bubbles:true})); highlightField(sel.id||sel.name,true); appendMiniLog(`Selected ${opt.text} on ${sel.id||sel.name}`); speakFeedback(`${opt.text} selected`); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok'} }
+        }
+        appendMiniLog('Option not found'); speakFeedback('Could not find that option'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'option_not_found'};
+      }
+
+      // SUBMIT / RESET
+      if (action === 'submit' || result.intent === 'submit') {
+        const formsVisible = Array.from(document.querySelectorAll('form')).filter(f => f.offsetParent !== null);
+        if (formsVisible.length === 0) { appendMiniLog('No visible form to submit'); speakFeedback('No form found to submit'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error'} }
+        const f = formsVisible[0]; f.requestSubmit ? f.requestSubmit() : f.submit();
+        appendMiniLog(`Submitted form ${f.id}`); speakFeedback('Form submitted'); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok',action:'submitted',formId:f.id};
+      }
+      if (action === 'reset' || action === 'clear') {
+        const formsVisible = Array.from(document.querySelectorAll('form')).filter(f => f.offsetParent !== null);
+        if (formsVisible.length === 0) { appendMiniLog('No visible form to reset'); speakFeedback('No form found to reset'); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error'} }
+        const f = formsVisible[0]; f.reset(); appendMiniLog(`Reset form ${f.id}`); speakFeedback('Form cleared'); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok',action:'reset',formId:f.id};
+      }
+
+      // NAVIGATION next / previous
+      if (result.intent === 'form_navigation' || ['next','previous'].includes(action) || (slots && slots.direction)) {
+        const direction = (slots && slots.direction) || action;
+        const active = document.activeElement;
+        const inputs = Array.from(document.querySelectorAll('input, select, textarea, button')).filter(i=>i.offsetParent!==null);
+        const idx = inputs.indexOf(active);
+        if (direction === 'next' || action === 'next') {
+          const next = inputs[(idx+1) % inputs.length]; next && next.focus(); appendMiniLog('Moved to next field'); speakFeedback('Moving to next field'); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok',nav:'next'};
+        } else {
+          const prev = inputs[(idx-1+inputs.length) % inputs.length]; prev && prev.focus(); appendMiniLog('Moved to previous field'); speakFeedback('Moving to previous field'); updateHistory(rawText||JSON.stringify(result),'ok'); return {status:'ok',nav:'previous'};
+        }
+      }
+
+      appendMiniLog('Unhandled action'); speakFeedback("Sorry, I didn't understand that command"); updateHistory(rawText||JSON.stringify(result),'error'); return {status:'error',reason:'unhandled'};
+    }
+
+    // expose globally
+    window.applyNormalizedCommand = applyNormalizedCommand;
+
+    // QA panel wiring
+    document.getElementById('quick-command').addEventListener('change', e=>{
+      if (e.target.value) document.getElementById('voice-json-input').value = e.target.value;
+    });
+
+    document.getElementById('btn-apply').addEventListener('click', ()=>{
+      const raw = document.getElementById('voice-json-input').value.trim();
+      if (!raw) { appendMiniLog('No input'); return; }
+      let parsed;
+      try { parsed = JSON.parse(raw); }
+      catch (err) {
+        // quick heuristic for simple commands
+        const parts = raw.split(/\s+/);
+        const verb = parts[0] ? parts[0].toLowerCase() : '';
+        if (['fill','set','type','enter','update'].includes(verb)) {
+          const field = parts[1] || '';
+          const value = parts.slice(2).join(' ');
+          parsed = { intent:'form_action', slots:{ action:'fill', field, value } };
+        } else if (['check','uncheck','toggle','select','choose','pick'].includes(verb)) {
+          const field = parts.slice(1).join(' ');
+          parsed = { intent:'form_action', slots:{ action:verb, field } };
+        } else if (['submit','reset','clear','next','previous'].includes(verb)) {
+          parsed = { intent: verb, slots:{ action:verb } };
+        } else { appendMiniLog('Not JSON and not a recognized quick command'); return; }
+      }
+      appendMiniLog('Applying: ' + (typeof parsed === 'string' ? parsed : JSON.stringify(parsed)));
+      try { window.applyNormalizedCommand(parsed, raw); } catch (e) { appendMiniLog('Error applying command: ' + e.message); console.error(e) }
+    });
+
+    document.getElementById('btn-clear').addEventListener('click', ()=>{
+      document.getElementById('voice-json-input').value = '';
+      appendMiniLog('QA input cleared');
+    });
+
+    // Expose helpers for console testing
+    window.hodaHelpers = {
+      FIELD_MAP, mapSpokenToId, highlightField, appendMiniLog, updateHistory
+    };
+  </script>
+</body>
+</html>
