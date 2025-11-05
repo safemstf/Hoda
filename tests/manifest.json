@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "WhoDa–Hoda NLP Assistant",
+  "version": "1.0",
+  "description": "Runs Llama 3 locally in Edge using WebLLM for natural-language understanding.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "128": "icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["setup.js", "style.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
