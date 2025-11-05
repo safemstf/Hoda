@@ -1,6 +1,6 @@
 ﻿/**
  * ============================================================================
- * HODA VOICE ASSISTANT - OBJECT-ORIENTED ARCHITECTURE
+ * HODA VOICE ASSISTANT - OBJECT-ORIENTED ARCHITECTURE no network error
  * ============================================================================
  */
 
@@ -800,7 +800,7 @@ class HodaVoiceAssistant {
     this.resolver = new IntentResolver({
       useNormalizerFirst: true,
       llmFallback: true,
-      enableLLM: false,
+      enableLLM: true,
       enableLogging: true
     });
 
