@@ -763,8 +763,59 @@ class CommandProcessor {
       return { success: true };
     } catch (err) {
       console.error('[CommandProcessor] Execute failed:', err);
+      
+      // Check if it's a restricted page error (content script not available)
+      const isRestrictedPageError = err.message?.includes('Receiving end does not exist') ||
+                                   err.message?.includes('Could not establish connection');
+      
+      // Only handle zoom commands on restricted pages
+      if (isRestrictedPageError && intentResult.intent === 'zoom') {
+        try {
+          // Get current tab to check URL
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          
+          // Check if it's a chrome:// page (content scripts can't inject)
+          if (tab?.url?.startsWith('chrome://')) {
+            console.log('[CommandProcessor] Detected chrome:// page for zoom command');
+            return await this.handleRestrictedPageZoom(intentResult, tab);
+          }
+        } catch (tabError) {
+          console.warn('[CommandProcessor] Failed to check tab URL:', tabError);
+        }
+      }
+      
       throw err;
     }
+  }
+
+  /**
+   * Handle zoom command on restricted pages (chrome://)
+   * Provides TTS feedback via background script since content script can't inject
+   * 
+   * @param {Object} intentResult - Command intent with intent and slots
+   * @param {Object} tab - Chrome tab object with URL and ID
+   * @returns {Promise<Object>} Failure result with user-friendly message
+   */
+  async handleRestrictedPageZoom(intentResult, tab) {
+    console.log('[CommandProcessor] Handling restricted page zoom on:', tab.url);
+    
+    // Send to background script for TTS/notification
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'RESTRICTED_PAGE_ZOOM',
+        tabId: tab.id,
+        intent: intentResult.intent,
+        slots: intentResult.slots,
+        url: tab.url
+      });
+    } catch (err) {
+      console.error('[CommandProcessor] Failed to send to background:', err);
+    }
+    
+    return {
+      success: false,
+      message: 'Zoom not available, try another command'
+    };
   }
 
   getStats() {
@@ -1098,9 +1149,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         console.log('[Debug] 🧪 Testing command:', command.intent, command.slots || {});
 
+        let tab; // Declare outside try block for use in catch
         try {
           // Get active tab
-          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          tab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0];
           if (!tab?.id) {
             throw new Error('No active tab found');
           }
@@ -1143,6 +1195,36 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
           console.error('[Debug] ❌ Command failed:', error);
+          
+          // Check if it's a restricted page error for zoom commands
+          const isRestrictedPageError = error.message?.includes('Receiving end does not exist') ||
+                                       error.message?.includes('Could not establish connection');
+          
+          if (isRestrictedPageError && command.intent === 'zoom') {
+            try {
+              // Get current tab to check URL (if not already available)
+              if (!tab) {
+                const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+                tab = tabs[0];
+              }
+              
+              // Check if it's a chrome:// page (content scripts can't inject)
+              if (tab?.url?.startsWith('chrome://')) {
+                console.log('[Debug] Detected chrome:// page for zoom command');
+                
+                // Use app's commandProcessor to handle restricted page zoom
+                if (app?.commandProcessor) {
+                  return await app.commandProcessor.handleRestrictedPageZoom(
+                    { intent: command.intent, slots: command.slots },
+                    tab
+                  );
+                }
+              }
+            } catch (tabError) {
+              console.warn('[Debug] Failed to check tab URL:', tabError);
+            }
+          }
+          
           return { success: false, error: error.message };
         }
       },
