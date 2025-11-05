@@ -219,6 +219,50 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   return true;
 });
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // GET PDF ZOOM
+  if (message.type === 'GET_PDF_ZOOM') {
+    (async () => {
+      try {
+        if (!sender.tab?.id) {
+          throw new Error('No tab ID available');
+        }
+        
+        const zoom = await chrome.tabs.getZoom(sender.tab.id);
+        console.log('[Background] Current PDF zoom:', zoom);  // ← Changed
+        sendResponse({ success: true, zoom });
+      } catch (error) {
+        console.error('[Background] Failed to get PDF zoom:', error);  // ← Changed
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+  
+  // SET PDF ZOOM
+  if (message.type === 'SET_PDF_ZOOM') {
+    (async () => {
+      try {
+        if (!sender.tab?.id) {
+          throw new Error('No tab ID available');
+        }
+        
+        const zoom = Math.max(0.5, Math.min(3.0, message.zoom || 1.0));
+        await chrome.tabs.setZoom(sender.tab.id, zoom);
+        console.log('[Background] PDF zoom set to:', zoom);  // ← Changed
+        sendResponse({ success: true, zoom });
+      } catch (error) {
+        console.error('[Background] Failed to set PDF zoom:', error);  // ← Changed
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+  
+  // Let other handlers process their messages
+  return false;
+});
+
 /**
  * Handle zoom command on restricted pages (chrome://)
  * Provides TTS feedback since content script cannot inject
