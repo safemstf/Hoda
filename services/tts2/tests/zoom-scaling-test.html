@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoda Zoom & Text Scaling Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+        }
+
+        .section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .section h2 {
+            color: #333;
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+
+        .control-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .control-group p {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #6c757d;
+        }
+
+        button.secondary:hover {
+            background: #5a6268;
+        }
+
+        button.danger {
+            background: #e74c3c;
+        }
+
+        button.danger:hover {
+            background: #c0392b;
+        }
+
+        .display-box {
+            background: white;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .display-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .display-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .sample-text {
+            padding: 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            border-left: 4px solid #764ba2;
+        }
+
+        .sample-text h3 {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .sample-text p {
+            font-size: 1em;
+            color: #555;
+            margin-bottom: 10px;
+            line-height: 1.8;
+        }
+
+        .status {
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .status-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .status-entry:last-child {
+            border-bottom: none;
+        }
+
+        .status-success {
+            color: #27ae60;
+        }
+
+        .status-error {
+            color: #e74c3c;
+        }
+
+        .status-info {
+            color: #3498db;
+        }
+
+        @media (max-width: 900px) {
+            .content {
+                grid-template-columns: 1fr;
+                gap: 30px;
+            }
+        }
+
+        .voice-commands {
+            background: #fffacd;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+        }
+
+        .voice-commands h3 {
+            color: #d68910;
+            margin-bottom: 10px;
+        }
+
+        .voice-commands ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .voice-commands li {
+            padding: 8px 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+
+        .voice-commands code {
+            background: #fff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #d68910;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Zoom & Text Scaling Test</h1>
+            <p>Hoda Voice Assistant - Accessibility Features</p>
+        </header>
+
+        <div class="content">
+            <!-- Left Section: Controls -->
+            <div class="section">
+                <h2>Zoom Controls</h2>
+
+                <div class="control-group">
+                    <label>Page Zoom</label>
+                    <p>Control page zoom level (50% - 300%)</p>
+                    <div class="button-group">
+                        <button onclick="zoomIn()">➕ Zoom In (+10%)</button>
+                        <button onclick="zoomOut()">➖ Zoom Out (-10%)</button>
+                        <button class="secondary" onclick="resetZoom()">↺ Reset (100%)</button>
+                    </div>
+                </div>
+
+                <div class="display-box">
+                    <div class="display-value" id="zoomDisplay">100%</div>
+                    <div class="display-label">Current Zoom Level</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Text Size</label>
+                    <p>Control text scaling (75% - 200%)</p>
+                    <div class="button-group">
+                        <button onclick="textLarger()">🔤➕ Larger</button>
+                        <button onclick="textSmaller()">🔤➖ Smaller</button>
+                        <button class="secondary" onclick="resetText()">↺ Reset</button>
+                    </div>
+                </div>
+
+                <div class="display-box">
+                    <div class="display-value" id="textScaleDisplay">100%</div>
+                    <div class="display-label">Current Text Scale</div>
+                </div>
+
+                <div class="control-group">
+                    <label>Reset All</label>
+                    <p>Reset both zoom and text scaling</p>
+                    <button class="danger" onclick="resetAll()">🔄 Reset Everything</button>
+                </div>
+
+                <div class="voice-commands">
+                    <h3>🎤 Voice Commands</h3>
+                    <ul>
+                        <li><code>zoom in</code> - Increase zoom</li>
+                        <li><code>zoom out</code> - Decrease zoom</li>
+                        <li><code>reset zoom</code> - Reset to 100%</li>
+                        <li><code>text larger</code> - Increase text</li>
+                        <li><code>text smaller</code> - Decrease text</li>
+                        <li><code>reset all</code> - Reset both</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Section: Preview & Status -->
+            <div class="section">
+                <h2>Preview & Status</h2>
+
+                <div class="sample-text">
+                    <h3>Heading Level 3</h3>
+                    <p>This is sample text that demonstrates the text scaling feature. Watch this content scale as you adjust the text size using the controls on the left.</p>
+                    <p><strong>Bold text:</strong> This text is bold for emphasis.</p>
+                    <p><em>Italic text:</em> This text is italicized.</p>
+                </div>
+
+                <div class="control-group">
+                    <label>Status Log</label>
+                    <div class="status" id="statusLog">
+                        <div class="status-entry status-info">[INFO] Zoom & Text Scaling Test Page Loaded</div>
+                        <div class="status-entry status-info">[INFO] Ready to test zoom and text scaling</div>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Test Results</label>
+                    <div id="testResults"></div>
+                </div>
+
+                <div class="control-group">
+                    <button class="secondary" onclick="runTests()">▶ Run Tests</button>
+                    <button class="secondary" onclick="clearLog()">🗑 Clear Log</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State management
+        let state = {
+            zoom: 1.0,
+            textScale: 1.0
+        };
+
+        // Logging utilities
+        function addLog(message, type = 'info') {
+            const log = document.getElementById('statusLog');
+            const entry = document.createElement('div');
+            entry.className = `status-entry status-${type}`;
+            
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('statusLog').innerHTML = '';
+        }
+
+        // Zoom functions
+        function setZoom(level) {
+            const clampedZoom = Math.max(0.5, Math.min(3.0, level));
+            state.zoom = clampedZoom;
+            
+            // Apply zoom via zoom-content-script
+            if (window.HODA_HANDLE_ZOOM_COMMAND) {
+                window.HODA_HANDLE_ZOOM_COMMAND('zoom-' + (clampedZoom > 1.0 ? 'in' : clampedZoom < 1.0 ? 'out' : 'reset'));
+            }
+            
+            // Update display
+            document.getElementById('zoomDisplay').textContent = `${(clampedZoom * 100).toFixed(0)}%`;
+            addLog(`Zoom set to ${(clampedZoom * 100).toFixed(0)}%`, 'success');
+        }
+
+        function zoomIn() {
+            setZoom(state.zoom + 0.1);
+        }
+
+        function zoomOut() {
+            setZoom(state.zoom - 0.1);
+        }
+
+        function resetZoom() {
+            setZoom(1.0);
+        }
+
+        // Text scaling functions
+        function setTextScale(scale) {
+            const clampedScale = Math.max(0.75, Math.min(2.0, scale));
+            state.textScale = clampedScale;
+            
+            // Apply text scaling
+            document.documentElement.style.setProperty('--hoda-text-scale', clampedScale.toString());
+            document.documentElement.classList.add('hoda-text-scale');
+            
+            // Update display
+            document.getElementById('textScaleDisplay').textContent = `${(clampedScale * 100).toFixed(0)}%`;
+            addLog(`Text scale set to ${(clampedScale * 100).toFixed(0)}%`, 'success');
+        }
+
+        function textLarger() {
+            setTextScale(state.textScale + 0.15);
+        }
+
+        function textSmaller() {
+            setTextScale(state.textScale - 0.15);
+        }
+
+        function resetText() {
+            setTextScale(1.0);
+            document.documentElement.classList.remove('hoda-text-scale');
+        }
+
+        function resetAll() {
+            resetZoom();
+            resetText();
+            addLog('Reset all to defaults', 'success');
+        }
+
+        // Test runner
+        async function runTests() {
+            addLog('Starting tests...', 'info');
+            let passed = 0;
+            let failed = 0;
+
+            const tests = [
+                {
+                    name: 'Zoom In',
+                    fn: () => {
+                        const before = state.zoom;
+                        zoomIn();
+                        return state.zoom > before;
+                    }
+                },
+                {
+                    name: 'Zoom Out',
+                    fn: () => {
+                        const before = state.zoom;
+                        zoomOut();
+                        return state.zoom < before;
+                    }
+                },
+                {
+                    name: 'Reset Zoom',
+                    fn: () => {
+                        resetZoom();
+                        return state.zoom === 1.0;
+                    }
+                },
+                {
+                    name: 'Text Larger',
+                    fn: () => {
+                        const before = state.textScale;
+                        textLarger();
+                        return state.textScale > before;
+                    }
+                },
+                {
+                    name: 'Text Smaller',
+                    fn: () => {
+                        const before = state.textScale;
+                        textSmaller();
+                        return state.textScale < before;
+                    }
+                },
+                {
+                    name: 'Reset Text',
+                    fn: () => {
+                        resetText();
+                        return state.textScale === 1.0;
+                    }
+                },
+                {
+                    name: 'Zoom Max Clamp',
+                    fn: () => {
+                        setZoom(10.0);
+                        return state.zoom === 3.0;
+                    }
+                },
+                {
+                    name: 'Text Scale Min Clamp',
+                    fn: () => {
+                        setTextScale(0.1);
+                        return state.textScale === 0.75;
+                    }
+                }
+            ];
+
+            for (const test of tests) {
+                try {
+                    const result = test.fn();
+                    if (result) {
+                        addLog(`✓ ${test.name}`, 'success');
+                        passed++;
+                    } else {
+                        addLog(`✗ ${test.name} - assertion failed`, 'error');
+                        failed++;
+                    }
+                } catch (error) {
+                    addLog(`✗ ${test.name} - ${error.message}`, 'error');
+                    failed++;
+                }
+            }
+
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = `
+                <div style="padding: 15px; background: #f0f0f0; border-radius: 8px;">
+                    <p><strong>Passed:</strong> ${passed}/${tests.length}</p>
+                    <p><strong>Failed:</strong> ${failed}/${tests.length}</p>
+                    <p style="margin-top: 10px;">
+                        ${failed === 0 ? '✅ All tests passed!' : '⚠️ Some tests failed'}
+                    </p>
+                </div>
+            `;
+
+            addLog(`Tests complete: ${passed} passed, ${failed} failed`, 'info');
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            addLog('Page loaded and ready for testing', 'info');
+            addLog(`Current zoom: ${(state.zoom * 100).toFixed(0)}%`, 'info');
+            addLog(`Current text scale: ${(state.textScale * 100).toFixed(0)}%`, 'info');
+        });
+    </script>
+</body>
+</html>
