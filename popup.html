@@ -1,550 +1,630 @@
 ﻿<!doctype html>
 <html>
-  <head>
-    <meta charset="utf-8" />
-    <title>Hoda Voice Navigation</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
+
+<head>
+  <meta charset="utf-8" />
+  <title>Hoda Voice Navigation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --primary: #6366f1;
+      --primary-dark: #4f46e5;
+      --primary-light: #818cf8;
+      --secondary: #8b5cf6;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --error: #ef4444;
+      --bg-main: #f8fafc;
+      --bg-card: #ffffff;
+      --text-primary: #0f172a;
+      --text-secondary: #64748b;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --radius-full: 9999px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
+      width: 400px;
+      min-height: 500px;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      padding: 0;
+      margin: 0;
+      overflow-x: hidden;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      padding: 20px 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 300px;
+      height: 300px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .logo-icon {
+      font-size: 28px;
+    }
+
+    .logo-text {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .quota-bar-container {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-full);
+      height: 6px;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .quota-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--success), rgba(255, 255, 255, 0.9));
+      border-radius: var(--radius-full);
+      transition: width 0.3s ease;
+    }
+
+    .quota-text {
+      font-size: 11px;
+      opacity: 0.9;
+      margin-top: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Main Content */
+    .content {
+      padding: 20px;
+    }
+
+    /* Voice Settings */
+    .voice-settings {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .voice-select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-card);
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .voice-select:hover {
+      border-color: var(--primary);
+    }
+
+    .voice-select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+    }
+
+    .voice-preview {
+      display: flex;
+      gap: 8px;
+    }
+
+    .voice-preview-btn {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .voice-preview-btn:hover {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* Mic Section */
+    .mic-section {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .mic-button {
+      width: 100px;
+      height: 100px;
+      border-radius: var(--radius-full);
+      border: none;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      color: white;
+      font-size: 40px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-md);
+      position: relative;
+    }
+
+    .mic-button::before {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border-radius: var(--radius-full);
+      padding: 4px;
+      background: linear-gradient(135deg, var(--primary-light), var(--secondary));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .mic-button:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: var(--shadow-glow);
+    }
+
+    .mic-button:hover:not(:disabled)::before {
+      opacity: 1;
+    }
+
+    .mic-button:active:not(:disabled) {
+      transform: scale(0.95);
+    }
+
+    .mic-button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: var(--text-muted);
+    }
+
+    .mic-button.listening {
+      animation: pulse 2s infinite;
+      box-shadow: var(--shadow-glow);
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
       }
 
-      :root {
-        --primary: #6366f1;
-        --primary-dark: #4f46e5;
-        --primary-light: #818cf8;
-        --secondary: #8b5cf6;
-        --success: #10b981;
-        --warning: #f59e0b;
-        --error: #ef4444;
-        --bg-main: #f8fafc;
-        --bg-card: #ffffff;
-        --text-primary: #0f172a;
-        --text-secondary: #64748b;
-        --text-muted: #94a3b8;
-        --border: #e2e8f0;
-        --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-        --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-        --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-        --radius-sm: 6px;
-        --radius-md: 10px;
-        --radius-lg: 16px;
-        --radius-full: 9999px;
+      50% {
+        box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
       }
+    }
 
-      body { 
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
-        width: 400px;
-        min-height: 500px;
-        background: var(--bg-main);
-        color: var(--text-primary);
-        padding: 0;
-        margin: 0;
-        overflow-x: hidden;
-      }
+    .status-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      transition: color 0.3s;
+    }
 
-      /* Header */
-      .header {
-        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-        color: white;
-        padding: 20px 20px 24px;
-        position: relative;
-        overflow: hidden;
-      }
+    .status-text.active {
+      color: var(--primary);
+      font-weight: 600;
+    }
 
-      .header::before {
-        content: '';
-        position: absolute;
-        top: -50%;
-        right: -20%;
-        width: 300px;
-        height: 300px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 50%;
-      }
+    .status-text.error {
+      color: var(--error);
+    }
 
-      .header-content {
-        position: relative;
-        z-index: 1;
-      }
+    .keyboard-hint {
+      margin-top: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+    }
 
-      .logo {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 12px;
-      }
+    kbd {
+      padding: 2px 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 10px;
+    }
 
-      .logo-icon {
-        font-size: 28px;
-      }
+    /* Transcript Card */
+    .card {
+      background: var(--bg-card);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      margin-bottom: 16px;
+      box-shadow: var(--shadow-sm);
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
 
-      .logo-text {
-        font-size: 22px;
-        font-weight: 700;
-        letter-spacing: -0.5px;
-      }
+    .card:hover {
+      box-shadow: var(--shadow-md);
+    }
 
-      .quota-bar-container {
-        background: rgba(255, 255, 255, 0.2);
-        border-radius: var(--radius-full);
-        height: 6px;
-        overflow: hidden;
-        backdrop-filter: blur(10px);
-      }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
 
-      .quota-bar {
-        height: 100%;
-        background: linear-gradient(90deg, var(--success), rgba(255, 255, 255, 0.9));
-        border-radius: var(--radius-full);
-        transition: width 0.3s ease;
-      }
+    .transcript-box {
+      background: var(--bg-main);
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      min-height: 70px;
+      font-size: 14px;
+      color: var(--text-primary);
+      font-family: 'SF Mono', 'Consolas', monospace;
+      line-height: 1.6;
+      transition: all 0.3s;
+    }
 
-      .quota-text {
-        font-size: 11px;
-        opacity: 0.9;
-        margin-top: 6px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
+    .transcript-box.empty {
+      color: var(--text-muted);
+      font-style: italic;
+      border-style: dashed;
+    }
 
-      /* Main Content */
-      .content {
-        padding: 20px;
-      }
+    .transcript-box:not(.empty) {
+      border-color: var(--primary);
+      border-style: solid;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+    }
 
-      /* Mic Section */
-      .mic-section {
-        text-align: center;
-        margin-bottom: 24px;
-      }
+    /* Command Result */
+    .command-result {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+      animation: slideIn 0.3s ease;
+      font-weight: 500;
+    }
 
-      .mic-button {
-        width: 100px;
-        height: 100px;
-        border-radius: var(--radius-full);
-        border: none;
-        background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-        color: white;
-        font-size: 40px;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0 auto 16px;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: var(--shadow-md);
-        position: relative;
-      }
-
-      .mic-button::before {
-        content: '';
-        position: absolute;
-        inset: -4px;
-        border-radius: var(--radius-full);
-        padding: 4px;
-        background: linear-gradient(135deg, var(--primary-light), var(--secondary));
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
+    @keyframes slideIn {
+      from {
         opacity: 0;
-        transition: opacity 0.3s;
+        transform: translateY(-10px);
       }
 
-      .mic-button:hover:not(:disabled) {
-        transform: scale(1.05);
-        box-shadow: var(--shadow-glow);
-      }
-
-      .mic-button:hover:not(:disabled)::before {
+      to {
         opacity: 1;
-      }
-
-      .mic-button:active:not(:disabled) {
-        transform: scale(0.95);
-      }
-
-      .mic-button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        background: var(--text-muted);
-      }
-
-      .mic-button.listening {
-        animation: pulse 2s infinite;
-        box-shadow: var(--shadow-glow);
-      }
-
-      @keyframes pulse {
-        0%, 100% { 
-          box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
-        }
-        50% { 
-          box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
-        }
-      }
-
-      .status-text {
-        font-size: 14px;
-        color: var(--text-secondary);
-        font-weight: 500;
-        transition: color 0.3s;
-      }
-
-      .status-text.active {
-        color: var(--primary);
-        font-weight: 600;
-      }
-
-      .status-text.error {
-        color: var(--error);
-      }
-
-      .keyboard-hint {
-        margin-top: 8px;
-        font-size: 11px;
-        color: var(--text-muted);
-        text-align: center;
-      }
-
-      kbd {
-        padding: 2px 6px;
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 3px;
-        font-family: 'SF Mono', 'Consolas', monospace;
-        font-size: 10px;
-      }
-
-      /* Transcript Card */
-      .card {
-        background: var(--bg-card);
-        border-radius: var(--radius-md);
-        padding: 16px;
-        margin-bottom: 16px;
-        box-shadow: var(--shadow-sm);
-        border: 1px solid var(--border);
-        transition: all 0.2s;
-      }
-
-      .card:hover {
-        box-shadow: var(--shadow-md);
-      }
-
-      .card-title {
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .transcript-box {
-        background: var(--bg-main);
-        border: 2px dashed var(--border);
-        border-radius: var(--radius-sm);
-        padding: 14px;
-        min-height: 70px;
-        font-size: 14px;
-        color: var(--text-primary);
-        font-family: 'SF Mono', 'Consolas', monospace;
-        line-height: 1.6;
-        transition: all 0.3s;
-      }
-
-      .transcript-box.empty {
-        color: var(--text-muted);
-        font-style: italic;
-        border-style: dashed;
-      }
-
-      .transcript-box:not(.empty) {
-        border-color: var(--primary);
-        border-style: solid;
-        background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
-      }
-
-      /* Command Result */
-      .command-result {
-        padding: 12px 14px;
-        border-radius: var(--radius-sm);
-        font-size: 13px;
-        margin-top: 12px;
-        display: none;
-        animation: slideIn 0.3s ease;
-        font-weight: 500;
-      }
-
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateY(-10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      .command-result.show {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .command-result.success {
-        background: rgba(16, 185, 129, 0.1);
-        color: var(--success);
-        border: 1px solid rgba(16, 185, 129, 0.3);
-      }
-
-      .command-result.error {
-        background: rgba(239, 68, 68, 0.1);
-        color: var(--error);
-        border: 1px solid rgba(239, 68, 68, 0.3);
-      }
-
-      .command-result.warning {
-        background: rgba(245, 158, 11, 0.1);
-        color: var(--warning);
-        border: 1px solid rgba(245, 158, 11, 0.3);
-      }
-
-      /* Stats */
-      .stats-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
-      }
-
-      .stat-item {
-        background: linear-gradient(135deg, var(--bg-main), var(--bg-card));
-        padding: 16px;
-        border-radius: var(--radius-md);
-        text-align: center;
-        border: 1px solid var(--border);
-        transition: all 0.2s;
-      }
-
-      .stat-item:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-      }
-
-      .stat-value {
-        font-size: 28px;
-        font-weight: 700;
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        margin-bottom: 4px;
-      }
-
-      .stat-label {
-        font-size: 11px;
-        color: var(--text-secondary);
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        font-weight: 600;
-      }
-
-      /* Quick Actions */
-      .quick-actions {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
-
-      .quick-btn {
-        padding: 12px;
-        border: 1px solid var(--border);
-        background: var(--bg-card);
-        border-radius: var(--radius-sm);
-        font-size: 13px;
-        cursor: pointer;
-        transition: all 0.2s;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        font-weight: 500;
-        color: var(--text-primary);
-      }
-
-      .quick-btn:hover {
-        background: var(--primary);
-        color: white;
-        border-color: var(--primary);
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-md);
-      }
-
-      .quick-btn:active {
         transform: translateY(0);
       }
+    }
 
-      /* Footer */
-      .footer {
-        padding: 16px 20px;
-        border-top: 1px solid var(--border);
-        background: var(--bg-card);
-      }
+    .command-result.show {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
 
-      .link {
-        color: var(--primary);
-        text-decoration: none;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        font-weight: 500;
-        transition: color 0.2s;
-      }
+    .command-result.success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
 
-      .link:hover {
-        color: var(--primary-dark);
-        text-decoration: underline;
-      }
+    .command-result.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
 
-      /* Badge */
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        padding: 4px 8px;
-        border-radius: var(--radius-full);
-        font-size: 11px;
-        font-weight: 600;
-        background: rgba(99, 102, 241, 0.1);
-        color: var(--primary);
-      }
+    .command-result.warning {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
 
-      .badge.success {
-        background: rgba(16, 185, 129, 0.1);
-        color: var(--success);
-      }
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
 
-      .badge.warning {
-        background: rgba(245, 158, 11, 0.1);
-        color: var(--warning);
-      }
+    .stat-item {
+      background: linear-gradient(135deg, var(--bg-main), var(--bg-card));
+      padding: 16px;
+      border-radius: var(--radius-md);
+      text-align: center;
+      border: 1px solid var(--border);
+      transition: all 0.2s;
+    }
 
-      .badge.error {
-        background: rgba(239, 68, 68, 0.1);
-        color: var(--error);
-      }
+    .stat-item:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
 
-      /* Accessibility */
-      @media (prefers-reduced-motion: reduce) {
-        * {
-          animation: none !important;
-          transition: none !important;
-        }
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 600;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .quick-btn {
+      padding: 12px;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .quick-btn:hover {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .quick-btn:active {
+      transform: translateY(0);
+    }
+
+    /* Footer */
+    .footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-card);
+    }
+
+    .link {
+      color: var(--primary);
+      text-decoration: none;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+
+    .link:hover {
+      color: var(--primary-dark);
+      text-decoration: underline;
+    }
+
+    /* Badge */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 8px;
+      border-radius: var(--radius-full);
+      font-size: 11px;
+      font-weight: 600;
+      background: rgba(99, 102, 241, 0.1);
+      color: var(--primary);
+    }
+
+    .badge.success {
+      background: rgba(16, 185, 129, 0.1);
+      color: var(--success);
+    }
+
+    .badge.warning {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--warning);
+    }
+
+    .badge.error {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--error);
+    }
+
+    /* Accessibility */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation: none !important;
+        transition: none !important;
       }
-    </style>
-  </head>
-  <body>
-    <!-- Header with quota -->
-    <div class="header">
-      <div class="header-content">
-        <div class="logo">
-          <span class="logo-icon">🎤</span>
-          <span class="logo-text">Hoda Voice</span>
-        </div>
-        <div class="quota-bar-container">
-          <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
-        </div>
-        <div class="quota-text">
-          <span id="quotaText">40/40 requests left</span>
-          <span id="quotaReset" class="badge">Resets in 24h</span>
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Header with quota -->
+  <div class="header">
+    <div class="header-content">
+      <div class="logo">
+        <span class="logo-icon">🎤</span>
+        <span class="logo-text">Hoda Voice</span>
+      </div>
+      <div class="quota-bar-container">
+        <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
+      </div>
+      <div class="quota-text">
+        <span id="quotaText">40/40 requests left</span>
+        <span id="quotaReset" class="badge">Resets in 24h</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="content">
+    <!-- Mic Section -->
+    <div class="mic-section">
+      <button class="mic-button" id="micBtn" disabled>🎤</button>
+      <div class="status-text" id="statusText">Initializing...</div>
+      <div class="keyboard-hint">
+        Press <kbd>Ctrl+Shift+H</kbd> to toggle
+      </div>
+    </div>
+
+    <!-- Voice Settings Card (NEW - Add after mic-section) -->
+    <div class="card">
+      <div class="card-title">
+        🎙️ Voice Settings
+      </div>
+      <div class="voice-settings">
+        <select id="voiceSelect" class="voice-select">
+          <option value="">Loading voices...</option>
+        </select>
+        <div class="voice-preview">
+          <button class="voice-preview-btn" id="voiceTestBtn">
+            Test Voice
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Main Content -->
-    <div class="content">
-      <!-- Mic Section -->
-      <div class="mic-section">
-        <button class="mic-button" id="micBtn" disabled>🎤</button>
-        <div class="status-text" id="statusText">Initializing...</div>
-        <div class="keyboard-hint">
-          Press <kbd>Ctrl+Shift+H</kbd> to toggle
-        </div>
+    <!-- Transcript Card -->
+    <div class="card">
+      <div class="card-title">
+        💬 Transcript
       </div>
-
-      <!-- Transcript Card -->
-      <div class="card">
-        <div class="card-title">
-          💬 Transcript
-        </div>
-        <div class="transcript-box empty" id="transcript">
-          Click the mic and start speaking...
-        </div>
-        <div class="command-result" id="commandResult"></div>
+      <div class="transcript-box empty" id="transcript">
+        Click the mic and start speaking...
       </div>
+      <div class="command-result" id="commandResult"></div>
+    </div>
 
-      <!-- Stats Card -->
-      <div class="card">
-        <div class="card-title">
-          📊 Session Stats
-        </div>
-        <div class="stats-grid">
-          <div class="stat-item">
-            <div class="stat-value" id="statTotal">0</div>
-            <div class="stat-label">Total</div>
-          </div>
-          <div class="stat-item">
-            <div class="stat-value" id="statRecognized">0</div>
-            <div class="stat-label">Recognized</div>
-          </div>
-        </div>
+    <!-- Stats Card -->
+    <div class="card">
+      <div class="card-title">
+        📊 Session Stats
       </div>
-
-      <!-- Quick Actions Card -->
-      <div class="card">
-        <div class="card-title">
-          ⚡ Quick Actions
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="stat-value" id="statTotal">0</div>
+          <div class="stat-label">Total</div>
         </div>
-        <div class="quick-actions">
-          <button class="quick-btn" id="btnScrollDown">
-            <span>⬇️</span>
-            <span>Scroll Down</span>
-          </button>
-          <button class="quick-btn" id="btnScrollUp">
-            <span>⬆️</span>
-            <span>Scroll Up</span>
-          </button>
-          <button class="quick-btn" id="btnListLinks">
-            <span>🔗</span>
-            <span>List Links</span>
-          </button>
-          <button class="quick-btn" id="btnHelp">
-            <span>❓</span>
-            <span>Help</span>
-          </button>
+        <div class="stat-item">
+          <div class="stat-value" id="statRecognized">0</div>
+          <div class="stat-label">Recognized</div>
         </div>
       </div>
     </div>
 
-    <!-- Footer -->
-    <div class="footer">
-      <a href="#" class="link" id="openTests">
-        <span>🧪</span>
-        <span>Open Settings</span>
-      </a>
+    <!-- Quick Actions Card -->
+    <div class="card">
+      <div class="card-title">
+        ⚡ Quick Actions
+      </div>
+      <div class="quick-actions">
+        <button class="quick-btn" id="btnScrollDown">
+          <span>⬇️</span>
+          <span>Scroll Down</span>
+        </button>
+        <button class="quick-btn" id="btnScrollUp">
+          <span>⬆️</span>
+          <span>Scroll Up</span>
+        </button>
+        <button class="quick-btn" id="btnListLinks">
+          <span>🔗</span>
+          <span>List Links</span>
+        </button>
+        <button class="quick-btn" id="btnHelp">
+          <span>❓</span>
+          <span>Help</span>
+        </button>
+      </div>
     </div>
+  </div>
 
-    <!-- Load popup logic -->
-    <script type="module" src="popup.js"></script>
-  </body>
+  <!-- Footer -->
+  <div class="footer">
+    <a href="#" class="link" id="openTests">
+      <span>🧪</span>
+      <span>Open Settings</span>
+    </a>
+  </div>
+
+  <!-- Load popup logic -->
+  <script type="module" src="popup.js"></script>
+</body>
+
 </html>

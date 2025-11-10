@@ -395,7 +395,7 @@ class UIManager {
 }
 
 // ============================================================================
-// SPEECH RECOGNITION SERVICE - Fixed with readiness checks
+// SPEECH RECOGNITION SERVICE - With TTS coordination
 // ============================================================================
 class SpeechRecognitionService {
   constructor(options = {}) {
@@ -403,6 +403,10 @@ class SpeechRecognitionService {
     this.isListening = false;
     this.networkErrorCount = 0;
     this.maxNetworkErrors = options.maxNetworkErrors || 3;
+
+    // ✅ TTS coordination properties
+    this.isPausedForTTS = false;
+    this.wasListeningBeforeTTS = false;
 
     this.callbacks = {
       onStart: options.onStart || (() => { }),
@@ -412,12 +416,12 @@ class SpeechRecognitionService {
     };
 
     this.initRecognition();
-    console.log('[SpeechRecognition] ✅ Initialized (direct mode - WORKING!)');
+    console.log('[SpeechRecognition] ✅ Initialized with TTS coordination');
   }
 
   initRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
+
     if (!SpeechRecognition) {
       console.error('[SpeechRecognition] ❌ API not supported');
       this.callbacks.onError({
@@ -444,9 +448,9 @@ class SpeechRecognitionService {
     this.recognition.onresult = (event) => {
       const last = event.results.length - 1;
       const result = event.results[last];
-      
+
       console.log('[SpeechRecognition] 📝 Result:', result[0].transcript, 'Final:', result.isFinal);
-      
+
       this.callbacks.onResult({
         transcript: result[0].transcript.trim(),
         isFinal: result.isFinal,
@@ -460,13 +464,19 @@ class SpeechRecognitionService {
     };
 
     this.recognition.onend = () => {
-      console.log('[SpeechRecognition] 🔄 Ended, isListening:', this.isListening);
-      
+      console.log('[SpeechRecognition] 🔄 Ended, isListening:', this.isListening, 'isPausedForTTS:', this.isPausedForTTS);
+
+      // ✅ Don't auto-restart if paused for TTS
+      if (this.isPausedForTTS) {
+        console.log('[SpeechRecognition] Paused for TTS, waiting for resume signal');
+        return;
+      }
+
       // Auto-restart if we're supposed to be listening
       if (this.isListening) {
         console.log('[SpeechRecognition] ↻ Auto-restarting...');
         setTimeout(() => {
-          if (this.recognition && this.isListening) {
+          if (this.recognition && this.isListening && !this.isPausedForTTS) {
             try {
               this.recognition.start();
             } catch (e) {
@@ -482,6 +492,68 @@ class SpeechRecognitionService {
     };
 
     console.log('[SpeechRecognition] ✅ Recognition ready');
+  }
+
+  // ✅ IMPROVED: Pause recognition for TTS output
+  pauseForTTS() {
+    // ✅ If already paused, don't reset the flag
+    if (this.isPausedForTTS) {
+      console.log('[SpeechRecognition] ⚠️ Already paused for TTS, ignoring duplicate pause request');
+      return;
+    }
+
+    if (!this.isListening || !this.recognition) {
+      console.log('[SpeechRecognition] Not listening, nothing to pause for TTS');
+      return;
+    }
+
+    console.log('[SpeechRecognition] ⏸️ Pausing for TTS');
+    this.wasListeningBeforeTTS = true;
+    this.isPausedForTTS = true;
+    this.isListening = false;
+
+    // Stop recognition (will not auto-restart due to isPausedForTTS flag)
+    try {
+      this.recognition.stop();
+    } catch (err) {
+      console.error('[SpeechRecognition] Error pausing:', err);
+    }
+  }
+
+  // ✅ IMPROVED: Resume recognition after TTS completes
+  resumeAfterTTS() {
+    console.log('[SpeechRecognition] Resume request - wasListeningBeforeTTS:', this.wasListeningBeforeTTS, 'isPausedForTTS:', this.isPausedForTTS);
+
+    if (!this.wasListeningBeforeTTS) {
+      console.log('[SpeechRecognition] Was not listening before TTS, not resuming');
+      return;
+    }
+
+    // ✅ Only resume if we're actually paused
+    if (!this.isPausedForTTS) {
+      console.log('[SpeechRecognition] ⚠️ Not currently paused, ignoring resume request');
+      return;
+    }
+
+    console.log('[SpeechRecognition] ▶️ Resuming after TTS');
+    this.isPausedForTTS = false;
+    this.wasListeningBeforeTTS = false;
+
+    // Restart recognition after small delay
+    setTimeout(() => {
+      if (!this.isListening && this.recognition) {
+        try {
+          this.isListening = true;
+          this.recognition.start();
+          console.log('[SpeechRecognition] ✅ Resumed successfully');
+        } catch (error) {
+          console.error('[SpeechRecognition] Resume failed:', error);
+          this.isListening = false;
+        }
+      } else {
+        console.log('[SpeechRecognition] ⚠️ Cannot resume - isListening:', this.isListening, 'recognition:', !!this.recognition);
+      }
+    }, 100);
   }
 
   handleError(errorType, errorMessage) {
@@ -560,18 +632,18 @@ class SpeechRecognitionService {
       this.isListening = true;
       this.recognition.start();
       console.log('[SpeechRecognition] ✅ Start command sent');
-      
+
     } catch (error) {
       console.error('[SpeechRecognition] ❌ Start error:', error);
       this.isListening = false;
-      
+
       const errorInfo = {
         type: 'start-failed',
         message: error.message,
         userMessage: error.message || 'Failed to start speech recognition',
         statusMessage: '⚠️ Start failed'
       };
-      
+
       this.callbacks.onError(errorInfo);
       throw error;
     }
@@ -585,7 +657,7 @@ class SpeechRecognitionService {
 
     console.log('[SpeechRecognition] 🛑 Stopping...');
     this.isListening = false;
-    
+
     try {
       this.recognition.stop();
     } catch (err) {
@@ -601,10 +673,12 @@ class SpeechRecognitionService {
     return {
       isListening: this.isListening,
       networkErrorCount: this.networkErrorCount,
-      isSupported: this.isSupported()
+      isSupported: this.isSupported(),
+      isPausedForTTS: this.isPausedForTTS
     };
   }
 }
+
 // ============================================================================
 // COMMAND PROCESSOR
 // ============================================================================
@@ -615,6 +689,7 @@ class CommandProcessor {
     this.rateLimiter = options.rateLimiter;
     this.storageManager = options.storageManager;
     this.wakeWordDetector = options.wakeWordDetector;
+    this.uiManager = options.uiManager;
     this.ttsService = null;
     this.stats = { totalCommands: 0, recognizedCommands: 0 };
 
@@ -709,41 +784,40 @@ class CommandProcessor {
     this.stats.totalCommands++;
 
     try {
-      // Resolve intent
       const intentResult = await this.resolver.resolve(commandText);
       console.log('[CommandProcessor] Intent resolved:', intentResult);
 
-      if (intentResult.intent === 'unknown') {
-        await this.speak('I did not understand that command', true);
-        return {
-          success: false,
-          reason: 'unknown_command',
-          message: '❓ Unknown command'
-        };
+      // ✅ FREE RESPONSE - Just speak LLM's text
+      if (intentResult.intent === 'free_response' && intentResult.text) {
+        await this.speak(intentResult.text, false);
+        this.stats.recognizedCommands++;
+        return { success: true, intent: intentResult, message: intentResult.text };
       }
 
-      // Command recognized
+      // ✅ UNKNOWN - Speak error
+      if (intentResult.intent === 'unknown') {
+        await this.speak('I did not understand that command', true);
+        return { success: false, reason: 'unknown_command' };
+      }
+
+      // ✅ BROWSER COMMANDS - Execute silently (or brief visual feedback)
       this.stats.recognizedCommands++;
 
-      // Confirm and execute
-      await this.confirmCommand(intentResult);
+      // ✅ ADD THIS: Show visual confirmation
+      if (this.uiManager) {
+        this.uiManager.showCommandResult(`✓ ${intentResult.intent}`, false);
+      }
+
+      // NO TTS HERE - just execute
       await this.executeCommand(intentResult);
 
-      return {
-        success: true,
-        intent: intentResult
-      };
+      // Visual feedback only
+      return { success: true, intent: intentResult };
 
     } catch (error) {
       console.error('[CommandProcessor] Process error:', error);
       await this.speak('Command failed', true);
-
-      return {
-        success: false,
-        reason: 'execution_error',
-        message: '⚠️ Command failed',
-        error: error.message
-      };
+      return { success: false, reason: 'execution_error', error: error.message };
     } finally {
       await this.storageManager.saveStats(this.stats);
     }
@@ -763,17 +837,17 @@ class CommandProcessor {
       return { success: true };
     } catch (err) {
       console.error('[CommandProcessor] Execute failed:', err);
-      
+
       // Check if it's a restricted page error (content script not available)
       const isRestrictedPageError = err.message?.includes('Receiving end does not exist') ||
-                                   err.message?.includes('Could not establish connection');
-      
+        err.message?.includes('Could not establish connection');
+
       // Only handle zoom commands on restricted pages
       if (isRestrictedPageError && intentResult.intent === 'zoom') {
         try {
           // Get current tab to check URL
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-          
+
           // Check if it's a chrome:// page (content scripts can't inject)
           if (tab?.url?.startsWith('chrome://')) {
             console.log('[CommandProcessor] Detected chrome:// page for zoom command');
@@ -783,7 +857,7 @@ class CommandProcessor {
           console.warn('[CommandProcessor] Failed to check tab URL:', tabError);
         }
       }
-      
+
       throw err;
     }
   }
@@ -798,7 +872,7 @@ class CommandProcessor {
    */
   async handleRestrictedPageZoom(intentResult, tab) {
     console.log('[CommandProcessor] Handling restricted page zoom on:', tab.url);
-    
+
     // Send to background script for TTS/notification
     try {
       await chrome.runtime.sendMessage({
@@ -811,7 +885,7 @@ class CommandProcessor {
     } catch (err) {
       console.error('[CommandProcessor] Failed to send to background:', err);
     }
-    
+
     return {
       success: false,
       message: 'Zoom not available, try another command'
@@ -861,7 +935,8 @@ class HodaVoiceAssistant {
       tabManager: this.tabManager,
       rateLimiter: this.rateLimiter,
       storageManager: this.storageManager,
-      wakeWordDetector: this.wakeWordDetector
+      wakeWordDetector: this.wakeWordDetector,
+      uiManager: this.uiManager
     });
 
     // Initialize speech recognition
@@ -885,14 +960,6 @@ class HodaVoiceAssistant {
 
   async initialize() {
     console.log('[HodaVoiceAssistant] Starting initialization...');
-
-    // Initialize speech service (NO initialize() call needed)
-    this.speechService = new SpeechRecognitionService({
-      onStart: () => this.handleSpeechStart(),
-      onResult: (result) => this.handleSpeechResult(result),
-      onError: (error) => this.handleSpeechError(error),
-      onEnd: () => this.handleSpeechEnd()
-    });
 
     // Load rate limiter data
     await this.rateLimiter.loadFromStorage();
@@ -922,9 +989,43 @@ class HodaVoiceAssistant {
             speaker: {
               enabled: this.ttsEnabled,
               volume: 1.0,
-              rate: 1.0
+              rate: 1.0,
+              postSpeechDelay: 500
             }
           });
+
+          if (this.ttsService.speaker) {
+            this.ttsService.speaker.setSpeechRecognitionService(this.speechService);
+            console.log('[HodaVoiceAssistant] ✅ TTS linked to speech recognition');
+
+            // ✅ Load saved voice preference FIRST
+            const stored = await chrome.storage.local.get(['preferredVoice']);
+            if (stored.preferredVoice) {
+              const voice = this.ttsService.speaker.findVoiceByName(stored.preferredVoice);
+              if (voice) {
+                this.ttsService.speaker.voice = voice;
+                console.log('[HodaVoiceAssistant] ✅ Loaded saved voice:', voice.name);
+              } else {
+                // Saved voice not found, select best
+                const bestVoice = await this.ttsService.speaker.selectBestVoice();
+                if (bestVoice) {
+                  this.ttsService.speaker.voice = bestVoice;
+                  console.log('[HodaVoiceAssistant] ✅ Using voice:', bestVoice.name);
+                }
+              }
+            } else {
+              // No saved preference, select best
+              const bestVoice = await this.ttsService.speaker.selectBestVoice();
+              if (bestVoice) {
+                this.ttsService.speaker.voice = bestVoice;
+                console.log('[HodaVoiceAssistant] ✅ Using voice:', bestVoice.name);
+              }
+            }
+
+            // ✅ Populate voice selector UI
+            await this.populateVoiceSelector();
+          }
+
           this.isTTSReady = true;
           this.commandProcessor.setTTSService(this.ttsService);
           console.log('[HodaVoiceAssistant] ✅ TTS enabled');
@@ -954,6 +1055,7 @@ class HodaVoiceAssistant {
           this.isLLMReady = true;
 
           const status = this.rateLimiter.getStatus();
+          // ✅ FIX: Add opening parenthesis for template literal
           this.uiManager.updateStatus(`Ready ✨ - ${status.remaining}/${status.dailyLimit} left`);
           this.uiManager.showCommandResult('🤖 AI commands ready', false);
 
@@ -962,13 +1064,14 @@ class HodaVoiceAssistant {
         } catch (err) {
           console.log('[HodaVoiceAssistant] WebLLM init failed:', err.message);
           const status = this.rateLimiter.getStatus();
+          // ✅ FIX: Add opening parenthesis for template literal
           this.uiManager.updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
         }
       }
     });
   }
 
-  setupEventListeners() {
+  async setupEventListeners() {
     // Microphone button
     this.uiManager.elements.micBtn?.addEventListener('click', async () => {
       if (!this.speechService.isListening) {
@@ -989,6 +1092,33 @@ class HodaVoiceAssistant {
         }
       }
     });
+
+    // ✅ NEW: Voice selector
+    const voiceSelect = document.getElementById('voiceSelect');
+    if (voiceSelect) {
+      voiceSelect.addEventListener('change', async (e) => {
+        const selectedVoiceName = e.target.value;
+        if (selectedVoiceName && this.ttsService?.speaker) {
+          const voice = this.ttsService.speaker.findVoiceByName(selectedVoiceName);
+          if (voice) {
+            this.ttsService.speaker.voice = voice;
+            // Save preference
+            await chrome.storage.local.set({ preferredVoice: voice.name });
+            console.log('[HodaVoiceAssistant] Voice changed to:', voice.name);
+          }
+        }
+      });
+    }
+
+    // ✅ NEW: Test voice button
+    const voiceTestBtn = document.getElementById('voiceTestBtn');
+    if (voiceTestBtn) {
+      voiceTestBtn.addEventListener('click', async () => {
+        if (this.ttsService) {
+          await this.ttsService.speakResult('Hello, this is a voice test. How do I sound?');
+        }
+      });
+    }
 
     // Quick action buttons
     document.getElementById('btnScrollDown')?.addEventListener('click', () =>
@@ -1033,6 +1163,80 @@ class HodaVoiceAssistant {
         this.uiManager.showCommandResult('Microphone permission denied', true);
         await this.commandProcessor.speak('Please allow microphone access', true);
       }
+    }
+  }
+
+  async populateVoiceSelector() {
+    if (!this.ttsService?.speaker) {
+      console.log('[HodaVoiceAssistant] TTS not ready, skipping voice selector');
+      return;
+    }
+
+    const voiceSelect = document.getElementById('voiceSelect');
+    if (!voiceSelect) {
+      console.log('[HodaVoiceAssistant] Voice selector element not found');
+      return;
+    }
+
+    try {
+      // Get all English voices
+      const voices = await this.ttsService.speaker.getVoices();
+      const englishVoices = voices.filter(v => v.lang.startsWith('en-'));
+
+      // Clear existing options
+      voiceSelect.innerHTML = '';
+
+      // Group by gender/type
+      const categories = {
+        'Female Voices': englishVoices.filter(v =>
+          v.name.includes('Female') ||
+          ['Zira', 'Samantha', 'Karen', 'Moira', 'Victoria', 'Tessa'].some(n => v.name.includes(n))
+        ),
+        'Male Voices': englishVoices.filter(v =>
+          v.name.includes('Male') ||
+          ['David', 'Alex', 'Mark', 'Daniel', 'Fred'].some(n => v.name.includes(n))
+        ),
+        'Other Voices': []
+      };
+
+      // Catch remaining voices
+      categories['Other Voices'] = englishVoices.filter(v =>
+        !categories['Female Voices'].includes(v) &&
+        !categories['Male Voices'].includes(v)
+      );
+
+      // Add voices by category
+      for (const [category, categoryVoices] of Object.entries(categories)) {
+        if (categoryVoices.length === 0) continue;
+
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = category;
+
+        categoryVoices.forEach(voice => {
+          const option = document.createElement('option');
+          option.value = voice.name;
+          option.textContent = `${voice.name}`;
+
+          // Select current voice
+          if (this.ttsService.speaker.voice?.name === voice.name) {
+            option.selected = true;
+          }
+
+          optgroup.appendChild(option);
+        });
+
+        voiceSelect.appendChild(optgroup);
+      }
+
+      // Load saved preference
+      const stored = await chrome.storage.local.get(['preferredVoice']);
+      if (stored.preferredVoice) {
+        voiceSelect.value = stored.preferredVoice;
+      }
+
+      console.log('[HodaVoiceAssistant] ✅ Voice selector populated with', englishVoices.length, 'voices');
+    } catch (err) {
+      console.error('[HodaVoiceAssistant] Failed to populate voice selector:', err);
     }
   }
 
@@ -1104,7 +1308,8 @@ class HodaVoiceAssistant {
       quota: this.rateLimiter.getStatus(),
       resolver: this.resolver.getStats(),
       isLLMReady: this.isLLMReady,
-      isTTSReady: this.isTTSReady
+      isTTSReady: this.isTTSReady,
+      ttsStatus: this.ttsService?.getStatus?.() || null
     };
   }
 }
@@ -1195,11 +1400,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         } catch (error) {
           console.error('[Debug] ❌ Command failed:', error);
-          
+
           // Check if it's a restricted page error for zoom commands
           const isRestrictedPageError = error.message?.includes('Receiving end does not exist') ||
-                                       error.message?.includes('Could not establish connection');
-          
+            error.message?.includes('Could not establish connection');
+
           if (isRestrictedPageError && command.intent === 'zoom') {
             try {
               // Get current tab to check URL (if not already available)
@@ -1207,11 +1412,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
                 tab = tabs[0];
               }
-              
+
               // Check if it's a chrome:// page (content scripts can't inject)
               if (tab?.url?.startsWith('chrome://')) {
                 console.log('[Debug] Detected chrome:// page for zoom command');
-                
+
                 // Use app's commandProcessor to handle restricted page zoom
                 if (app?.commandProcessor) {
                   return await app.commandProcessor.handleRestrictedPageZoom(
@@ -1224,7 +1429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
               console.warn('[Debug] Failed to check tab URL:', tabError);
             }
           }
-          
+
           return { success: false, error: error.message };
         }
       },

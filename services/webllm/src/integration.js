@@ -77,6 +77,39 @@ export class WebLLMService {
   }
 
   /**
+   * Generate a free-form LLM response (no intent parsing)
+   */
+  async generateFreeResponse(sttInput) {
+    try {
+      validateSTTInput(sttInput);
+
+      if (!this.isInitialized) {
+        await this.initialize();
+      }
+
+      console.log('[WebLLM Service] Generating free response for:', sttInput.text);
+
+      // Call model directly with appropriate temperature for conversation
+      const response = await this.parser.callModel(sttInput.text, {
+        temperature: 0.7, // Higher for more natural conversation
+        maxTokens: this.config.maxTokens
+      });
+
+      // Wrap into a TTS-friendly object
+      return {
+        type: 'tts_output',
+        text: response,
+        confidence: 1.0,
+        intent: 'free_response',
+        slots: {}
+      };
+    } catch (error) {
+      console.error('[WebLLM Service] Error generating free response:', error);
+      return generateErrorResponse(error, sttInput?.text);
+    }
+  }
+
+  /**
    * Batch process multiple commands
    */
   async processCommands(sttInputs) {

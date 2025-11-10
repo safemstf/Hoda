@@ -1290,7 +1290,7 @@ console.log('[Content] Loading - Complete final version...');
         const text = linkData.text;
         const href = linkData.href;
         return `
-            <div style="margin: 8px 0; padding: 10px; background: rgba(255,255,255,0.06); border-radius: 6px;">
+            <div style="margin: 8px 0; padding: 10px; background: rgba(255, 255, 255, 0.06); border-radius: 6px;">
               <strong style="color: #10b981;">${i + 1}.</strong> ${text}
               <div style="font-size: 11px; opacity: 0.6; margin-top: 4px; word-break: break-all;">${href.substring(0, 60)}${href.length > 60 ? '...' : ''}</div>
             </div>
@@ -1320,8 +1320,8 @@ console.log('[Content] Loading - Complete final version...');
       Object.assign(overlay.style, {
         position: 'fixed',
         bottom: '80px',
-        left: '50%',
-        transform: 'translateX(-50%)',
+        left: '10%',
+        transform: 'translateX(-10%)',
         maxWidth: '500px',
         width: '90%',
         maxHeight: '50vh',

@@ -73,6 +73,52 @@ export class IntentParser {
   }
 
   /**
+ * Direct model call without intent parsing (for free-form responses)
+ * @param {string} text - User input
+ * @param {object} options - Generation options
+ * @returns {Promise<string>} - Model's raw response
+ */
+  async callModel(text, options = {}) {
+    if (!this.engine) {
+      throw new Error('WebLLM engine not initialized');
+    }
+
+    const temperature = options.temperature || 0.7;
+    const maxTokens = options.maxTokens || 200;
+
+    try {
+      console.log('[IntentParser] Generating free response for:', text);
+
+      // Create a simple conversational prompt
+      const messages = [
+        {
+          role: 'system',
+          content: 'You are Hoda, a helpful voice assistant. Respond naturally and conversationally to the user\'s question or statement. Keep responses concise (1-2 sentences).'
+        },
+        {
+          role: 'user',
+          content: text
+        }
+      ];
+
+      const response = await this.engine.chat.completions.create({
+        messages,
+        temperature,
+        max_tokens: maxTokens
+      });
+
+      const modelReply = response.choices[0].message.content.trim();
+      console.log('[IntentParser] Free response generated:', modelReply);
+
+      return modelReply;
+
+    } catch (error) {
+      console.error('[IntentParser] Error generating free response:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Build the prompt for intent recognition
    */
   buildPrompt(text, pageContext = null) {

@@ -8,22 +8,22 @@ import { CommandNormalizer } from './commandNormalizer.js';
 export class IntentResolver {
   constructor(options = {}) {
     this.normalizer = new CommandNormalizer();
-    
+
     // WebLLM instance (auto-loads in background)
     this.llm = null;
     this.llmEnabled = false;
     this.llmLoading = false;
     this.llmLoadError = null;
-    
+
     this.config = {
       useNormalizerFirst: options.useNormalizerFirst !== false,
       llmFallback: options.llmFallback !== false,
-      llmTimeout: options.llmTimeout || 5000,
+      llmTimeout: options.llmTimeout || 25000,
       simpleCommandMaxWords: options.simpleCommandMaxWords || 5,
       enableLLM: options.enableLLM !== false,
       autoLoadLLM: options.autoLoadLLM !== false,
       enableLogging: options.enableLogging !== false,
-      
+
       privacy: options.privacy || {
         enableAnalytics: false,
         enableLogging: true,
@@ -41,7 +41,7 @@ export class IntentResolver {
 
   startBackgroundLoad() {
     console.log('[IntentResolver] 🔄 Starting background WebLLM load...');
-    
+
     this.loadWebLLM().then(() => {
       console.log('[IntentResolver] ✅ Background load complete');
     }).catch(err => {
@@ -57,7 +57,7 @@ export class IntentResolver {
 
     if (this.llmLoading) {
       console.log('[IntentResolver] ⏳ WebLLM already loading, waiting...');
-      
+
       return new Promise((resolve) => {
         const checkInterval = setInterval(() => {
           if (!this.llmLoading) {
@@ -65,7 +65,7 @@ export class IntentResolver {
             resolve(this.llm !== null);
           }
         }, 100);
-        
+
         setTimeout(() => {
           clearInterval(checkInterval);
           resolve(false);
@@ -88,10 +88,10 @@ export class IntentResolver {
 
       // ✅ DYNAMIC IMPORT - loads at runtime, not module load time
       const { createService } = await import('../../webllm/src/index.js');
-      
+
       // Create WebLLM service
       this.llm = await createService(this.config.privacy);
-      
+
       const loadTime = Date.now() - startTime;
       console.log(`[IntentResolver] ✅ WebLLM loaded in ${loadTime}ms (${isCached ? 'cached' : 'downloaded'})`);
 
@@ -118,7 +118,7 @@ export class IntentResolver {
       this.llmLoading = false;
       this.llmEnabled = false;
       this.llm = null;
-      
+
       try {
         await chrome.storage.local.set({
           webllmReady: false,
@@ -127,7 +127,7 @@ export class IntentResolver {
       } catch (e) {
         // Ignore
       }
-      
+
       return false;
     }
   }
@@ -135,12 +135,12 @@ export class IntentResolver {
   async isWebLLMCached() {
     try {
       const databases = await indexedDB.databases();
-      const hasCache = databases.some(db => 
-        db.name.includes('webllm') || 
-        db.name.includes('mlc') || 
+      const hasCache = databases.some(db =>
+        db.name.includes('webllm') ||
+        db.name.includes('mlc') ||
         db.name.includes('tvmjs')
       );
-      
+
       return hasCache;
     } catch (error) {
       console.warn('[IntentResolver] Could not check cache:', error);
@@ -150,16 +150,13 @@ export class IntentResolver {
 
   async resolve(text, context = {}) {
     const startTime = Date.now();
-    
     this.log('Resolving:', text);
 
     // STEP 1: Quick check with normalizer (fast path)
     if (this.config.useNormalizerFirst) {
       const normalizerResult = this.normalizer.normalize(text);
-      
       if (normalizerResult.intent !== 'unknown' && normalizerResult.confidence > 0.7) {
         this.log('✅ Normalizer resolved (fast):', normalizerResult.intent);
-        
         return {
           source: 'normalizer',
           intent: normalizerResult.intent,
@@ -174,28 +171,33 @@ export class IntentResolver {
     // STEP 2: Normalizer failed - try WebLLM
     if (this.config.enableLLM) {
       this.log('⚠️ Normalizer failed, checking WebLLM...');
-      
       try {
         if (this.llm && this.llmEnabled) {
           this.log('⚡ WebLLM available, using it...');
-          
-          const llmResult = await this.resolveLLM(text, context);
-          
-          if (llmResult && llmResult.intent !== 'unknown') {
-            this.log('✅ WebLLM resolved:', llmResult.intent);
-            
+
+          // ✅ FIXED: Pass text as string, include confidence in context
+          const llmResult = await this.resolveLLM(text, {
+            ...context,
+            confidence: 1.0  // ✅ Ensure validation passes
+          });
+
+          // Accept either free-form response or structured intent
+          if (llmResult && (llmResult.text || llmResult.intent)) {
+            this.log('✅ WebLLM resolved:', llmResult.intent || 'free_response');
             return {
               source: 'llm',
-              intent: llmResult.intent,
+              intent: llmResult.intent || 'free_response',
               slots: llmResult.slots || {},
               original: text,
-              confidence: llmResult.confidence || 0.9,
+              confidence: llmResult.confidence || 1.0, // ✅ Default to 1.0 for free response
+              text: llmResult.text || null,
               reasoning: llmResult.reasoning,
-              processingTime: Date.now() - startTime
+              processingTime: Date.now() - startTime,
+              raw: llmResult
             };
           }
         } else if (this.llmLoading) {
-          this.log('⏳ WebLLM still loading, returning unknown for now...');
+          this.log('⏳ WebLLM still loading...');
         } else if (this.llmLoadError) {
           this.log('❌ WebLLM failed to load:', this.llmLoadError);
         } else {
@@ -206,15 +208,9 @@ export class IntentResolver {
       }
     }
 
-    // STEP 3: Both failed - return normalizer result (unknown)
+    // STEP 3: Both failed - return normalizer fallback
     const normalizerResult = this.normalizer.normalize(text);
-    
-    this.log('❌ Returning unknown:', {
-      llmAvailable: !!this.llm,
-      llmLoading: this.llmLoading,
-      llmError: this.llmLoadError
-    });
-    
+    this.log('❌ Returning unknown');
     return {
       source: 'normalizer_fallback',
       intent: normalizerResult.intent,
@@ -230,29 +226,39 @@ export class IntentResolver {
     };
   }
 
-  async resolveLLM(text, context) {
+  async resolveLLM(text, context = {}) {
     if (!this.llm) {
       throw new Error('WebLLM not initialized');
     }
 
-    this.log('⚡ Calling WebLLM...');
-    
+    this.log('⚡ Calling WebLLM generateFreeResponse...');
+
     try {
-      const llmResult = await Promise.race([
-        this.llm.processCommand(text, {
+      // Build the STT-format input with confidence for validation
+      const sttInput = {
+        text,
+        confidence: context.confidence || 1.0, // ✅ Include confidence for validation
+        context: {
           url: context.url || context.currentUrl,
-          context: {
-            previousCommand: context.previousCommand,
-            recentTranscripts: context.recentTranscripts
-          }
-        }),
-        new Promise((_, reject) => 
+          title: context.title || context.currentTitle,
+          previousCommand: context.previousCommand,
+          recentTranscripts: context.recentTranscripts || []
+        }
+      };
+
+      // Use generateFreeResponse if available, fallback to processCommand
+      const llmPromise = this.llm.generateFreeResponse
+        ? this.llm.generateFreeResponse(sttInput)
+        : this.llm.processCommand(sttInput);
+
+      const llmResult = await Promise.race([
+        llmPromise,
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('LLM timeout')), this.config.llmTimeout)
         )
       ]);
-      
+
       return llmResult;
-      
     } catch (err) {
       if (err.message === 'LLM timeout') {
         this.log('⏱️ WebLLM timed out');
@@ -263,7 +269,7 @@ export class IntentResolver {
 
   isComplexCommand(text) {
     const wordCount = text.trim().split(/\s+/).length;
-    
+
     const complexIndicators = [
       wordCount > this.config.simpleCommandMaxWords,
       /\b(find|search|locate|show me|where is)\b/i.test(text),
@@ -271,13 +277,13 @@ export class IntentResolver {
       /\?/.test(text),
       text.length > 50
     ];
-    
+
     return complexIndicators.filter(Boolean).length >= 2;
   }
 
   async initializeLLM(llmInstance = null) {
     console.log('[IntentResolver] initializeLLM called');
-    
+
     if (llmInstance) {
       this.llm = llmInstance;
       this.llmEnabled = true;
@@ -285,7 +291,7 @@ export class IntentResolver {
       console.log('[IntentResolver] ✅ WebLLM ready (injected)');
       return true;
     }
-    
+
     return await this.loadWebLLM();
   }
 
@@ -298,16 +304,16 @@ export class IntentResolver {
   enableLLM() {
     console.log('[IntentResolver] Enabling WebLLM');
     this.config.enableLLM = true;
-    
+
     if (this.llm) {
       this.llmEnabled = true;
       return true;
     }
-    
+
     if (!this.llmLoading && !this.llmLoadError) {
       this.startBackgroundLoad();
     }
-    
+
     return false;
   }
 
