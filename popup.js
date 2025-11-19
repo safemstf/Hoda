@@ -323,6 +323,10 @@ class UIManager {
       quotaBar: document.getElementById('quotaBar'),
       quotaText: document.getElementById('quotaText')
     };
+
+    // Add volume visualizer
+    this.volumeVisualizer = new window.VolumeVisualizer();
+
     console.log('[UIManager] Initialized');
   }
 
@@ -392,6 +396,18 @@ class UIManager {
       this.elements.micBtn.disabled = !enabled;
     }
   }
+
+  startVolumeVisualizer(stream) {
+    if (this.volumeVisualizer && stream) {
+      this.volumeVisualizer.start(stream);
+    }
+  }
+
+  stopVolumeVisualizer() {
+    if (this.volumeVisualizer) {
+      this.volumeVisualizer.stop();
+    }
+  }
 }
 
 // ============================================================================
@@ -412,7 +428,8 @@ class SpeechRecognitionService {
       onStart: options.onStart || (() => { }),
       onResult: options.onResult || (() => { }),
       onError: options.onError || (() => { }),
-      onEnd: options.onEnd || (() => { })
+      onEnd: options.onEnd || (() => { }),
+      onStreamAvailable: options.onStreamAvailable || (() => { })  // ✅ ADD THIS LINE
     };
 
     this.initRecognition();
@@ -630,6 +647,11 @@ class SpeechRecognitionService {
     try {
       console.log('[SpeechRecognition] 🚀 Starting...');
       this.isListening = true;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Pass to UI Manager
+      if (this.callbacks.onStreamAvailable) {
+        this.callbacks.onStreamAvailable(stream);
+      }
       this.recognition.start();
       console.log('[SpeechRecognition] ✅ Start command sent');
 
@@ -838,17 +860,36 @@ class CommandProcessor {
     } catch (err) {
       console.error('[CommandProcessor] Execute failed:', err);
 
-      // Check if it's a restricted page error (content script not available)
-      const isRestrictedPageError = err.message?.includes('Receiving end does not exist') ||
+      // ============================================================================
+      // IMPROVED: Check if content script is not available
+      // ============================================================================
+      const isConnectionError = err.message?.includes('Receiving end does not exist') ||
         err.message?.includes('Could not establish connection');
 
-      // Only handle zoom commands on restricted pages
-      if (isRestrictedPageError && intentResult.intent === 'zoom') {
+      if (isConnectionError) {
+        console.warn('[CommandProcessor] Content script not loaded on this page');
+
+        // More helpful error message
+        await this.speak('Content script not ready. Please refresh the page.', true);
+
+        if (this.uiManager) {
+          this.uiManager.showCommandResult('⚠️ Refresh page and try again', true);
+        }
+
+        return {
+          success: false,
+          reason: 'content_script_not_loaded',
+          message: 'Content script not ready. Refresh the page and try again.'
+        };
+      }
+
+      // ============================================================================
+      // Handle zoom on restricted pages (chrome://)
+      // ============================================================================
+      if (intentResult.intent === 'zoom') {
         try {
-          // Get current tab to check URL
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
-          // Check if it's a chrome:// page (content scripts can't inject)
           if (tab?.url?.startsWith('chrome://')) {
             console.log('[CommandProcessor] Detected chrome:// page for zoom command');
             return await this.handleRestrictedPageZoom(intentResult, tab);
@@ -946,7 +987,8 @@ class HodaVoiceAssistant {
       onStart: () => this.handleSpeechStart(),
       onResult: (result) => this.handleSpeechResult(result),
       onError: (error) => this.handleSpeechError(error),
-      onEnd: () => this.handleSpeechEnd()
+      onEnd: () => this.handleSpeechEnd(),
+      onStreamAvailable: (stream) => this.handleStreamAvailable(stream)  // ✅ ADD THIS LINE
     });
 
     // State
@@ -1247,6 +1289,11 @@ class HodaVoiceAssistant {
   handleSpeechStart() {
     this.uiManager.updateStatus('🎤 Listening...');
     this.uiManager.setListeningState(true);
+  }
+
+  handleStreamAvailable(stream) {
+    console.log('[HodaVoiceAssistant] 🎵 Audio stream available');
+    this.uiManager.startVolumeVisualizer(stream);
   }
 
   async handleSpeechResult(result) {

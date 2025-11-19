@@ -641,7 +641,7 @@ export class CommandNormalizer {
         }
 
         // ========================================================================
-        // STEP 6: Extract form action slots
+        // STEP 6: Extract form action slots (FIXED)
         // ========================================================================
         if (actionName.toLowerCase().includes('fill') ||
             actionName.toLowerCase().includes('enter') ||
@@ -654,35 +654,80 @@ export class CommandNormalizer {
             actionName.toLowerCase().includes('choose') ||
             actionName.toLowerCase().includes('field')) {
 
-            // Fill/Enter/Type actions
-            if (matchedText.includes('fill') ||
+            // ============================================================================
+            // FIX 1: CHECK SUBMIT FIRST (highest priority to prevent misclassification)
+            // ============================================================================
+            if (matchedText.includes('submit') ||
+                matchedText.includes('send form') ||
+                matchedText.includes('post form')) {
+                slots.action = 'submit';
+                console.log('[Normalizer] → SUBMIT form');
+            }
+
+            // ============================================================================
+            // FIX 2: List fields action (check early to avoid confusion with "fill")
+            // ============================================================================
+            else if (actionName.toLowerCase().includes('list') || actionName.toLowerCase().includes('show')) {
+                slots.action = 'list';
+                slots.field = 'fields';
+                console.log('[Normalizer] → LIST fields');
+            }
+
+            // ============================================================================
+            // FIX 3: Fill/Enter/Type actions with AGGRESSIVE preposition filtering
+            // ============================================================================
+            else if (matchedText.includes('fill') ||
                 matchedText.includes('enter') ||
                 matchedText.includes('type') ||
                 matchedText.includes('input') ||
                 matchedText.includes('complete')) {
+
                 slots.action = 'fill';
+
+                // Stop words to filter out (prepositions, articles, etc.)
+                const stopWords = ['in', 'out', 'the', 'a', 'an', 'my', 'your', 'into', 'with', 'on', 'at'];
 
                 // Extract field name from captured group or text
                 if (match.length > 1 && match[1]) {
-                    const captured = String(match[1]).trim();
+                    let captured = String(match[1]).trim();
+
+                    // Split into words
+                    let words = captured.split(/\s+/);
+
+                    // Remove leading stop words
+                    while (words.length > 0 && stopWords.includes(words[0].toLowerCase())) {
+                        words.shift();
+                    }
+
+                    captured = words.join(' ');
+
                     // If it looks like "fieldname value", split it
-                    const parts = captured.split(/\s+/);
-                    if (parts.length > 1) {
-                        slots.field = parts[0];
-                        slots.value = parts.slice(1).join(' ');
+                    if (words.length > 1) {
+                        // First word is field name, rest is value
+                        slots.field = words[0];
+                        slots.value = words.slice(1).join(' ');
                     } else {
                         slots.field = captured;
                     }
                 }
                 // Try to extract from the matched text
                 else {
-                    const fieldMatch = matchedText.match(/(?:fill|enter|type|input|complete)\s+(?:in\s+)?(?:the\s+)?(.+)/);
+                    // Match pattern with aggressive stop word removal
+                    const fieldMatch = matchedText.match(/(?:fill|enter|type|input|complete)\s+(?:in\s+|out\s+|the\s+|a\s+|an\s+|my\s+|your\s+|into\s+|with\s+)*(.+)/);
                     if (fieldMatch && fieldMatch[1]) {
-                        const extracted = fieldMatch[1].trim();
-                        const parts = extracted.split(/\s+/);
-                        if (parts.length > 1) {
-                            slots.field = parts[0];
-                            slots.value = parts.slice(1).join(' ');
+                        let extracted = fieldMatch[1].trim();
+
+                        // Split and remove leading stop words
+                        let words = extracted.split(/\s+/);
+                        while (words.length > 0 && stopWords.includes(words[0].toLowerCase())) {
+                            words.shift();
+                        }
+
+                        extracted = words.join(' ');
+
+                        if (words.length > 1) {
+                            slots.field = words[0];
+                            slots.value = words.slice(1).join(' ');
                         } else {
                             slots.field = extracted;
                         }
@@ -692,18 +737,14 @@ export class CommandNormalizer {
                 console.log('[Normalizer] → FILL field:', slots.field, 'value:', slots.value);
             }
 
-            // Submit actions
-            else if (matchedText.includes('submit') || matchedText.includes('send') || matchedText.includes('post')) {
-                slots.action = 'submit';
-                console.log('[Normalizer] → SUBMIT form');
-            }
-
+            // ============================================================================
             // Check/Select/Choose actions
+            // ============================================================================
             else if (matchedText.includes('check') ||
-                     matchedText.includes('uncheck') ||
-                     matchedText.includes('select') ||
-                     matchedText.includes('choose') ||
-                     matchedText.includes('pick')) {
+                matchedText.includes('uncheck') ||
+                matchedText.includes('select') ||
+                matchedText.includes('choose') ||
+                matchedText.includes('pick')) {
 
                 if (matchedText.includes('uncheck')) {
                     slots.action = 'uncheck';
@@ -725,17 +766,11 @@ export class CommandNormalizer {
 
                 console.log('[Normalizer] → SELECT/CHECK:', slots.target || slots.field);
             }
-
-            // List fields action
-            else if (matchedText.includes('list') && matchedText.includes('field')) {
-                slots.action = 'list';
-                slots.field = 'fields';
-                console.log('[Normalizer] → LIST fields');
-            }
         }
 
         console.log('[Normalizer] Extracted slots:', slots);
         return slots;
+
     }
 
     /**

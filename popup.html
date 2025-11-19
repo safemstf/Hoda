@@ -12,101 +12,163 @@
     }
 
     :root {
-      --primary: #6366f1;
-      --primary-dark: #4f46e5;
-      --primary-light: #818cf8;
-      --secondary: #8b5cf6;
+      /* Cyan-Blue-Teal palette */
+      --primary: #06b6d4;
+      --primary-dark: #0891b2;
+      --primary-light: #22d3ee;
+      --secondary: #3b82f6;
+      --accent: #14b8a6;
       --success: #10b981;
-      --warning: #f59e0b;
+      --warning: #eab308;
       --error: #ef4444;
+
+      /* Neutrals */
       --bg-main: #f8fafc;
       --bg-card: #ffffff;
       --text-primary: #0f172a;
-      --text-secondary: #64748b;
+      --text-secondary: #475569;
       --text-muted: #94a3b8;
       --border: #e2e8f0;
-      --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-      --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 16px;
-      --radius-full: 9999px;
+
+      /* Shadows */
+      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+      --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.5);
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', sans-serif;
-      width: 400px;
-      min-height: 500px;
-      background: var(--bg-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      width: 420px;
+      min-height: 600px;
+      background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
       color: var(--text-primary);
       padding: 0;
       margin: 0;
       overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Header */
+    /* Square pattern background */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(6, 182, 212, 0.03) 19px, rgba(6, 182, 212, 0.03) 20px),
+        repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(6, 182, 212, 0.03) 19px, rgba(6, 182, 212, 0.03) 20px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header with square pattern */
     .header {
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      background: linear-gradient(135deg,
+          rgba(6, 182, 212, 0.95) 0%,
+          rgba(59, 130, 246, 0.95) 100%);
       color: white;
-      padding: 20px 20px 24px;
+      padding: 28px 24px 32px;
       position: relative;
       overflow: hidden;
     }
 
+    /* Animated square pattern in header */
     .header::before {
       content: '';
       position: absolute;
-      top: -50%;
-      right: -20%;
-      width: 300px;
-      height: 300px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 50%;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image:
+        repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255, 255, 255, 0.03) 35px, rgba(255, 255, 255, 0.03) 70px),
+        repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(255, 255, 255, 0.03) 35px, rgba(255, 255, 255, 0.03) 70px);
+      animation: squareShift 20s linear infinite;
+    }
+
+    @keyframes squareShift {
+      0% {
+        transform: translate(0, 0);
+      }
+
+      100% {
+        transform: translate(70px, 70px);
+      }
     }
 
     .header-content {
       position: relative;
-      z-index: 1;
+      z-index: 2;
     }
 
     .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 12px;
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
     .logo-icon {
-      font-size: 28px;
+      font-size: 36px;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
     }
 
     .logo-text {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
+      font-size: 26px;
+      font-weight: 800;
+      letter-spacing: -0.8px;
+      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
 
+    .tagline {
+      font-size: 13px;
+      font-weight: 500;
+      opacity: 0.95;
+      margin-bottom: 18px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Square quota bar */
     .quota-bar-container {
       background: rgba(255, 255, 255, 0.2);
-      border-radius: var(--radius-full);
-      height: 6px;
+      height: 10px;
       overflow: hidden;
       backdrop-filter: blur(10px);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
     }
 
     .quota-bar {
       height: 100%;
-      background: linear-gradient(90deg, var(--success), rgba(255, 255, 255, 0.9));
-      border-radius: var(--radius-full);
-      transition: width 0.3s ease;
+      background: rgba(255, 255, 255, 0.95);
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+      position: relative;
+    }
+
+    .quota-bar::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 50%;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent);
     }
 
     .quota-text {
-      font-size: 11px;
-      opacity: 0.9;
-      margin-top: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.95;
+      margin-top: 10px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -114,7 +176,238 @@
 
     /* Main Content */
     .content {
-      padding: 20px;
+      padding: 28px 24px;
+    }
+
+    /* Square mic button with volume visualizer */
+    .mic-section {
+      text-align: center;
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .mic-container {
+      position: relative;
+      display: inline-block;
+      margin: 0 auto 24px;
+    }
+
+    /* Volume visualizer - square bars */
+    .volume-visualizer {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 200px;
+      height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .volume-bar {
+      width: 8px;
+      background: linear-gradient(180deg, var(--primary-light), var(--primary));
+      transition: height 0.1s ease;
+      opacity: 0;
+      box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+    }
+
+    .volume-bar.active {
+      opacity: 1;
+    }
+
+    /* Square mic button */
+    .mic-button {
+      width: 120px;
+      height: 120px;
+      border: none;
+      background: linear-gradient(135deg,
+          var(--primary) 0%,
+          var(--secondary) 100%);
+      color: white;
+      font-size: 52px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 10px 30px rgba(6, 182, 212, 0.35),
+        0 4px 12px rgba(0, 0, 0, 0.1);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Corner decorations */
+    .mic-button::before,
+    .mic-button::after {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.5);
+      transition: all 0.3s;
+    }
+
+    .mic-button::before {
+      top: -6px;
+      left: -6px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .mic-button::after {
+      bottom: -6px;
+      right: -6px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .mic-button:hover:not(:disabled) {
+      transform: scale(1.05);
+      box-shadow: var(--shadow-glow),
+        0 15px 35px rgba(6, 182, 212, 0.4);
+    }
+
+    .mic-button:hover:not(:disabled)::before,
+    .mic-button:hover:not(:disabled)::after {
+      width: 30px;
+      height: 30px;
+    }
+
+    .mic-button:active:not(:disabled) {
+      transform: scale(0.98);
+    }
+
+    .mic-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background: linear-gradient(135deg,
+          var(--text-muted),
+          var(--text-secondary));
+    }
+
+    .mic-button.listening {
+      animation: pulse-square 2s infinite;
+    }
+
+    @keyframes pulse-square {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7),
+          0 10px 30px rgba(6, 182, 212, 0.35);
+      }
+
+      50% {
+        box-shadow: 0 0 0 20px rgba(6, 182, 212, 0),
+          0 10px 30px rgba(6, 182, 212, 0.35);
+      }
+    }
+
+    .status-text {
+      font-size: 16px;
+      color: var(--text-secondary);
+      font-weight: 600;
+      transition: all 0.3s;
+      margin-bottom: 10px;
+      letter-spacing: -0.2px;
+    }
+
+    .status-text.active {
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .status-text.error {
+      color: var(--error);
+    }
+
+    .keyboard-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    kbd {
+      padding: 4px 8px;
+      background: white;
+      border: 2px solid var(--border);
+      font-family: -apple-system, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      color: var(--text-primary);
+    }
+
+    /* Square cards */
+    .card {
+      background: white;
+      padding: 22px;
+      margin-bottom: 18px;
+      box-shadow: var(--shadow-md);
+      border: 2px solid var(--border);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+    }
+
+    /* Square corner accents */
+    .card::before,
+    .card::after {
+      content: '';
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border: 2px solid var(--primary);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .card::before {
+      top: -2px;
+      left: -2px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .card::after {
+      bottom: -2px;
+      right: -2px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary);
+    }
+
+    .card:hover::before,
+    .card:hover::after {
+      opacity: 1;
+    }
+
+    .card-title {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .card-title::before {
+      content: '';
+      width: 4px;
+      height: 16px;
+      background: linear-gradient(180deg, var(--primary), var(--secondary));
     }
 
     /* Voice Settings */
@@ -126,12 +419,12 @@
 
     .voice-select {
       width: 100%;
-      padding: 12px;
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      background: var(--bg-card);
+      padding: 14px 16px;
+      border: 2px solid var(--border);
+      background: var(--bg-main);
       color: var(--text-primary);
-      font-size: 13px;
+      font-size: 14px;
+      font-weight: 500;
       cursor: pointer;
       transition: all 0.2s;
       font-family: inherit;
@@ -144,210 +437,115 @@
     .voice-select:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
-    }
-
-    .voice-preview {
-      display: flex;
-      gap: 8px;
+      box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
     }
 
     .voice-preview-btn {
-      flex: 1;
-      padding: 10px;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      border-radius: var(--radius-sm);
-      font-size: 13px;
+      width: 100%;
+      padding: 14px;
+      border: 2px solid var(--border);
+      background: white;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s;
-      font-weight: 500;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       color: var(--text-primary);
+      font-family: inherit;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .voice-preview-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg,
+          transparent,
+          rgba(6, 182, 212, 0.2),
+          transparent);
+      transition: left 0.5s;
     }
 
     .voice-preview-btn:hover {
-      background: var(--primary);
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
       color: white;
       border-color: var(--primary);
-      transform: translateY(-1px);
-      box-shadow: var(--shadow-sm);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(6, 182, 212, 0.3);
     }
 
-    /* Mic Section */
-    .mic-section {
-      text-align: center;
-      margin-bottom: 24px;
+    .voice-preview-btn:hover::before {
+      left: 100%;
     }
 
-    .mic-button {
-      width: 100px;
-      height: 100px;
-      border-radius: var(--radius-full);
-      border: none;
-      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-      color: white;
-      font-size: 40px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 16px;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: var(--shadow-md);
-      position: relative;
-    }
-
-    .mic-button::before {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border-radius: var(--radius-full);
-      padding: 4px;
-      background: linear-gradient(135deg, var(--primary-light), var(--secondary));
-      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-
-      -webkit-mask-composite: xor;
-      mask-composite: exclude;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .mic-button:hover:not(:disabled) {
-      transform: scale(1.05);
-      box-shadow: var(--shadow-glow);
-    }
-
-    .mic-button:hover:not(:disabled)::before {
-      opacity: 1;
-    }
-
-    .mic-button:active:not(:disabled) {
-      transform: scale(0.95);
-    }
-
-    .mic-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-      background: var(--text-muted);
-    }
-
-    .mic-button.listening {
-      animation: pulse 2s infinite;
-      box-shadow: var(--shadow-glow);
-    }
-
-    @keyframes pulse {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
-      }
-
-      50% {
-        box-shadow: 0 0 0 20px rgba(99, 102, 241, 0);
-      }
-    }
-
-    .status-text {
-      font-size: 14px;
-      color: var(--text-secondary);
-      font-weight: 500;
-      transition: color 0.3s;
-    }
-
-    .status-text.active {
-      color: var(--primary);
-      font-weight: 600;
-    }
-
-    .status-text.error {
-      color: var(--error);
-    }
-
-    .keyboard-hint {
-      margin-top: 8px;
-      font-size: 11px;
-      color: var(--text-muted);
-      text-align: center;
-    }
-
-    kbd {
-      padding: 2px 6px;
-      background: var(--bg-card);
-      border: 1px solid var(--border);
-      border-radius: 3px;
-      font-family: 'SF Mono', 'Consolas', monospace;
-      font-size: 10px;
-    }
-
-    /* Transcript Card */
-    .card {
-      background: var(--bg-card);
-      border-radius: var(--radius-md);
-      padding: 16px;
-      margin-bottom: 16px;
-      box-shadow: var(--shadow-sm);
-      border: 1px solid var(--border);
-      transition: all 0.2s;
-    }
-
-    .card:hover {
-      box-shadow: var(--shadow-md);
-    }
-
-    .card-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 10px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
+    /* Square transcript box */
     .transcript-box {
       background: var(--bg-main);
-      border: 2px dashed var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px;
-      min-height: 70px;
+      border: 3px solid var(--border);
+      padding: 18px;
+      min-height: 90px;
       font-size: 14px;
       color: var(--text-primary);
-      font-family: 'SF Mono', 'Consolas', monospace;
-      line-height: 1.6;
+      font-family: -apple-system, 'Consolas', monospace;
+      line-height: 1.8;
       transition: all 0.3s;
+      font-weight: 500;
+      position: relative;
     }
 
     .transcript-box.empty {
       color: var(--text-muted);
       font-style: italic;
-      border-style: dashed;
     }
 
     .transcript-box:not(.empty) {
       border-color: var(--primary);
-      border-style: solid;
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(139, 92, 246, 0.05));
+      background: linear-gradient(135deg,
+          rgba(6, 182, 212, 0.03),
+          rgba(59, 130, 246, 0.03));
+    }
+
+    /* Square corner indicators */
+    .transcript-box:not(.empty)::before,
+    .transcript-box:not(.empty)::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border: 3px solid var(--primary);
+    }
+
+    .transcript-box:not(.empty)::before {
+      top: -3px;
+      right: -3px;
+      border-left: none;
+      border-bottom: none;
+    }
+
+    .transcript-box:not(.empty)::after {
+      bottom: -3px;
+      left: -3px;
+      border-right: none;
+      border-top: none;
     }
 
     /* Command Result */
     .command-result {
-      padding: 12px 14px;
-      border-radius: var(--radius-sm);
+      padding: 14px 18px;
       font-size: 13px;
-      margin-top: 12px;
+      font-weight: 700;
+      margin-top: 14px;
       display: none;
-      animation: slideIn 0.3s ease;
-      font-weight: 500;
+      animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    @keyframes slideIn {
+    @keyframes slideUp {
       from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(15px);
       }
 
       to {
@@ -359,271 +557,353 @@
     .command-result.show {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .command-result.success {
-      background: rgba(16, 185, 129, 0.1);
+      background: linear-gradient(135deg,
+          rgba(16, 185, 129, 0.1),
+          rgba(16, 185, 129, 0.05));
       color: var(--success);
-      border: 1px solid rgba(16, 185, 129, 0.3);
+      border: 2px solid rgba(16, 185, 129, 0.3);
     }
 
     .command-result.error {
-      background: rgba(239, 68, 68, 0.1);
+      background: linear-gradient(135deg,
+          rgba(239, 68, 68, 0.1),
+          rgba(239, 68, 68, 0.05));
       color: var(--error);
-      border: 1px solid rgba(239, 68, 68, 0.3);
+      border: 2px solid rgba(239, 68, 68, 0.3);
     }
 
-    .command-result.warning {
-      background: rgba(245, 158, 11, 0.1);
-      color: var(--warning);
-      border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-
-    /* Stats */
+    /* Stats - square containers */
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 14px;
     }
 
     .stat-item {
-      background: linear-gradient(135deg, var(--bg-main), var(--bg-card));
-      padding: 16px;
-      border-radius: var(--radius-md);
+      background: linear-gradient(135deg,
+          var(--bg-main),
+          white);
+      padding: 24px 20px;
       text-align: center;
-      border: 1px solid var(--border);
-      transition: all 0.2s;
+      border: 2px solid var(--border);
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Animated square pattern on hover */
+    .stat-item::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(90deg,
+          var(--primary),
+          var(--secondary));
+      transform: scaleX(0);
+      transition: transform 0.3s;
     }
 
     .stat-item:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
+      transform: translateY(-4px) scale(1.02);
+      box-shadow: var(--shadow-lg);
+      border-color: var(--primary);
+    }
+
+    .stat-item:hover::before {
+      transform: scaleX(1);
     }
 
     .stat-value {
-      font-size: 28px;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      font-size: 40px;
+      font-weight: 900;
+      background: linear-gradient(135deg,
+          var(--primary) 0%,
+          var(--secondary) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 4px;
+      margin-bottom: 8px;
+      letter-spacing: -1px;
+      line-height: 1;
     }
 
     .stat-label {
       font-size: 11px;
       color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      font-weight: 600;
+      letter-spacing: 1.2px;
+      font-weight: 700;
     }
 
-    /* Quick Actions */
-    .quick-actions {
+    /* Square action buttons */
+    .action-buttons {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
+      gap: 14px;
     }
 
-    .quick-btn {
-      padding: 12px;
-      border: 1px solid var(--border);
-      background: var(--bg-card);
-      border-radius: var(--radius-sm);
-      font-size: 13px;
+    .action-btn {
+      padding: 20px 16px;
+      border: 2px solid var(--border);
+      background: white;
+      font-size: 14px;
+      font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 6px;
-      font-weight: 500;
+      gap: 10px;
       color: var(--text-primary);
+      font-family: inherit;
+      position: relative;
+      overflow: hidden;
     }
 
-    .quick-btn:hover {
-      background: var(--primary);
-      color: white;
+    .action-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg,
+          var(--primary),
+          var(--secondary));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .action-btn .icon {
+      font-size: 32px;
+      position: relative;
+      z-index: 1;
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .action-btn span:not(.icon) {
+      position: relative;
+      z-index: 1;
+      transition: color 0.3s;
+    }
+
+    .action-btn:hover:not(:disabled) {
       border-color: var(--primary);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
+      transform: translateY(-4px) scale(1.03);
+      box-shadow: 0 12px 30px rgba(6, 182, 212, 0.25);
     }
 
-    .quick-btn:active {
-      transform: translateY(0);
+    .action-btn:hover:not(:disabled)::before {
+      opacity: 1;
+    }
+
+    .action-btn:hover:not(:disabled) span:not(.icon) {
+      color: white;
+    }
+
+    .action-btn:hover:not(:disabled) .icon {
+      transform: scale(1.15);
+    }
+
+    .action-btn.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      background: var(--bg-main);
+    }
+
+    .badge-coming-soon {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      font-size: 9px;
+      font-weight: 800;
+      padding: 4px 8px;
+      background: linear-gradient(135deg, var(--accent), var(--primary));
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      box-shadow: 0 2px 8px rgba(20, 184, 166, 0.4);
     }
 
     /* Footer */
     .footer {
-      padding: 16px 20px;
-      border-top: 1px solid var(--border);
-      background: var(--bg-card);
+      padding: 24px;
+      border-top: 2px solid rgba(6, 182, 212, 0.1);
+      background: white;
+      text-align: center;
+    }
+
+    .footer-text {
+      font-size: 12px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-bottom: 12px;
     }
 
     .link {
       color: var(--primary);
       text-decoration: none;
-      font-size: 13px;
-      display: flex;
+      font-size: 14px;
+      font-weight: 700;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 6px;
-      font-weight: 500;
-      transition: color 0.2s;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      padding: 10px 20px;
+      background: rgba(6, 182, 212, 0.08);
+      border: 2px solid rgba(6, 182, 212, 0.2);
     }
 
     .link:hover {
-      color: var(--primary-dark);
-      text-decoration: underline;
-    }
-
-    /* Badge */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 4px 8px;
-      border-radius: var(--radius-full);
-      font-size: 11px;
-      font-weight: 600;
-      background: rgba(99, 102, 241, 0.1);
-      color: var(--primary);
-    }
-
-    .badge.success {
-      background: rgba(16, 185, 129, 0.1);
-      color: var(--success);
-    }
-
-    .badge.warning {
-      background: rgba(245, 158, 11, 0.1);
-      color: var(--warning);
-    }
-
-    .badge.error {
-      background: rgba(239, 68, 68, 0.1);
-      color: var(--error);
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(6, 182, 212, 0.3);
     }
 
     /* Accessibility */
     @media (prefers-reduced-motion: reduce) {
-      * {
-        animation: none !important;
-        transition: none !important;
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
       }
+    }
+
+    *:focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 3px;
     }
   </style>
 </head>
 
 <body>
-  <!-- Header with quota -->
-  <div class="header">
-    <div class="header-content">
-      <div class="logo">
-        <span class="logo-icon">🎤</span>
-        <span class="logo-text">Hoda Voice</span>
-      </div>
-      <div class="quota-bar-container">
-        <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
-      </div>
-      <div class="quota-text">
-        <span id="quotaText">40/40 requests left</span>
-        <span id="quotaReset" class="badge">Resets in 24h</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Main Content -->
-  <div class="content">
-    <!-- Mic Section -->
-    <div class="mic-section">
-      <button class="mic-button" id="micBtn" disabled>🎤</button>
-      <div class="status-text" id="statusText">Initializing...</div>
-      <div class="keyboard-hint">
-        Press <kbd>Ctrl+Shift+H</kbd> to toggle
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="header-content">
+        <div class="logo">
+          <span class="logo-icon">🎙️</span>
+          <span class="logo-text">Hoda Voice</span>
+        </div>
+        <div class="tagline">Accessible Voice Navigation</div>
+        <div class="quota-bar-container">
+          <div class="quota-bar" id="quotaBar" style="width: 100%"></div>
+        </div>
+        <div class="quota-text">
+          <span id="quotaText">40/40 requests left</span>
+          <span>Resets in 24h</span>
+        </div>
       </div>
     </div>
 
-    <!-- Voice Settings Card (NEW - Add after mic-section) -->
-    <div class="card">
-      <div class="card-title">
-        🎙️ Voice Settings
+    <!-- Main Content -->
+    <div class="content">
+      <!-- Mic Section with Volume Visualizer -->
+      <div class="mic-section">
+        <div class="mic-container">
+          <!-- Volume Visualizer Bars -->
+          <div class="volume-visualizer" id="volumeVisualizer">
+            <div class="volume-bar" data-bar="0"></div>
+            <div class="volume-bar" data-bar="1"></div>
+            <div class="volume-bar" data-bar="2"></div>
+            <div class="volume-bar" data-bar="3"></div>
+            <div class="volume-bar" data-bar="4"></div>
+            <div class="volume-bar" data-bar="5"></div>
+            <div class="volume-bar" data-bar="6"></div>
+            <div class="volume-bar" data-bar="7"></div>
+          </div>
+
+          <button class="mic-button" id="micBtn" disabled aria-label="Toggle voice recognition">
+            🎤
+          </button>
+        </div>
+        <div class="status-text" id="statusText">Initializing...</div>
+        <div class="keyboard-hint">
+          Press <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> to toggle
+        </div>
       </div>
-      <div class="voice-settings">
-        <select id="voiceSelect" class="voice-select">
-          <option value="">Loading voices...</option>
-        </select>
-        <div class="voice-preview">
+
+      <!-- Voice Settings -->
+      <div class="card">
+        <div class="card-title">
+          🎙️ Voice Settings
+        </div>
+        <div class="voice-settings">
+          <select id="voiceSelect" class="voice-select" aria-label="Select voice">
+            <option value="">Loading voices...</option>
+          </select>
           <button class="voice-preview-btn" id="voiceTestBtn">
-            Test Voice
+            🔊 Test Voice
+          </button>
+        </div>
+      </div>
+
+      <!-- Transcript -->
+      <div class="card">
+        <div class="card-title">
+          💬 Transcript
+        </div>
+        <div class="transcript-box empty" id="transcript" aria-live="polite">
+          Click the mic and start speaking...
+        </div>
+        <div class="command-result" id="commandResult" role="alert" aria-live="polite"></div>
+      </div>
+
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">
+          📊 Session Stats
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Total</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statRecognized">0</div>
+            <div class="stat-label">Recognized</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="card">
+        <div class="card-title">
+          ⚡ Quick Access
+        </div>
+        <div class="action-buttons">
+          <button class="action-btn" id="btnHelp" aria-label="View help and commands">
+            <span class="icon">❓</span>
+            <span>Help</span>
+          </button>
+          <button class="action-btn disabled" disabled aria-label="Tutorial coming soon">
+            <span class="badge-coming-soon">Soon</span>
+            <span class="icon">🎓</span>
+            <span>Tutorial</span>
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Transcript Card -->
-    <div class="card">
-      <div class="card-title">
-        💬 Transcript
-      </div>
-      <div class="transcript-box empty" id="transcript">
-        Click the mic and start speaking...
-      </div>
-      <div class="command-result" id="commandResult"></div>
-    </div>
-
-    <!-- Stats Card -->
-    <div class="card">
-      <div class="card-title">
-        📊 Session Stats
-      </div>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <div class="stat-value" id="statTotal">0</div>
-          <div class="stat-label">Total</div>
-        </div>
-        <div class="stat-item">
-          <div class="stat-value" id="statRecognized">0</div>
-          <div class="stat-label">Recognized</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Quick Actions Card -->
-    <div class="card">
-      <div class="card-title">
-        ⚡ Quick Actions
-      </div>
-      <div class="quick-actions">
-        <button class="quick-btn" id="btnScrollDown">
-          <span>⬇️</span>
-          <span>Scroll Down</span>
-        </button>
-        <button class="quick-btn" id="btnScrollUp">
-          <span>⬆️</span>
-          <span>Scroll Up</span>
-        </button>
-        <button class="quick-btn" id="btnListLinks">
-          <span>🔗</span>
-          <span>List Links</span>
-        </button>
-        <button class="quick-btn" id="btnHelp">
-          <span>❓</span>
-          <span>Help</span>
-        </button>
-      </div>
+    <!-- Footer -->
+    <div class="footer">
+      <div class="footer-text">Made with ❤️ for accessibility</div>
+      <a href="#" class="link" id="openTests">
+        <span>⚙️</span>
+        <span>Settings</span>
+      </a>
     </div>
   </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    <a href="#" class="link" id="openTests">
-      <span>🧪</span>
-      <span>Open Settings</span>
-    </a>
-  </div>
-
-  <!-- Load popup logic -->
+  <script src="volumeVisualizer.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
 
