@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voice Form Filling – Tests</title>
+  <title>Voice Form Filling – Test Bed</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <style>
     * { box-sizing: border-box; }
     body {
@@ -32,6 +33,7 @@
     .actions { display:flex; gap:10px; margin-top: 10px; }
     .success { display:none; color:#155724; background:#d4edda; border:1px solid #c3e6cb; padding:10px; border-radius:8px; margin-top:10px; }
     .error { display:none; color:#721c24; background:#f8d7da; border:1px solid #f5c6cb; padding:10px; border-radius:8px; margin-top:10px; }
+
     .panel { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .panel input[type=text] { width:auto; flex:1 1 340px; }
     .pill {
@@ -41,7 +43,6 @@
     .dot { width:10px; height:10px; border-radius:50%; background:#9aa4d4; }
     .dot.on { background:#27d17f; box-shadow:0 0 10px #27d17f; }
 
-    /* Voice overlay (Feature #1) */
     #voice-overlay {
       position: fixed; right: 20px; bottom: 20px; max-width: 360px;
       background: #1f2937; color: #fff; padding: 12px 14px; border-radius: 12px;
@@ -55,15 +56,16 @@
 </head>
 <body>
   <div class="container">
+
     <div class="header">
       <h1>📋 Voice Form Filling – Test Bed</h1>
-      <p>Say: <em>“list fields”, “fill email john at example dot com”, “check terms”, “select option 2”, “submit form”</em></p>
+      <p>Try commands like: <em>“fill email john at example dot com”, “check terms”, “select option 2”, “submit form”</em></p>
     </div>
 
     <!-- Voice controls -->
-    <div class="card" aria-labelledby="voiceControlsTitle">
-      <h2 id="voiceControlsTitle" style="margin-top:0">🎤 Voice Controls</h2>
-      <div class="panel" role="group" aria-label="Voice controls">
+    <div class="card">
+      <h2 style="margin-top:0">🎤 Voice Controls</h2>
+      <div class="panel">
         <button id="btnStart">Start Listening</button>
         <button id="btnStop">Stop</button>
         <span class="pill"><span id="sttDot" class="dot"></span> <span id="sttText">idle</span></span>
@@ -74,177 +76,18 @@
       </div>
     </div>
 
-    <!-- Forms grid -->
-    <div class="grid">
-      <!-- Login -->
-      <div class="card">
-        <h3>🔐 Login Form</h3>
-        <form id="login-form" aria-describedby="login-status">
-          <div class="form-group">
-            <label for="login-email">Email*</label>
-            <input id="login-email" name="email" type="email" required placeholder="your@email.com" />
-          </div>
-          <div class="form-group">
-            <label for="login-password">Password*</label>
-            <input id="login-password" name="password" type="password" required minlength="6" />
-          </div>
-          <div class="form-group checkbox-group">
-            <input id="login-remember" type="checkbox" name="remember" />
-            <label for="login-remember">Remember me</label>
-          </div>
-          <div class="actions">
-            <button type="submit">Login</button>
-            <button type="reset">Reset</button>
-          </div>
-          <div id="login-success" class="success" role="status">Login successful!</div>
-          <div id="login-error" class="error" role="alert">Please check your input</div>
-        </form>
-      </div>
+   
 
-      <!-- Signup -->
-      <div class="card">
-        <h3>📝 Signup Form</h3>
-        <form id="signup-form">
-          <div class="form-group">
-            <label for="signup-name">Full Name*</label>
-            <input id="signup-name" name="name" required placeholder="John Doe" />
-          </div>
-          <div class="form-group">
-            <label for="signup-email">Email*</label>
-            <input id="signup-email" name="email" type="email" required placeholder="john@example.com" />
-          </div>
-          <div class="form-group">
-            <label for="signup-password">Password*</label>
-            <input id="signup-password" name="password" type="password" required minlength="8" />
-          </div>
-          <div class="form-group">
-            <label for="signup-age">Age*</label>
-            <input id="signup-age" name="age" type="number" required min="13" max="120" />
-          </div>
-          <div class="form-group">
-            <label for="signup-country">Country*</label>
-            <select id="signup-country" name="country" required>
-              <option value="">Select a country</option>
-              <option value="us">United States</option>
-              <option value="uk">United Kingdom</option>
-              <option value="ca">Canada</option>
-              <option value="au">Australia</option>
-              <option value="de">Germany</option>
-            </select>
-          </div>
-          <div class="form-group checkbox-group">
-            <input id="signup-terms" type="checkbox" name="terms" required />
-            <label for="signup-terms">I agree to the terms*</label>
-          </div>
-          <div class="actions">
-            <button type="submit">Sign Up</button>
-            <button type="reset">Reset</button>
-          </div>
-          <div id="signup-success" class="success" role="status">Account created!</div>
-          <div id="signup-error" class="error" role="alert">Please fill all required fields</div>
-        </form>
-      </div>
-
-      <!-- Contact -->
-      <div class="card">
-        <h3>📧 Contact Form</h3>
-        <form id="contact-form">
-          <div class="form-group">
-            <label for="contact-name">Name*</label>
-            <input id="contact-name" name="name" required placeholder="Your name" />
-          </div>
-          <div class="form-group">
-            <label for="contact-email">Email*</label>
-            <input id="contact-email" name="email" type="email" required placeholder="your@email.com" />
-          </div>
-          <div class="form-group">
-            <label for="contact-subject">Subject*</label>
-            <select id="contact-subject" name="subject" required>
-              <option value="">Choose a topic</option>
-              <option value="general">General Inquiry</option>
-              <option value="support">Technical Support</option>
-              <option value="feedback">Feedback</option>
-              <option value="bug">Bug Report</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="contact-message">Message*</label>
-            <textarea id="contact-message" name="message" required placeholder="Your message here..."></textarea>
-          </div>
-          <div class="actions">
-            <button type="submit">Send Message</button>
-            <button type="reset">Reset</button>
-          </div>
-          <div id="contact-success" class="success" role="status">Message sent!</div>
-          <div id="contact-error" class="error" role="alert">Please complete all fields</div>
-        </form>
-      </div>
-
-      <!-- Checkout -->
-      <div class="card">
-        <h3>🛒 Checkout Form</h3>
-        <form id="checkout-form">
-          <div class="form-group">
-            <label for="checkout-name">Full Name*</label>
-            <input id="checkout-name" name="name" required placeholder="John Doe" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-email">Email*</label>
-            <input id="checkout-email" name="email" type="email" required placeholder="john@example.com" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-address">Address*</label>
-            <input id="checkout-address" name="address" required placeholder="123 Main St" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-city">City*</label>
-            <input id="checkout-city" name="city" required placeholder="New York" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-zip">ZIP Code*</label>
-            <input id="checkout-zip" name="zip" required pattern="\d{5}" placeholder="12345" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-card">Card Number*</label>
-            <input id="checkout-card" name="card" required pattern="\d{16}" placeholder="1234567890123456" />
-          </div>
-          <div class="form-group">
-            <label for="checkout-shipping">Shipping Method*</label>
-            <select id="checkout-shipping" name="shipping" required>
-              <option value="">Select shipping</option>
-              <option value="standard">Standard (5–7 days)</option>
-              <option value="express">Express (2–3 days)</option>
-              <option value="overnight">Overnight</option>
-            </select>
-          </div>
-          <div class="form-group checkbox-group">
-            <input id="checkout-subscribe" name="subscribe" type="checkbox" />
-            <label for="checkout-subscribe">Subscribe to newsletter</label>
-          </div>
-          <div class="form-group checkbox-group">
-            <input id="checkout-terms" name="terms" type="checkbox" required />
-            <label for="checkout-terms">I agree to terms*</label>
-          </div>
-          <div class="actions">
-            <button type="submit">Complete Purchase</button>
-            <button type="reset">Reset</button>
-          </div>
-          <div id="checkout-success" class="success" role="status">Order placed successfully!</div>
-          <div id="checkout-error" class="error" role="alert">Please complete all required fields</div>
-        </form>
-      </div>
-    </div>
   </div>
 
-  <!-- Voice overlay (Feature #1) -->
   <div id="voice-overlay" aria-live="polite" aria-atomic="true">
     <div class="title">Voice Assistant</div>
     <div class="line">Ready.</div>
   </div>
 
-  <!-- Screen-reader live region -->
   <div id="sr-live" style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden" aria-live="assertive" aria-atomic="true"></div>
 
-  <script src="voice-form-controller.js" defer></script>
+  
+  <script src="enhanced voice-form-controller.js" defer></script>
 </body>
 </html>
