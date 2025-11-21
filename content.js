@@ -931,7 +931,8 @@ console.log('[Content] Loading - Complete final version...');
 
     _speakNextChunk() {
       if (this._tts.stopped) {
-        // Call completion callback even when stopped
+        console.log('[TTS] Stopped, not continuing');
+        // Clear callback on stop
         if (this._tts.onAllChunksComplete) {
           const callback = this._tts.onAllChunksComplete;
           this._tts.onAllChunksComplete = null;
@@ -940,42 +941,44 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      const idx = this._tts.chunkIndex;
-      if (!this._tts.chunks || idx >= this._tts.chunks.length) {
-        this._tts.utterance = null;
-        this._tts.autoContinue = false;
+      if (this._tts.chunkIndex >= this._tts.chunks.length) {
+        // ALL CHUNKS COMPLETE - MUST CALL THE CALLBACK HERE
+        console.log('[TTS] ✅ All chunks complete');
         this._setSpeaking(false);
-        console.log('[Feedback] finished all chunks');
 
-        // Call completion callback when all chunks done
+        // THIS IS CRITICAL - call the completion callback
         if (this._tts.onAllChunksComplete) {
           const callback = this._tts.onAllChunksComplete;
-          this._tts.onAllChunksComplete = null;
-          callback();
+          this._tts.onAllChunksComplete = null; // Clear it
+          console.log('[TTS] 🎉 Calling onAllChunksComplete callback');
+          callback(); // Call it
         }
         return;
       }
 
-      const chunk = this._tts.chunks[idx];
-      const u = new SpeechSynthesisUtterance(chunk);
+      const chunk = this._tts.chunks[this._tts.chunkIndex];
+      console.log(`[TTS] Speaking chunk ${this._tts.chunkIndex + 1}/${this._tts.chunks.length}`);
 
-      try {
-        const voice = this.getPreferredVoice();
-        if (voice) u.voice = voice;
-      } catch (e) {
-        console.warn('[Feedback] failed to set voice for chunk', e);
-      }
+      const utterance = new SpeechSynthesisUtterance(chunk);
 
-      u.rate = this.settings.ttsRate ?? 0.95;
-      u.pitch = this.settings.ttsPitch ?? 1.0;
-      u.volume = 0.95;
+      // ⭐ CRITICAL: Set voice, rate, pitch (was missing!)
+      const voice = this.getPreferredVoice();
+      if (voice) utterance.voice = voice;
+      utterance.rate = this.settings.ttsRate ?? 1.0;
+      utterance.pitch = this.settings.ttsPitch ?? 1.0;
+      utterance.volume = 0.95;
 
-      u.onend = () => {
+      // ⭐ CRITICAL: Store utterance so we can track/stop it
+      this._tts.utterance = utterance;
+
+      utterance.onend = () => {
+        console.log(`[TTS] ✅ Chunk ${this._tts.chunkIndex + 1} finished`);
+        this._tts.chunkIndex++;
+
+        // Check if stopped during speech
         if (this._tts.stopped) {
-          this._tts.utterance = null;
+          console.log('[TTS] Detected stop during chunk completion');
           this._setSpeaking(false);
-
-          // Call completion callback when stopped
           if (this._tts.onAllChunksComplete) {
             const callback = this._tts.onAllChunksComplete;
             this._tts.onAllChunksComplete = null;
@@ -984,19 +987,14 @@ console.log('[Content] Loading - Complete final version...');
           return;
         }
 
-        this._tts.chunkIndex += 1;
-        this._tts.utterance = null;
-
-        if (this._tts.autoContinue && this._tts.chunkIndex < this._tts.chunks.length) {
+        if (this._tts.autoContinue) {
+          // Small delay before next chunk for better pacing
           setTimeout(() => {
-            if (!this._tts.stopped) this._speakNextChunk();
-          }, 200);
+            this._speakNextChunk();
+          }, 50); // 50ms pause between chunks
         } else {
-          this._tts.autoContinue = false;
-          this._tts.utterance = null;
+          console.log('[TTS] autoContinue is false, stopping');
           this._setSpeaking(false);
-
-          // Call completion callback when all chunks finished
           if (this._tts.onAllChunksComplete) {
             const callback = this._tts.onAllChunksComplete;
             this._tts.onAllChunksComplete = null;
@@ -1005,28 +1003,27 @@ console.log('[Content] Loading - Complete final version...');
         }
       };
 
-      u.onerror = (e) => {
-        console.error('[Feedback] TTS chunk error', e);
-        this._tts.utterance = null;
-        this._tts.autoContinue = false;
-        this._setSpeaking(false);
+      utterance.onerror = (error) => {
+        console.error('[TTS] ❌ Chunk error:', error);
+        this._tts.chunkIndex++;
 
-        // Call completion callback on error
-        if (this._tts.onAllChunksComplete) {
-          const callback = this._tts.onAllChunksComplete;
-          this._tts.onAllChunksComplete = null;
-          callback();
+        // Continue to next chunk even on error
+        if (this._tts.autoContinue && !this._tts.stopped) {
+          setTimeout(() => {
+            this._speakNextChunk();
+          }, 100);
+        } else {
+          this._setSpeaking(false);
+          if (this._tts.onAllChunksComplete) {
+            const callback = this._tts.onAllChunksComplete;
+            this._tts.onAllChunksComplete = null;
+            callback();
+          }
         }
       };
 
-      this._tts.utterance = u;
-
-      try {
-        window.speechSynthesis.speak(u);
-      } catch (e) {
-        console.error('[Feedback] speak failed', e);
-        this._setSpeaking(false);
-      }
+      // Speak the utterance
+      window.speechSynthesis.speak(utterance);
     }
 
     _chunkTextToSentences(text, maxChunkChars = 1600) {
@@ -1880,36 +1877,56 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      // Add timeout protection (30 seconds max per block)
-      const TIMEOUT = 30000;
+      console.log('[PageReader] 📖 Starting block read:', block.text.substring(0, 50) + '...');
 
-      return Promise.race([
-        new Promise((resolve) => {
-          // Prefix headings
-          let text = block.text;
-          if (block.isHeading) {
-            const level = block.type.replace('h', '');
-            text = `Heading ${level}. ${text}`;
+      // Prefix headings
+      let text = block.text;
+      if (block.isHeading) {
+        const level = block.type.replace('h', '');
+        text = `Heading ${level}. ${text}`;
+      }
+
+      // Create promise that ONLY resolves when TTS finishes or errors
+      return new Promise((resolve, reject) => {
+        let resolved = false;
+
+        // Timeout protection (30 seconds max per block)
+        const timeout = setTimeout(() => {
+          if (!resolved) {
+            resolved = true;
+            console.warn('[PageReader] ⏱️ Block reading timeout after 30s');
+            resolve();
           }
+        }, 30000);
 
+        try {
           this.tts.speak(text, {
             onEnd: () => {
-              console.log('[PageReader] Block reading completed');
-              resolve();
+              if (!resolved) {
+                resolved = true;
+                console.log('[PageReader] ✅ Block reading completed');
+                clearTimeout(timeout);
+                resolve();
+              }
             },
             onError: (error) => {
-              console.error('[PageReader] TTS error:', error);
-              resolve();
+              if (!resolved) {
+                resolved = true;
+                console.error('[PageReader] ❌ TTS error:', error);
+                clearTimeout(timeout);
+                resolve(); // Resolve anyway to continue
+              }
             }
           });
-        }),
-        new Promise((resolve) => {
-          setTimeout(() => {
-            console.warn('[PageReader] Block reading timeout after 30s');
+        } catch (error) {
+          if (!resolved) {
+            resolved = true;
+            console.error('[PageReader] ❌ Exception calling TTS:', error);
+            clearTimeout(timeout);
             resolve();
-          }, TIMEOUT);
-        })
-      ]);
+          }
+        }
+      });
     }
 
     /**
@@ -2789,10 +2806,10 @@ console.log('[Content] Loading - Complete final version...');
         // Create TTS adapter for PageReader
         const ttsAdapter = {
           speak: (text, options = {}) => {
-            console.log('[TTS Adapter] Speaking:', text.substring(0, 50) + '...');
+            console.log('[TTS Adapter] 🔊 Speaking:', text.substring(0, 50) + '...');
 
             if (!this.feedback) {
-              console.error('[TTS Adapter] No feedback system available');
+              console.error('[TTS Adapter] ❌ No feedback system available');
               if (options.onError) {
                 options.onError(new Error('TTS not available'));
               }
@@ -2800,15 +2817,16 @@ console.log('[Content] Loading - Complete final version...');
             }
 
             try {
-              // Wrap callback-based speakLong into the interface PageReader expects
+              // CRITICAL: The callback MUST be called when speech actually finishes
+              // speakLong should call the callback when TTS completes
               this.feedback.speakLong(text, () => {
-                console.log('[TTS Adapter] Speech completed');
+                console.log('[TTS Adapter] ✅ Speech completed callback fired');
                 if (options.onEnd) {
                   options.onEnd();
                 }
               });
             } catch (error) {
-              console.error('[TTS Adapter] Speech error:', error);
+              console.error('[TTS Adapter] ❌ Speech error:', error);
               if (options.onError) {
                 options.onError(error);
               }
@@ -2816,7 +2834,7 @@ console.log('[Content] Loading - Complete final version...');
           },
 
           stop: () => {
-            console.log('[TTS Adapter] Stopping speech');
+            console.log('[TTS Adapter] 🛑 Stopping speech');
             if (this.feedback) {
               this.feedback.stopSpeech();
             }
