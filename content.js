@@ -891,6 +891,59 @@ console.log('[Content] Loading - Complete final version...');
     }
 
     /**
+     * Speak a single block of text without interrupting ongoing speech
+     * Used by PageReader for continuous reading
+     */
+    speakBlock(text, onComplete) {
+      if (!text) {
+        if (onComplete) onComplete();
+        return;
+      }
+
+      console.log('[Feedback] 🗣️ speakBlock:', text.substring(0, 50) + '...');
+
+      // Ensure voices are loaded
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        console.warn('[Feedback] No voices available for speakBlock');
+        // Try to trigger voice loading
+        window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.onvoiceschanged = null;
+          this.speakBlock(text, onComplete); // Retry
+        };
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+
+      // Set voice preferences
+      const voice = this.getPreferredVoice();
+      if (voice) utterance.voice = voice;
+      utterance.rate = this.settings.ttsRate ?? 1.0;
+      utterance.pitch = this.settings.ttsPitch ?? 1.0;
+      utterance.volume = 0.95;
+
+      utterance.onend = () => {
+        console.log('[Feedback] ✅ speakBlock completed');
+        if (onComplete) onComplete();
+      };
+
+      utterance.onerror = (error) => {
+        console.error('[Feedback] ❌ speakBlock error:', error);
+        // Call completion even on error to continue reading
+        if (onComplete) onComplete();
+      };
+
+      // Speak without stopping existing speech
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.error('[Feedback] speakBlock exception:', e);
+        if (onComplete) onComplete();
+      }
+    }
+
+    /**
      * IMPROVED: Force stop ALL speech
      */
     stopSpeech() {
@@ -1900,9 +1953,7 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      console.log('[PageReader] 📖 Starting block read:', block.text.substring(0, 50) + '...');
-
-      const startTime = Date.now();
+      console.log('[PageReader] 📖 Reading block:', block.text.substring(0, 50) + '...');
 
       // Prefix headings
       let text = block.text;
@@ -1911,56 +1962,45 @@ console.log('[Content] Loading - Complete final version...');
         text = `Heading ${level}. ${text}`;
       }
 
-      // Minimum duration to prevent rapid jumping (1 second per block minimum)
-      const MIN_BLOCK_DURATION = 1000;
-
-      // Create promise that ONLY resolves when TTS finishes or errors
-      return new Promise((resolve, reject) => {
+      // Create promise that resolves when TTS finishes
+      return new Promise((resolve) => {
         let resolved = false;
-
-        const safeResolve = () => {
-          if (resolved) return;
-          resolved = true;
-
-          const elapsed = Date.now() - startTime;
-          const remaining = MIN_BLOCK_DURATION - elapsed;
-
-          if (remaining > 0) {
-            // Block completed too fast - enforce minimum duration
-            console.warn(`[PageReader] ⚠️ Block completed in ${elapsed}ms - waiting ${remaining}ms more`);
-            setTimeout(() => {
-              clearTimeout(timeout);
-              resolve();
-            }, remaining);
-          } else {
-            clearTimeout(timeout);
-            resolve();
-          }
-        };
 
         // Timeout protection (30 seconds max per block)
         const timeout = setTimeout(() => {
           if (!resolved) {
+            resolved = true;
             console.warn('[PageReader] ⏱️ Block reading timeout after 30s');
-            safeResolve();
+            resolve();
           }
         }, 30000);
 
         try {
           this.tts.speak(text, {
             onEnd: () => {
-              console.log('[PageReader] ✅ Block reading completed');
-              safeResolve();
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                console.log('[PageReader] ✅ Block completed naturally');
+                resolve();
+              }
             },
             onError: (error) => {
-              console.error('[PageReader] ❌ TTS error:', error);
-              // Still enforce minimum duration even on error
-              safeResolve();
+              if (!resolved) {
+                resolved = true;
+                clearTimeout(timeout);
+                console.error('[PageReader] ❌ TTS error:', error);
+                resolve(); // Continue to next block even on error
+              }
             }
           });
         } catch (error) {
-          console.error('[PageReader] ❌ Exception calling TTS:', error);
-          safeResolve();
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            console.error('[PageReader] ❌ Exception calling TTS:', error);
+            resolve();
+          }
         }
       });
     }
@@ -2842,7 +2882,7 @@ console.log('[Content] Loading - Complete final version...');
         // Create TTS adapter for PageReader
         const ttsAdapter = {
           speak: (text, options = {}) => {
-            console.log('[TTS Adapter] 🔊 Speaking:', text.substring(0, 50) + '...');
+            console.log('[TTS Adapter] 🔊 Speaking block:', text.substring(0, 50) + '...');
 
             if (!this.feedback) {
               console.error('[TTS Adapter] ❌ No feedback system available');
@@ -2853,10 +2893,10 @@ console.log('[Content] Loading - Complete final version...');
             }
 
             try {
-              // CRITICAL: The callback MUST be called when speech actually finishes
-              // speakLong should call the callback when TTS completes
-              this.feedback.speakLong(text, () => {
-                console.log('[TTS Adapter] ✅ Speech completed callback fired');
+              // Use speakBlock instead of speakLong to avoid stopSpeech() resets
+              // speakBlock queues utterances without interrupting ongoing speech
+              this.feedback.speakBlock(text, () => {
+                console.log('[TTS Adapter] ✅ Block speech completed');
                 if (options.onEnd) {
                   options.onEnd();
                 }
