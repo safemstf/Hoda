@@ -178,6 +178,21 @@ export const INTENT_SCHEMAS = {
   },
 
   // ============================================================================
+  // TUTORIAL: Play onboarding tutorial
+  // ============================================================================
+  tutorial: {
+    description: 'Play tutorial command',
+    slots: [],
+    examples: [
+      'play tutorial',
+      'start tutorial',
+      'show tutorial',
+      'tutorial',
+      'replay tutorial'
+    ]
+  },
+
+  // ============================================================================
   // FORM: Form interactions
   // ============================================================================
   form_action: {
@@ -227,6 +242,7 @@ export const INTENT_SCHEMAS = {
 export const INTENT_PRIORITIES = {
   stop: 100,        // Always check stop first
   help: 90,
+  tutorial: 85,     // Tutorial should be easily accessible
   navigate: 80,     // Navigation is common
   read: 70,
   zoom: 60,

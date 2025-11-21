@@ -25,6 +25,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true; // Keep channel open for async response
   }
 
+  // Handle toggle icon update from popup - Author: arkaan
+  if (msg.type === 'UPDATE_TOGGLE_ICON') {
+    (async () => {
+      await setToggleState(msg.enabled);
+      await updateIcon(msg.enabled);
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+
   // Handle other messages (future commands, etc.)
   return false;
 });
@@ -195,7 +205,7 @@ chrome.runtime.onStartup.addListener(() => {
   console.log('[Background] Extension startup');
 });
 
-chrome.runtime.onInstalled.addListener((details) => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   console.log('[Background] Extension installed/updated:', details.reason);
   
   // Initialize storage on install
@@ -205,9 +215,14 @@ chrome.runtime.onInstalled.addListener((details) => {
       stats: {
         totalCommands: 0,
         recognizedCommands: 0
-      }
+      },
+      extensionEnabled: true // Default to enabled on install - Author: arkaan
     });
   }
+  
+  // Set icon based on saved state - Author: arkaan
+  const state = await getToggleState();
+  await updateIcon(state);
 });
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
@@ -330,3 +345,79 @@ async function handleRestrictedPageZoom(msg, sender, sendResponse) {
 }
 
 console.log('[Background] Ready');
+
+// ============================================================================
+// EXTENSION TOGGLE - Simple on/off control
+// Author: arkaan
+// ============================================================================
+
+// Get current toggle state from storage
+async function getToggleState() {
+  const result = await chrome.storage.local.get(['extensionEnabled']);
+  return result.extensionEnabled !== false; // Default to true if not set
+}
+
+// Save toggle state to storage
+async function setToggleState(enabled) {
+  await chrome.storage.local.set({ extensionEnabled: enabled });
+  console.log('[Background] Extension toggled:', enabled ? 'ON' : 'OFF');
+}
+
+// Update icon based on state - Author: arkaan
+async function updateIcon(enabled) {
+  const iconPath = 'icons/icon48.png'; // Same icon for now
+  await chrome.action.setIcon({ path: iconPath });
+  await chrome.action.setTitle({ 
+    title: enabled ? 'Hoda - Active (Click to turn OFF)' : 'Hoda - Inactive (Click to turn ON)' 
+  });
+  
+  // Set badge to show state - Author: arkaan
+  if (enabled) {
+    await chrome.action.setBadgeText({ text: 'ON' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#10b981' }); // Green
+  } else {
+    await chrome.action.setBadgeText({ text: 'OFF' });
+    await chrome.action.setBadgeBackgroundColor({ color: '#ef4444' }); // Red
+  }
+}
+
+// Toggle extension on/off
+async function toggleExtension() {
+  const currentState = await getToggleState();
+  const newState = !currentState;
+  
+  await setToggleState(newState);
+  await updateIcon(newState);
+  
+  // Send message to popup if it's open
+  try {
+    chrome.runtime.sendMessage({ 
+      type: 'TOGGLE_STATE_CHANGED', 
+      enabled: newState 
+    });
+  } catch (e) {
+    // Popup might not be open, that's OK
+  }
+  
+  return newState;
+}
+
+// Handle icon click - toggle extension
+chrome.action.onClicked.addListener(async (tab) => {
+  console.log('[Background] Icon clicked, toggling extension');
+  await toggleExtension();
+});
+
+// Handle keyboard shortcut - toggle extension
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === 'toggle-extension') {
+    console.log('[Background] Keyboard shortcut pressed, toggling extension');
+    await toggleExtension();
+  }
+});
+
+// Load saved state on startup and set icon
+chrome.runtime.onStartup.addListener(async () => {
+  const state = await getToggleState();
+  await updateIcon(state);
+});

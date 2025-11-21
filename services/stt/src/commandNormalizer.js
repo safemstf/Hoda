@@ -407,6 +407,22 @@ export class CommandNormalizer {
             );
         }
 
+        // ========================================================================
+        // TUTORIAL - Author: arkaan
+        // ========================================================================
+
+        if (lowerExample.includes('tutorial')) {
+            variations.push(
+                'play tutorial',
+                'start tutorial',
+                'show tutorial',
+                'tutorial',
+                'replay tutorial',
+                'run tutorial',
+                'begin tutorial'
+            );
+        }
+
         // Deduplicate
         const seen = new Set();
         const deduped = [];

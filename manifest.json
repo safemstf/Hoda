@@ -46,5 +46,13 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": false
+  },
+  "commands": {
+    "toggle-extension": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "Toggle Hoda extension on/off"
+    }
   }
 }
