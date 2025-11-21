@@ -255,6 +255,7 @@ console.log('[Content] Loading - Complete final version...');
     }
   });
 
+
   // ============================================================================
   // COMMAND QUEUE (Sequential Processing + COOLDOWN)
   // ============================================================================
@@ -1017,6 +1018,908 @@ console.log('[Content] Loading - Complete final version...');
   // ============================================================================
   // COMMAND EXECUTOR
   // ============================================================================
+  //supporting classes
+  class ReadingStateManager {
+    constructor(options = {}) {
+      this.contentBlocks = [];
+      this.currentIndex = 0;
+      this.state = 'idle'; // idle, reading, paused, stopped
+      this.pausedAt = null;
+
+      console.log('[ReadingStateManager] Initialized');
+    }
+
+    /**
+     * Load content blocks for reading
+     */
+    loadContent(blocks) {
+      this.contentBlocks = blocks || [];
+      this.currentIndex = 0;
+      this.state = 'idle';
+      this.pausedAt = null;
+
+      console.log(`[ReadingStateManager] Loaded ${this.contentBlocks.length} blocks`);
+    }
+
+    /**
+     * Start reading from beginning
+     */
+    startReading() {
+      if (this.contentBlocks.length === 0) {
+        console.warn('[ReadingStateManager] No content loaded');
+        return false;
+      }
+
+      this.currentIndex = 0;
+      this.state = 'reading';
+      this.pausedAt = null;
+
+      console.log('[ReadingStateManager] Started reading');
+      return true;
+    }
+
+    /**
+     * Start reading from current scroll position
+     */
+    startFromCurrentPosition() {
+      if (this.contentBlocks.length === 0) {
+        return false;
+      }
+
+      // Find first block that's visible or below current scroll
+      const scrollTop = window.scrollY;
+      const index = this.contentBlocks.findIndex(
+        block => block.position.top >= scrollTop - 100
+      );
+
+      if (index >= 0) {
+        this.currentIndex = index;
+      } else {
+        this.currentIndex = 0;
+      }
+
+      this.state = 'reading';
+      this.pausedAt = null;
+
+      console.log(`[ReadingStateManager] Starting from position ${this.currentIndex}`);
+      return true;
+    }
+
+    /**
+     * Pause reading at current position
+     */
+    pause() {
+      if (this.state !== 'reading') {
+        return false;
+      }
+
+      this.state = 'paused';
+      this.pausedAt = this.currentIndex;
+
+      console.log(`[ReadingStateManager] Paused at index ${this.pausedAt}`);
+      return true;
+    }
+
+    /**
+     * Resume reading from paused position
+     */
+    resume() {
+      if (this.state !== 'paused' || this.pausedAt === null) {
+        return false;
+      }
+
+      this.currentIndex = this.pausedAt;
+      this.state = 'reading';
+      this.pausedAt = null;
+
+      console.log(`[ReadingStateManager] Resumed from index ${this.currentIndex}`);
+      return true;
+    }
+
+    /**
+     * Stop reading completely
+     */
+    stop() {
+      this.state = 'stopped';
+      this.pausedAt = null;
+
+      console.log('[ReadingStateManager] Stopped reading');
+      return true;
+    }
+
+    /**
+     * Get current block being read
+     */
+    getCurrentBlock() {
+      if (this.currentIndex >= this.contentBlocks.length) {
+        return null;
+      }
+
+      return this.contentBlocks[this.currentIndex];
+    }
+
+    /**
+     * Move to next block
+     */
+    nextBlock() {
+      if (this.currentIndex < this.contentBlocks.length - 1) {
+        this.currentIndex++;
+        console.log(`[ReadingStateManager] Next block: ${this.currentIndex}`);
+        return this.getCurrentBlock();
+      }
+
+      return null;
+    }
+
+    /**
+     * Move to previous block
+     */
+    previousBlock() {
+      if (this.currentIndex > 0) {
+        this.currentIndex--;
+        console.log(`[ReadingStateManager] Previous block: ${this.currentIndex}`);
+        return this.getCurrentBlock();
+      }
+
+      return null;
+    }
+
+    /**
+     * Move to next paragraph (skip headings)
+     */
+    nextParagraph() {
+      let index = this.currentIndex + 1;
+
+      while (index < this.contentBlocks.length) {
+        const block = this.contentBlocks[index];
+        if (block.type === 'p' || !block.isHeading) {
+          this.currentIndex = index;
+          console.log(`[ReadingStateManager] Next paragraph: ${this.currentIndex}`);
+          return block;
+        }
+        index++;
+      }
+
+      console.log('[ReadingStateManager] No next paragraph found');
+      return null;
+    }
+
+    /**
+     * Move to previous paragraph (skip headings)
+     */
+    previousParagraph() {
+      let index = this.currentIndex - 1;
+
+      while (index >= 0) {
+        const block = this.contentBlocks[index];
+        if (block.type === 'p' || !block.isHeading) {
+          this.currentIndex = index;
+          console.log(`[ReadingStateManager] Previous paragraph: ${this.currentIndex}`);
+          return block;
+        }
+        index--;
+      }
+
+      console.log('[ReadingStateManager] No previous paragraph found');
+      return null;
+    }
+
+    /**
+     * Check if at end of content
+     */
+    isAtEnd() {
+      return this.currentIndex >= this.contentBlocks.length - 1;
+    }
+
+    /**
+     * Check if at beginning of content
+     */
+    isAtBeginning() {
+      return this.currentIndex === 0;
+    }
+
+    /**
+     * Get reading progress
+     */
+    getProgress() {
+      if (this.contentBlocks.length === 0) {
+        return {
+          current: 0,
+          total: 0,
+          percentage: 0
+        };
+      }
+
+      return {
+        current: this.currentIndex + 1,
+        total: this.contentBlocks.length,
+        percentage: Math.round((this.currentIndex / this.contentBlocks.length) * 100)
+      };
+    }
+
+    /**
+     * Get current state info
+     */
+    getState() {
+      return {
+        state: this.state,
+        currentIndex: this.currentIndex,
+        pausedAt: this.pausedAt,
+        hasContent: this.contentBlocks.length > 0,
+        progress: this.getProgress()
+      };
+    }
+
+    /**
+     * Scroll to current block
+     */
+    scrollToCurrentBlock() {
+      const block = this.getCurrentBlock();
+      if (block && block.element) {
+        block.element.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+        return true;
+      }
+      return false;
+    }
+
+    /**
+     * Highlight current block visually
+     */
+    highlightCurrentBlock() {
+      // Remove previous highlights
+      document.querySelectorAll('.hoda-reading-highlight').forEach(el => {
+        el.classList.remove('hoda-reading-highlight');
+      });
+
+      // Add highlight to current block
+      const block = this.getCurrentBlock();
+      if (block && block.element) {
+        block.element.classList.add('hoda-reading-highlight');
+      }
+    }
+
+    /**
+     * Clear all highlights
+     */
+    clearHighlights() {
+      document.querySelectorAll('.hoda-reading-highlight').forEach(el => {
+        el.classList.remove('hoda-reading-highlight');
+      });
+    }
+
+    /**
+     * Reset to initial state
+     */
+    reset() {
+      this.currentIndex = 0;
+      this.state = 'idle';
+      this.pausedAt = null;
+      this.clearHighlights();
+
+      console.log('[ReadingStateManager] Reset');
+    }
+  }
+
+
+  class ContentExtractor {
+    constructor(options = {}) {
+      this.config = {
+        minParagraphLength: options.minParagraphLength || 20,
+        minWordsPerElement: options.minWordsPerElement || 5,
+        excludeSelectors: options.excludeSelectors || [
+          'nav', 'header', 'footer', 'aside', '.ad', '.advertisement',
+          '.sidebar', '.menu', '.navigation', '.cookie-notice',
+          '[role="navigation"]', '[role="banner"]', '[role="complementary"]',
+          '.social-share', '.comments', '.related-posts', 'script', 'style'
+        ],
+        contentSelectors: options.contentSelectors || [
+          'article', 'main', '[role="main"]', '.content', '.post-content',
+          '.article-content', '.entry-content', '.post-body', '.story-body'
+        ]
+      };
+
+      console.log('[ContentExtractor] Initialized', this.config);
+    }
+
+    /**
+     * Extract main readable content from page
+     * Returns array of content blocks with metadata
+     */
+    extractContent() {
+      console.log('[ContentExtractor] Extracting content from page...');
+
+      // Try semantic content containers first
+      let contentRoot = this.findContentRoot();
+
+      if (!contentRoot) {
+        console.log('[ContentExtractor] No semantic container found, using body');
+        contentRoot = document.body;
+      }
+
+      // Extract text blocks
+      const blocks = this.extractTextBlocks(contentRoot);
+
+      console.log(`[ContentExtractor] Extracted ${blocks.length} content blocks`);
+
+      return blocks;
+    }
+
+    /**
+     * Find the main content container using semantic HTML
+     */
+    findContentRoot() {
+      // Try each content selector in priority order
+      for (const selector of this.config.contentSelectors) {
+        const element = document.querySelector(selector);
+        if (element && this.isValidContentContainer(element)) {
+          console.log(`[ContentExtractor] Found content root: ${selector}`);
+          return element;
+        }
+      }
+
+      return null;
+    }
+
+    /**
+     * Check if element is a valid content container
+     */
+    isValidContentContainer(element) {
+      if (!element) return false;
+
+      // Must have reasonable text content
+      const text = element.textContent || '';
+      const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+
+      return wordCount >= this.config.minWordsPerElement * 3;
+    }
+
+    /**
+     * Extract text blocks from container
+     */
+    extractTextBlocks(container) {
+      const blocks = [];
+
+      // Get all text-bearing elements
+      const elements = this.getTextElements(container);
+
+      for (const element of elements) {
+        // Skip excluded elements
+        if (this.shouldExclude(element)) {
+          continue;
+        }
+
+        const block = this.createContentBlock(element);
+        if (block) {
+          blocks.push(block);
+        }
+      }
+
+      return blocks;
+    }
+
+    /**
+     * Get all elements that contain readable text
+     */
+    getTextElements(container) {
+      const elements = [];
+
+      // Target paragraphs, headings, list items
+      const selectors = [
+        'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'li', 'blockquote', 'td', 'th', 'dd', 'dt',
+        'figcaption', 'caption'
+      ];
+
+      for (const selector of selectors) {
+        const found = container.querySelectorAll(selector);
+        elements.push(...Array.from(found));
+      }
+
+      return elements;
+    }
+
+    /**
+     * Check if element should be excluded
+     */
+    shouldExclude(element) {
+      if (!element) return true;
+
+      // Check if element or parent matches exclude selectors
+      for (const selector of this.config.excludeSelectors) {
+        if (element.matches(selector) || element.closest(selector)) {
+          return true;
+        }
+      }
+
+      // Check if hidden
+      const style = window.getComputedStyle(element);
+      if (style.display === 'none' || style.visibility === 'hidden') {
+        return true;
+      }
+
+      return false;
+    }
+
+    /**
+     * Create content block from element
+     */
+    createContentBlock(element) {
+      const text = this.extractText(element);
+
+      if (!text || text.length < this.config.minParagraphLength) {
+        return null;
+      }
+
+      return {
+        text: text,
+        type: element.tagName.toLowerCase(),
+        element: element,
+        isHeading: /^h[1-6]$/i.test(element.tagName),
+        position: this.getElementPosition(element)
+      };
+    }
+
+    /**
+     * Extract clean text from element
+     */
+    extractText(element) {
+      if (!element) return '';
+
+      let text = '';
+
+      // Special handling for images - use alt text
+      if (element.tagName === 'IMG') {
+        const alt = element.getAttribute('alt');
+        return alt ? `Image: ${alt}` : '';
+      }
+
+      // Get text content
+      text = element.textContent || '';
+
+      // Clean up whitespace
+      text = text.replace(/\s+/g, ' ').trim();
+
+      // Handle links naturally - don't announce "link" constantly
+      // Just read the link text in flow
+
+      return text;
+    }
+
+    /**
+     * Get element's position on page
+     */
+    getElementPosition(element) {
+      const rect = element.getBoundingClientRect();
+      return {
+        top: rect.top + window.scrollY,
+        left: rect.left + window.scrollX,
+        bottom: rect.bottom + window.scrollY,
+        isVisible: this.isElementVisible(element)
+      };
+    }
+
+    /**
+     * Check if element is currently visible in viewport
+     */
+    isElementVisible(element) {
+      const rect = element.getBoundingClientRect();
+      return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= window.innerHeight &&
+        rect.right <= window.innerWidth
+      );
+    }
+
+    /**
+     * Extract content starting from current scroll position
+     */
+    extractFromCurrentPosition() {
+      const blocks = this.extractContent();
+      const scrollTop = window.scrollY;
+
+      // Filter blocks that are at or below current scroll position
+      return blocks.filter(block => block.position.top >= scrollTop - 100);
+    }
+
+    /**
+     * Get summary of extracted content
+     */
+    getContentSummary() {
+      const blocks = this.extractContent();
+
+      return {
+        totalBlocks: blocks.length,
+        paragraphs: blocks.filter(b => b.type === 'p').length,
+        headings: blocks.filter(b => b.isHeading).length,
+        totalWords: blocks.reduce((sum, b) => {
+          return sum + b.text.split(/\s+/).length;
+        }, 0),
+        estimatedReadingTime: this.estimateReadingTime(blocks)
+      };
+    }
+
+    /**
+     * Estimate reading time in seconds
+     * Average reading speed: 200 words per minute
+     */
+    estimateReadingTime(blocks) {
+      const totalWords = blocks.reduce((sum, b) => {
+        return sum + b.text.split(/\s+/).length;
+      }, 0);
+
+      return Math.ceil(totalWords / 200 * 60); // seconds
+    }
+  }
+
+
+  class PageReader {
+    constructor(options = {}) {
+      this.extractor = new ContentExtractor(options.extraction);
+      this.stateManager = new ReadingStateManager();
+
+      // TTS will be injected
+      this.tts = null;
+
+      // Reading queue
+      this.readingQueue = [];
+      this.isProcessingQueue = false;
+      this.shouldStopQueue = false;
+
+      // Configuration
+      this.config = {
+        pauseBetweenBlocks: options.pauseBetweenBlocks || 500, // ms
+        scrollToBlock: options.scrollToBlock !== false,
+        highlightBlock: options.highlightBlock !== false,
+        autoScroll: options.autoScroll !== false
+      };
+
+      console.log('[PageReader] Initialized');
+    }
+
+    /**
+     * Set TTS engine
+     */
+    setTTS(tts) {
+      this.tts = tts;
+      console.log('[PageReader] TTS engine connected');
+    }
+
+    /**
+     * Start reading page from top
+     */
+    async readPage() {
+      console.log('[PageReader] Read page requested');
+
+      // Extract content
+      const blocks = this.extractor.extractContent();
+
+      if (blocks.length === 0) {
+        return this.announceError('No readable content on this page');
+      }
+
+      // Load content into state manager
+      this.stateManager.loadContent(blocks);
+      this.stateManager.startReading();
+
+      // Announce start
+      await this.announce('Reading page');
+
+      // Start reading blocks
+      await this.processReadingQueue();
+
+      return { success: true, blocksCount: blocks.length };
+    }
+
+    /**
+     * Read from current scroll position
+     */
+    async readFromHere() {
+      console.log('[PageReader] Read from here requested');
+
+      // Extract content from current position
+      const blocks = this.extractor.extractFromCurrentPosition();
+
+      if (blocks.length === 0) {
+        return this.announceError('No readable content from this position');
+      }
+
+      this.stateManager.loadContent(blocks);
+      this.stateManager.startReading();
+
+      await this.announce('Reading from here');
+      await this.processReadingQueue();
+
+      return { success: true, blocksCount: blocks.length };
+    }
+
+    /**
+     * Pause reading
+     */
+    async pauseReading() {
+      console.log('[PageReader] Pause requested');
+
+      if (this.stateManager.state !== 'reading') {
+        return { success: false, reason: 'not-reading' };
+      }
+
+      this.shouldStopQueue = true;
+      this.stateManager.pause();
+
+      // Stop TTS
+      if (this.tts) {
+        this.tts.stop();
+      }
+
+      await this.announce('Paused');
+
+      return { success: true };
+    }
+
+    /**
+     * Resume reading
+     */
+    async resumeReading() {
+      console.log('[PageReader] Resume requested');
+
+      if (this.stateManager.state !== 'paused') {
+        return { success: false, reason: 'not-paused' };
+      }
+
+      this.stateManager.resume();
+      await this.announce('Resuming');
+
+      this.shouldStopQueue = false;
+      await this.processReadingQueue();
+
+      return { success: true };
+    }
+
+    /**
+     * Stop reading completely
+     */
+    async stopReading() {
+      console.log('[PageReader] Stop requested');
+
+      this.shouldStopQueue = true;
+      this.stateManager.stop();
+      this.stateManager.clearHighlights();
+
+      // Stop TTS
+      if (this.tts) {
+        this.tts.stop();
+      }
+
+      return { success: true };
+    }
+
+    /**
+     * Navigate to next paragraph
+     */
+    async nextParagraph() {
+      console.log('[PageReader] Next paragraph requested');
+
+      const block = this.stateManager.nextParagraph();
+
+      if (!block) {
+        if (this.stateManager.isAtEnd()) {
+          return this.announceError('End of page');
+        }
+        return this.announceError('No next paragraph');
+      }
+
+      // If reading, continue with new position
+      if (this.stateManager.state === 'reading') {
+        this.shouldStopQueue = true;
+        if (this.tts) {
+          this.tts.stop();
+        }
+
+        // Small delay then continue
+        await this.sleep(300);
+        this.shouldStopQueue = false;
+        await this.processReadingQueue();
+      } else {
+        // Just highlight and scroll
+        if (this.config.scrollToBlock) {
+          this.stateManager.scrollToCurrentBlock();
+        }
+        if (this.config.highlightBlock) {
+          this.stateManager.highlightCurrentBlock();
+        }
+      }
+
+      return { success: true };
+    }
+
+    /**
+     * Navigate to previous paragraph
+     */
+    async previousParagraph() {
+      console.log('[PageReader] Previous paragraph requested');
+
+      const block = this.stateManager.previousParagraph();
+
+      if (!block) {
+        if (this.stateManager.isAtBeginning()) {
+          return this.announceError('At beginning');
+        }
+        return this.announceError('No previous paragraph');
+      }
+
+      // If reading, continue with new position
+      if (this.stateManager.state === 'reading') {
+        this.shouldStopQueue = true;
+        if (this.tts) {
+          this.tts.stop();
+        }
+
+        await this.sleep(300);
+        this.shouldStopQueue = false;
+        await this.processReadingQueue();
+      } else {
+        if (this.config.scrollToBlock) {
+          this.stateManager.scrollToCurrentBlock();
+        }
+        if (this.config.highlightBlock) {
+          this.stateManager.highlightCurrentBlock();
+        }
+      }
+
+      return { success: true };
+    }
+
+    /**
+     * Process the reading queue
+     */
+    async processReadingQueue() {
+      if (this.isProcessingQueue) {
+        console.log('[PageReader] Already processing queue');
+        return;
+      }
+
+      this.isProcessingQueue = true;
+      this.shouldStopQueue = false;
+
+      while (this.stateManager.state === 'reading' && !this.shouldStopQueue) {
+        const block = this.stateManager.getCurrentBlock();
+
+        if (!block) {
+          // Reached end
+          await this.announce('End of page');
+          this.stateManager.stop();
+          break;
+        }
+
+        // Scroll to block
+        if (this.config.scrollToBlock) {
+          this.stateManager.scrollToCurrentBlock();
+        }
+
+        // Highlight block
+        if (this.config.highlightBlock) {
+          this.stateManager.highlightCurrentBlock();
+        }
+
+        // Read block
+        await this.readBlock(block);
+
+        // Check if should stop
+        if (this.shouldStopQueue) {
+          break;
+        }
+
+        // Pause between blocks
+        await this.sleep(this.config.pauseBetweenBlocks);
+
+        // Move to next block
+        const nextBlock = this.stateManager.nextBlock();
+        if (!nextBlock) {
+          // Reached end
+          await this.announce('End of page');
+          this.stateManager.stop();
+          break;
+        }
+      }
+
+      this.isProcessingQueue = false;
+      this.stateManager.clearHighlights();
+    }
+
+    /**
+     * Read a single content block
+     */
+    async readBlock(block) {
+      if (!this.tts || !block) {
+        return;
+      }
+
+      return new Promise((resolve) => {
+        // Prefix headings
+        let text = block.text;
+        if (block.isHeading) {
+          const level = block.type.replace('h', '');
+          text = `Heading ${level}. ${text}`;
+        }
+
+        this.tts.speak(text, {
+          onEnd: () => resolve(),
+          onError: (error) => {
+            console.error('[PageReader] TTS error:', error);
+            resolve();
+          }
+        });
+      });
+    }
+
+    /**
+     * Announce message via TTS
+     */
+    async announce(message) {
+      if (!this.tts) {
+        console.log(`[PageReader] Announce: ${message}`);
+        return;
+      }
+
+      return new Promise((resolve) => {
+        this.tts.speak(message, {
+          priority: 'high',
+          onEnd: () => resolve(),
+          onError: () => resolve()
+        });
+      });
+    }
+
+    /**
+     * Announce error message
+     */
+    async announceError(message) {
+      await this.announce(message);
+      return { success: false, error: message };
+    }
+
+    /**
+     * Sleep utility
+     */
+    sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Get current reading state
+     */
+    getState() {
+      return this.stateManager.getState();
+    }
+
+    /**
+     * Get content summary
+     */
+    getContentSummary() {
+      return this.extractor.getContentSummary();
+    }
+
+    /**
+     * Stop all activity and reset
+     */
+    async reset() {
+      this.shouldStopQueue = true;
+
+      if (this.tts) {
+        this.tts.stop();
+      }
+
+      this.stateManager.reset();
+      this.readingQueue = [];
+      this.isProcessingQueue = false;
+
+      console.log('[PageReader] Reset complete');
+    }
+  }
+
   class CommandExecutor {
     constructor(feedback) {
       this.feedback = feedback;
@@ -1817,12 +2720,9 @@ console.log('[Content] Loading - Complete final version...');
       }
 
       try {
-        // Dynamically import PageReader modules
-        const { PageReader } = await import(chrome.runtime.getURL('services/page-reader/page-reader.js'));
-        const { ContentExtractor } = await import(chrome.runtime.getURL('services/page-reader/content-extractor.js'));
-        const { ReadingStateManager } = await import(chrome.runtime.getURL('services/page-reader/reading-state-manager.js'));
+        console.log('[Executor] Initializing PageReader');
 
-        // Create PageReader instance
+        // Create PageReader instance (classes are in same file now)
         this.pageReader = new PageReader({
           scrollToBlock: true,
           highlightBlock: true,
@@ -1832,20 +2732,34 @@ console.log('[Content] Loading - Complete final version...');
         // Create TTS adapter for PageReader
         const ttsAdapter = {
           speak: (text, options = {}) => {
-            return new Promise((resolve, reject) => {
-              if (!this.feedback) {
-                reject(new Error('TTS not available'));
-                return;
-              }
+            console.log('[TTS Adapter] Speaking:', text.substring(0, 50) + '...');
 
-              // Use speakLong for better handling
+            if (!this.feedback) {
+              console.error('[TTS Adapter] No feedback system available');
+              if (options.onError) {
+                options.onError(new Error('TTS not available'));
+              }
+              return;
+            }
+
+            try {
+              // Wrap callback-based speakLong into the interface PageReader expects
               this.feedback.speakLong(text, () => {
-                if (options.onEnd) options.onEnd();
-                resolve();
+                console.log('[TTS Adapter] Speech completed');
+                if (options.onEnd) {
+                  options.onEnd();
+                }
               });
-            });
+            } catch (error) {
+              console.error('[TTS Adapter] Speech error:', error);
+              if (options.onError) {
+                options.onError(error);
+              }
+            }
           },
+
           stop: () => {
+            console.log('[TTS Adapter] Stopping speech');
             if (this.feedback) {
               this.feedback.stopSpeech();
             }
@@ -1854,10 +2768,10 @@ console.log('[Content] Loading - Complete final version...');
 
         this.pageReader.setTTS(ttsAdapter);
 
-        console.log('[Executor] PageReader initialized');
+        console.log('[Executor] ✅ PageReader initialized with TTS adapter');
         return this.pageReader;
       } catch (error) {
-        console.error('[Executor] Failed to initialize PageReader:', error);
+        console.error('[Executor] ❌ Failed to initialize PageReader:', error);
         throw error;
       }
     }
@@ -1866,38 +2780,46 @@ console.log('[Content] Loading - Complete final version...');
       const action = (slots.action || '').toLowerCase();
       const scope = (slots.scope || slots.target || '').toLowerCase();
 
-      console.log('[Executor] doRead:', { action, scope, slots });
+      console.log('[Executor] doRead called:', { action, scope, slots });
 
       try {
         // Initialize PageReader if needed
         const reader = await this.initializePageReader();
+        console.log('[Executor] PageReader ready');
 
         // Handle stop command
         if (action === 'stop') {
+          console.log('[Executor] Stopping reading');
           await reader.stopReading();
+          this.speakShort('Stopped reading');
           return { success: true, message: 'Stopped reading' };
         }
 
         // Handle pause command
         if (action === 'pause') {
+          console.log('[Executor] Pausing reading');
           const result = await reader.pauseReading();
           if (result.success) {
             return { success: true, message: 'Paused' };
           }
+          this.speakShort('Nothing to pause');
           return { success: false, message: 'Not currently reading' };
         }
 
         // Handle resume command
         if (action === 'resume' || action === 'continue') {
+          console.log('[Executor] Resuming reading');
           const result = await reader.resumeReading();
           if (result.success) {
             return { success: true, message: 'Resumed' };
           }
+          this.speakShort('Nothing to resume');
           return { success: false, message: 'Nothing to resume' };
         }
 
         // Handle next paragraph
-        if (action === 'next' && scope === 'paragraph') {
+        if (action === 'next' && (scope === 'paragraph' || !scope)) {
+          console.log('[Executor] Next paragraph');
           const result = await reader.nextParagraph();
           if (result.success) {
             return { success: true, message: 'Next paragraph' };
@@ -1906,7 +2828,8 @@ console.log('[Content] Loading - Complete final version...');
         }
 
         // Handle previous paragraph
-        if (action === 'previous' && scope === 'paragraph') {
+        if (action === 'previous' && (scope === 'paragraph' || !scope)) {
+          console.log('[Executor] Previous paragraph');
           const result = await reader.previousParagraph();
           if (result.success) {
             return { success: true, message: 'Previous paragraph' };
@@ -1916,24 +2839,50 @@ console.log('[Content] Loading - Complete final version...');
 
         // Handle read from here
         if (scope === 'here' || action === 'here') {
+          console.log('[Executor] Reading from current position');
           const result = await reader.readFromHere();
           if (result.success) {
             return { success: true, message: 'Reading from here' };
           }
+          this.speakShort(result.error || 'No content to read');
           return { success: false, message: result.error || 'No content to read' };
         }
 
-        // Default: read page from top
-        const result = await reader.readPage();
-        if (result.success) {
-          return { success: true, message: 'Reading page' };
+        // Handle read visible area
+        if (scope === 'this' || scope === 'visible' || scope === 'screen') {
+          console.log('[Executor] Reading visible area');
+          const text = this.getViewportText();
+
+          if (!text) {
+            this.speakShort('No visible text found');
+            return { success: false, message: 'No visible text found' };
+          }
+
+          if (this.feedback) {
+            this.feedback.speakLong(text);
+          }
+
+          return { success: true, message: 'Reading visible area' };
         }
+
+        // Default: read page from top
+        console.log('[Executor] Reading full page');
+        const result = await reader.readPage();
+
+        if (result.success) {
+          console.log('[Executor] Started reading', result.blocksCount, 'blocks');
+          return { success: true, message: `Reading page (${result.blocksCount} sections)` };
+        }
+
+        this.speakShort(result.error || 'No content to read');
         return { success: false, message: result.error || 'No content to read' };
 
       } catch (error) {
-        console.error('[Executor] doRead error:', error);
+        console.error('[Executor] ❌ doRead error:', error);
 
         // Fallback to simple text reading
+        console.log('[Executor] Falling back to simple text extraction');
+
         let text = '';
         if (scope === 'this' || scope === 'visible') {
           text = this.getViewportText();
@@ -1942,6 +2891,7 @@ console.log('[Content] Loading - Complete final version...');
         }
 
         if (!text) {
+          this.speakShort('No readable text found on page');
           return { success: false, message: 'No text found' };
         }
 
@@ -1949,7 +2899,11 @@ console.log('[Content] Loading - Complete final version...');
           this.feedback.speakLong(text);
         }
 
-        return { success: true, message: `Reading (${scope === 'this' ? 'visible area' : 'page'})` };
+        return {
+          success: true,
+          message: `Reading ${scope === 'this' ? 'visible area' : 'page'} (fallback mode)`,
+          fallback: true
+        };
       }
     }
 
