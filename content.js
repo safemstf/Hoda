@@ -891,8 +891,9 @@ console.log('[Content] Loading - Complete final version...');
     }
 
     /**
-     * Speak text simply - no chunking, no interruption
-     * BASIC version for testing
+     * Speak a single block of text without interrupting ongoing speech
+     * Used by PageReader for continuous reading
+     * Handles long text by chunking if needed
      */
     speakBlock(text, onComplete) {
       if (!text) {
@@ -900,9 +901,71 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      console.log('[Feedback] 🗣️ speakBlock - SIMPLE VERSION');
+      console.log('[Feedback] 🗣️ speakBlock:', text.substring(0, 50) + '...', `(${text.length} chars)`);
 
+      // Ensure voices are loaded
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        console.warn('[Feedback] No voices available for speakBlock');
+        // Try to trigger voice loading
+        window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.onvoiceschanged = null;
+          this.speakBlock(text, onComplete); // Retry
+        };
+        return;
+      }
+
+      // Check if text exceeds browser limit
+      const MAX_CHARS = 4000; // Conservative limit for cross-browser compatibility
+      if (text.length > MAX_CHARS) {
+        console.warn(`[Feedback] Block too long (${text.length} chars), splitting...`);
+
+        // Split at sentence boundaries
+        const chunks = this._chunkTextToSentences(text, MAX_CHARS);
+        let chunkIndex = 0;
+
+        const speakNextChunk = () => {
+          if (chunkIndex >= chunks.length) {
+            console.log('[Feedback] ✅ All chunks of block completed');
+            if (onComplete) onComplete();
+            return;
+          }
+
+          const chunk = chunks[chunkIndex++];
+          const utterance = new SpeechSynthesisUtterance(chunk);
+
+          const voice = this.getPreferredVoice();
+          if (voice) utterance.voice = voice;
+          utterance.rate = this.settings.ttsRate ?? 1.0;
+          utterance.pitch = this.settings.ttsPitch ?? 1.0;
+          utterance.volume = 0.95;
+
+          utterance.onend = () => {
+            console.log(`[Feedback] Chunk ${chunkIndex}/${chunks.length} done`);
+            speakNextChunk(); // Speak next chunk
+          };
+
+          utterance.onerror = (error) => {
+            console.error('[Feedback] Chunk error:', error);
+            speakNextChunk(); // Continue anyway
+          };
+
+          window.speechSynthesis.speak(utterance);
+        };
+
+        speakNextChunk(); // Start first chunk
+        return;
+      }
+
+      // Text is short enough for single utterance
       const utterance = new SpeechSynthesisUtterance(text);
+
+      // Set voice preferences
+      const voice = this.getPreferredVoice();
+      if (voice) utterance.voice = voice;
+      utterance.rate = this.settings.ttsRate ?? 1.0;
+      utterance.pitch = this.settings.ttsPitch ?? 1.0;
+      utterance.volume = 0.95;
 
       utterance.onend = () => {
         console.log('[Feedback] ✅ speakBlock completed');
@@ -910,12 +973,18 @@ console.log('[Content] Loading - Complete final version...');
       };
 
       utterance.onerror = (error) => {
-        console.error('[Feedback] ❌ speakBlock error:', error);
+        console.error('[Feedback] ❌ speakBlock error:', error.error);
+        // Call completion even on error to continue reading
         if (onComplete) onComplete();
       };
 
-      window.speechSynthesis.speak(utterance);
-      console.log('[Feedback] Utterance queued to speechSynthesis');
+      // Speak without stopping existing speech
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (e) {
+        console.error('[Feedback] speakBlock exception:', e);
+        if (onComplete) onComplete();
+      }
     }
 
     /**
@@ -1683,7 +1752,7 @@ console.log('[Content] Loading - Complete final version...');
      * Start reading page from top
      */
     async readPage() {
-      console.log('[PageReader] Read page requested - SIMPLE MODE');
+      console.log('[PageReader] Read page requested');
 
       // Extract content
       const blocks = this.extractor.extractContent();
@@ -1692,34 +1761,17 @@ console.log('[Content] Loading - Complete final version...');
         return this.announceError('No readable content on this page');
       }
 
-      console.log(`[PageReader] Extracted ${blocks.length} blocks`);
+      // Load content into state manager
+      this.stateManager.loadContent(blocks);
+      this.stateManager.startReading();
 
-      // SIMPLE APPROACH: Concatenate all blocks into single text
-      const fullText = blocks.map(block => {
-        let text = block.text;
-        if (block.isHeading) {
-          const level = block.type.replace('h', '');
-          text = `Heading ${level}. ${text}`;
-        }
-        return text;
-      }).join('. ');
+      // Announce start
+      await this.announce('Reading page');
 
-      console.log(`[PageReader] Full text: ${fullText.length} characters`);
-      console.log(`[PageReader] Starting speech...`);
+      // Start reading blocks
+      await this.processReadingQueue();
 
-      // Speak entire page as one utterance
-      return new Promise((resolve) => {
-        this.tts.speak(fullText, {
-          onEnd: () => {
-            console.log('[PageReader] ✅ Finished reading entire page');
-            resolve({ success: true, blocksCount: blocks.length });
-          },
-          onError: (error) => {
-            console.error('[PageReader] ❌ Error reading page:', error);
-            resolve({ success: false, error: error.message });
-          }
-        });
-      });
+      return { success: true, blocksCount: blocks.length };
     }
 
     /**
