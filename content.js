@@ -941,6 +941,29 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
+      // Ensure voices are loaded before speaking
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices || voices.length === 0) {
+        console.warn('[TTS] ⚠️ No voices available yet, waiting for voices to load...');
+
+        // Set up one-time listener for voices
+        if (!this._tts.waitingForVoices) {
+          this._tts.waitingForVoices = true;
+
+          window.speechSynthesis.onvoiceschanged = () => {
+            console.log('[TTS] ✅ Voices loaded, continuing speech');
+            this._tts.waitingForVoices = false;
+            window.speechSynthesis.onvoiceschanged = null; // Clear listener
+
+            // Continue speaking now that voices are available
+            if (!this._tts.stopped && this._tts.autoContinue) {
+              this._speakNextChunk();
+            }
+          };
+        }
+        return;
+      }
+
       if (this._tts.chunkIndex >= this._tts.chunks.length) {
         // ALL CHUNKS COMPLETE - MUST CALL THE CALLBACK HERE
         console.log('[TTS] ✅ All chunks complete');
@@ -957,7 +980,7 @@ console.log('[Content] Loading - Complete final version...');
       }
 
       const chunk = this._tts.chunks[this._tts.chunkIndex];
-      console.log(`[TTS] Speaking chunk ${this._tts.chunkIndex + 1}/${this._tts.chunks.length}`);
+      console.log(`[TTS] Speaking chunk ${this._tts.chunkIndex + 1}/${this._tts.chunks.length}: "${chunk.substring(0, 30)}..."`);
 
       const utterance = new SpeechSynthesisUtterance(chunk);
 
@@ -1879,6 +1902,8 @@ console.log('[Content] Loading - Complete final version...');
 
       console.log('[PageReader] 📖 Starting block read:', block.text.substring(0, 50) + '...');
 
+      const startTime = Date.now();
+
       // Prefix headings
       let text = block.text;
       if (block.isHeading) {
@@ -1886,45 +1911,56 @@ console.log('[Content] Loading - Complete final version...');
         text = `Heading ${level}. ${text}`;
       }
 
+      // Minimum duration to prevent rapid jumping (1 second per block minimum)
+      const MIN_BLOCK_DURATION = 1000;
+
       // Create promise that ONLY resolves when TTS finishes or errors
       return new Promise((resolve, reject) => {
         let resolved = false;
 
+        const safeResolve = () => {
+          if (resolved) return;
+          resolved = true;
+
+          const elapsed = Date.now() - startTime;
+          const remaining = MIN_BLOCK_DURATION - elapsed;
+
+          if (remaining > 0) {
+            // Block completed too fast - enforce minimum duration
+            console.warn(`[PageReader] ⚠️ Block completed in ${elapsed}ms - waiting ${remaining}ms more`);
+            setTimeout(() => {
+              clearTimeout(timeout);
+              resolve();
+            }, remaining);
+          } else {
+            clearTimeout(timeout);
+            resolve();
+          }
+        };
+
         // Timeout protection (30 seconds max per block)
         const timeout = setTimeout(() => {
           if (!resolved) {
-            resolved = true;
             console.warn('[PageReader] ⏱️ Block reading timeout after 30s');
-            resolve();
+            safeResolve();
           }
         }, 30000);
 
         try {
           this.tts.speak(text, {
             onEnd: () => {
-              if (!resolved) {
-                resolved = true;
-                console.log('[PageReader] ✅ Block reading completed');
-                clearTimeout(timeout);
-                resolve();
-              }
+              console.log('[PageReader] ✅ Block reading completed');
+              safeResolve();
             },
             onError: (error) => {
-              if (!resolved) {
-                resolved = true;
-                console.error('[PageReader] ❌ TTS error:', error);
-                clearTimeout(timeout);
-                resolve(); // Resolve anyway to continue
-              }
+              console.error('[PageReader] ❌ TTS error:', error);
+              // Still enforce minimum duration even on error
+              safeResolve();
             }
           });
         } catch (error) {
-          if (!resolved) {
-            resolved = true;
-            console.error('[PageReader] ❌ Exception calling TTS:', error);
-            clearTimeout(timeout);
-            resolve();
-          }
+          console.error('[PageReader] ❌ Exception calling TTS:', error);
+          safeResolve();
         }
       });
     }
