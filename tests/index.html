@@ -179,6 +179,188 @@
             border-radius: 3px;
             transition: width 0.3s;
         }
+
+        /* Keyboard Shortcuts Styles */
+        .shortcuts-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 12px;
+        }
+
+        .shortcut-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .shortcut-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .shortcut-label {
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 500;
+        }
+
+        .shortcut-keys {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+
+        .key-badge {
+            padding: 4px 10px;
+            background: rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #c7d2fe;
+            font-family: 'Courier New', monospace;
+            text-transform: uppercase;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .key-separator {
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 600;
+        }
+
+        .shortcut-edit-btn {
+            padding: 6px 12px;
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 6px;
+            color: #818cf8;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .shortcut-edit-btn:hover {
+            background: rgba(99, 102, 241, 0.25);
+            border-color: rgba(99, 102, 241, 0.5);
+        }
+
+        /* Shortcut Recording Modal */
+        .shortcut-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .shortcut-modal.active {
+            display: flex;
+        }
+
+        .shortcut-modal-content {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 32px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            text-align: center;
+        }
+
+        .shortcut-modal-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 16px;
+        }
+
+        .shortcut-modal-instruction {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .shortcut-recording {
+            padding: 20px;
+            background: rgba(99, 102, 241, 0.1);
+            border: 2px dashed rgba(99, 102, 241, 0.4);
+            border-radius: 12px;
+            margin-bottom: 20px;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .shortcut-recording.active {
+            border-color: #6366f1;
+            background: rgba(99, 102, 241, 0.2);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .modal-button {
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            font-size: 14px;
+        }
+
+        .modal-button.primary {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(99, 102, 241, 0.3);
+        }
+
+        .modal-button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .modal-button.secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .shortcut-help-text {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 16px;
+            font-style: italic;
+        }
     </style>
 </head>
 
@@ -280,6 +462,22 @@
             </div>
         </div>
 
+        <!-- Keyboard Shortcuts Section -->
+        <div class="status-panel">
+            <h2 class="section-title">⌨️ Keyboard Shortcuts</h2>
+            <p class="setting-description" style="margin-bottom: 16px;">
+                Customize keyboard shortcuts for quick access to Hoda features.
+            </p>
+            
+            <div class="shortcuts-grid" id="shortcutsGrid">
+                <!-- Shortcuts will be populated here -->
+            </div>
+            
+            <p class="shortcut-help-text">
+                💡 Tip: Use Ctrl/Cmd + Shift + Key for global shortcuts that work anywhere
+            </p>
+        </div>
+
         <!-- Test Section -->
         <div class="tests-section">
             <h2 class="section-title">🧪 Diagnostic Tests</h2>
@@ -338,6 +536,23 @@
         <div class="status-panel" id="statusContainer" aria-live="polite" hidden>
             <h2 class="section-title">Status</h2>
             <div id="statusMsg" class="result"></div>
+        </div>
+    </div>
+
+    <!-- Shortcut Recording Modal -->
+    <div class="shortcut-modal" id="shortcutModal">
+        <div class="shortcut-modal-content">
+            <h3 class="shortcut-modal-title" id="modalTitle">Record Keyboard Shortcut</h3>
+            <p class="shortcut-modal-instruction" id="modalInstruction">
+                Press your desired key combination
+            </p>
+            <div class="shortcut-recording" id="shortcutRecording">
+                <span style="color: rgba(255,255,255,0.5); font-size: 14px;">Waiting for input...</span>
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-button primary" id="saveShortcutBtn" disabled>Save</button>
+                <button class="modal-button secondary" id="cancelShortcutBtn">Cancel</button>
+            </div>
         </div>
     </div>
 

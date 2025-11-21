@@ -1,4 +1,4 @@
-// tests/index.js - Test Launcher with Settings Management
+// tests/index.js - Test Launcher with Settings Management & Keyboard Shortcuts
 // External module for test-launcher.html
 
 (async () => {
@@ -9,11 +9,327 @@
     wakeWordRequired: false,
     audioFeedback: true,
     visualFeedback: true,
-    llmEnabled: false
+    llmEnabled: false,
+    shortcuts: {
+      toggleListening: { keys: ['Ctrl', 'Shift', 'H'], enabled: true },
+      openSettings: { keys: ['Ctrl', 'Shift', 'S'], enabled: true },
+      startTutorial: { keys: ['Ctrl', 'Shift', 'T'], enabled: true },
+      toggleExtension: { keys: ['Ctrl', 'Shift', 'E'], enabled: true }
+    }
   };
 
   // Current settings (loaded from storage)
   let currentSettings = { ...DEFAULT_SETTINGS };
+
+  // Shortcut recording state
+  let recordingShortcut = null;
+  let recordedKeys = [];
+
+  // ============================================================================
+  // KEYBOARD SHORTCUTS MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Default shortcuts configuration
+   */
+  const SHORTCUTS_CONFIG = [
+    {
+      id: 'toggleListening',
+      label: 'Toggle Voice Listening',
+      description: 'Start/stop voice recognition',
+      icon: '🎤',
+      action: () => {
+        console.log('Toggle listening triggered');
+        // Send message to background script or content script
+        sendShortcutMessage('toggleListening');
+      }
+    },
+    {
+      id: 'openSettings',
+      label: 'Open Settings',
+      description: 'Open Hoda settings page',
+      icon: '⚙️',
+      action: () => {
+        console.log('Open settings triggered');
+        sendShortcutMessage('openSettings');
+      }
+    },
+    {
+      id: 'startTutorial',
+      label: 'Start Tutorial',
+      description: 'Begin interactive tutorial',
+      icon: '🎓',
+      action: () => {
+        console.log('Start tutorial triggered');
+        sendShortcutMessage('startTutorial');
+      }
+    },
+    {
+      id: 'toggleExtension',
+      label: 'Toggle Extension',
+      description: 'Enable/disable Hoda extension',
+      icon: '🔌',
+      action: () => {
+        console.log('Toggle extension triggered');
+        sendShortcutMessage('toggleExtension');
+      }
+    }
+  ];
+
+  /**
+   * Send shortcut message to background/content scripts
+   */
+  function sendShortcutMessage(action) {
+    if (typeof chrome !== 'undefined' && chrome.runtime) {
+      chrome.runtime.sendMessage({ 
+        type: 'SHORTCUT_TRIGGERED', 
+        action: action 
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Error sending shortcut message:', chrome.runtime.lastError);
+          showStatus(`Shortcut action failed: ${chrome.runtime.lastError.message}`, 'error');
+        } else {
+          console.log('Shortcut message sent:', action, response);
+          showStatus(`Shortcut triggered: ${action}`, 'success');
+        }
+      });
+    } else {
+      console.log('Chrome runtime not available, shortcut action:', action);
+      showStatus(`Shortcut simulated: ${action}`, 'info');
+    }
+  }
+
+  /**
+   * Render shortcuts UI
+   */
+  function renderShortcuts() {
+    const shortcutsGrid = document.getElementById('shortcutsGrid');
+    if (!shortcutsGrid) return;
+
+    shortcutsGrid.innerHTML = '';
+
+    SHORTCUTS_CONFIG.forEach(shortcut => {
+      const shortcutData = currentSettings.shortcuts[shortcut.id] || DEFAULT_SETTINGS.shortcuts[shortcut.id];
+      
+      const shortcutItem = document.createElement('div');
+      shortcutItem.className = 'shortcut-item';
+      
+      shortcutItem.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 12px; flex: 1;">
+          <span style="font-size: 20px;">${shortcut.icon}</span>
+          <div>
+            <div class="shortcut-label">${shortcut.label}</div>
+            <div style="font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px;">
+              ${shortcut.description}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="shortcut-keys">
+            ${shortcutData.keys.map(key => `<span class="key-badge">${key}</span>`).join('<span class="key-separator">+</span>')}
+          </div>
+          <button class="shortcut-edit-btn" data-shortcut-id="${shortcut.id}">
+            ✏️ Edit
+          </button>
+        </div>
+      `;
+      
+      shortcutsGrid.appendChild(shortcutItem);
+    });
+
+    // Attach edit button listeners
+    document.querySelectorAll('.shortcut-edit-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const shortcutId = e.target.getAttribute('data-shortcut-id');
+        openShortcutModal(shortcutId);
+      });
+    });
+  }
+
+  /**
+   * Open shortcut recording modal
+   */
+  function openShortcutModal(shortcutId) {
+    const modal = document.getElementById('shortcutModal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalInstruction = document.getElementById('modalInstruction');
+    const recording = document.getElementById('shortcutRecording');
+    
+    const shortcut = SHORTCUTS_CONFIG.find(s => s.id === shortcutId);
+    if (!shortcut) return;
+
+    recordingShortcut = shortcutId;
+    recordedKeys = [];
+
+    modalTitle.textContent = `Edit: ${shortcut.label}`;
+    modalInstruction.textContent = 'Press your desired key combination (e.g., Ctrl+Shift+K)';
+    recording.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 14px;">Waiting for input...</span>';
+    recording.classList.add('active');
+    
+    modal.classList.add('active');
+    
+    // Disable save button initially
+    document.getElementById('saveShortcutBtn').disabled = true;
+  }
+
+  /**
+   * Close shortcut recording modal
+   */
+  function closeShortcutModal() {
+    const modal = document.getElementById('shortcutModal');
+    const recording = document.getElementById('shortcutRecording');
+    
+    modal.classList.remove('active');
+    recording.classList.remove('active');
+    recordingShortcut = null;
+    recordedKeys = [];
+  }
+
+  /**
+   * Handle key press during shortcut recording
+   */
+  function handleShortcutKeyDown(e) {
+    const modal = document.getElementById('shortcutModal');
+    if (!modal.classList.contains('active')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    recordedKeys = [];
+    
+    // Capture modifiers
+    if (e.ctrlKey) recordedKeys.push('Ctrl');
+    if (e.shiftKey) recordedKeys.push('Shift');
+    if (e.altKey) recordedKeys.push('Alt');
+    if (e.metaKey) recordedKeys.push('Meta');
+
+    // Capture main key (ignore modifier keys themselves)
+    const ignoredKeys = ['Control', 'Shift', 'Alt', 'Meta'];
+    if (!ignoredKeys.includes(e.key)) {
+      recordedKeys.push(e.key.toUpperCase());
+    }
+
+    // Update UI
+    updateShortcutRecording();
+  }
+
+  /**
+   * Update shortcut recording display
+   */
+  function updateShortcutRecording() {
+    const recording = document.getElementById('shortcutRecording');
+    const saveBtn = document.getElementById('saveShortcutBtn');
+
+    if (recordedKeys.length > 0) {
+      recording.innerHTML = recordedKeys
+        .map(key => `<span class="key-badge">${key}</span>`)
+        .join('<span class="key-separator">+</span>');
+      saveBtn.disabled = false;
+    } else {
+      recording.innerHTML = '<span style="color: rgba(255,255,255,0.5); font-size: 14px;">Waiting for input...</span>';
+      saveBtn.disabled = true;
+    }
+  }
+
+  /**
+   * Save recorded shortcut
+   */
+  async function saveRecordedShortcut() {
+    if (!recordingShortcut || recordedKeys.length === 0) return;
+
+    // Check for conflicts
+    const conflict = Object.entries(currentSettings.shortcuts).find(([id, data]) => {
+      if (id === recordingShortcut) return false;
+      return JSON.stringify(data.keys) === JSON.stringify(recordedKeys);
+    });
+
+    if (conflict) {
+      const conflictShortcut = SHORTCUTS_CONFIG.find(s => s.id === conflict[0]);
+      if (!confirm(`This shortcut is already assigned to "${conflictShortcut.label}". Override?`)) {
+        return;
+      }
+    }
+
+    // Save to settings
+    currentSettings.shortcuts[recordingShortcut] = {
+      keys: recordedKeys,
+      enabled: true
+    };
+
+    try {
+      if (typeof chrome !== 'undefined' && chrome.storage) {
+        await chrome.storage.local.set({ shortcuts: currentSettings.shortcuts });
+        showStatus('✅ Shortcut saved successfully!', 'success');
+      }
+    } catch (error) {
+      console.error('Error saving shortcut:', error);
+      showStatus(`❌ Error saving shortcut: ${error.message}`, 'error');
+    }
+
+    // Update UI
+    renderShortcuts();
+    closeShortcutModal();
+  }
+
+  /**
+   * Setup shortcut modal listeners
+   */
+  function setupShortcutModalListeners() {
+    // Save button
+    document.getElementById('saveShortcutBtn').addEventListener('click', saveRecordedShortcut);
+
+    // Cancel button
+    document.getElementById('cancelShortcutBtn').addEventListener('click', closeShortcutModal);
+
+    // Close on outside click
+    document.getElementById('shortcutModal').addEventListener('click', (e) => {
+      if (e.target.id === 'shortcutModal') {
+        closeShortcutModal();
+      }
+    });
+
+    // Global keydown listener for recording
+    document.addEventListener('keydown', handleShortcutKeyDown);
+  }
+
+  /**
+   * Register global keyboard shortcuts
+   */
+  function registerGlobalShortcuts() {
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger if modal is open
+      const modal = document.getElementById('shortcutModal');
+      if (modal && modal.classList.contains('active')) return;
+
+      // Don't trigger in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+      // Check each shortcut
+      SHORTCUTS_CONFIG.forEach(shortcut => {
+        const shortcutData = currentSettings.shortcuts[shortcut.id];
+        if (!shortcutData || !shortcutData.enabled) return;
+
+        const keys = shortcutData.keys;
+        let match = true;
+
+        // Check modifiers
+        if (keys.includes('Ctrl') !== e.ctrlKey) match = false;
+        if (keys.includes('Shift') !== e.shiftKey) match = false;
+        if (keys.includes('Alt') !== e.altKey) match = false;
+        if (keys.includes('Meta') !== e.metaKey) match = false;
+
+        // Check main key
+        const mainKey = keys.find(k => !['Ctrl', 'Shift', 'Alt', 'Meta'].includes(k));
+        if (mainKey && e.key.toUpperCase() !== mainKey) match = false;
+
+        if (match) {
+          e.preventDefault();
+          console.log('Shortcut triggered:', shortcut.id);
+          shortcut.action();
+        }
+      });
+    });
+  }
 
   // ============================================================================
   // SETTINGS MANAGEMENT
@@ -31,7 +347,8 @@
           'visualFeedback',
           'llmEnabled',
           'rateLimitReset',
-          'dailyUsage'
+          'dailyUsage',
+          'shortcuts'
         ]);
 
         console.log('Loaded settings:', result);
@@ -41,11 +358,13 @@
           wakeWordRequired: result.wakeWordRequired ?? DEFAULT_SETTINGS.wakeWordRequired,
           audioFeedback: result.audioFeedback ?? DEFAULT_SETTINGS.audioFeedback,
           visualFeedback: result.visualFeedback ?? DEFAULT_SETTINGS.visualFeedback,
-          llmEnabled: result.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled
+          llmEnabled: result.llmEnabled ?? DEFAULT_SETTINGS.llmEnabled,
+          shortcuts: result.shortcuts ?? DEFAULT_SETTINGS.shortcuts
         };
 
         // Update UI
         updateSettingsUI();
+        renderShortcuts();
         updateQuotaUI(result.dailyUsage || 0);
 
         showStatus('Settings loaded', 'success');
@@ -142,7 +461,8 @@
         wakeWordRequired: wakeWordCheckbox?.checked ?? false,
         audioFeedback: audioCheckbox?.checked ?? true,
         visualFeedback: visualCheckbox?.checked ?? true,
-        llmEnabled: llmCheckbox?.checked ?? false
+        llmEnabled: llmCheckbox?.checked ?? false,
+        shortcuts: currentSettings.shortcuts
       };
 
       console.log('Saving settings:', settingsToSave);
@@ -169,7 +489,7 @@
    */
   async function resetSettings() {
     try {
-      if (!confirm('Reset all settings to defaults?')) {
+      if (!confirm('Reset all settings (including shortcuts) to defaults?')) {
         return;
       }
 
@@ -181,6 +501,7 @@
         
         // Update UI
         updateSettingsUI();
+        renderShortcuts();
         
         showStatus('🔄 Settings reset to defaults', 'success');
       }
@@ -365,7 +686,11 @@
       
       // Setup event listeners
       setupSettingsListeners();
+      setupShortcutModalListeners();
       initializeTestListeners();
+      
+      // Register global shortcuts
+      registerGlobalShortcuts();
       
       console.log('✅ Test launcher & settings initialized');
       
