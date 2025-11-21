@@ -1,10 +1,11 @@
 ﻿<!doctype html>
 <html>
-
 <head>
   <meta charset="utf-8" />
   <title>Hoda Voice Navigation</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;600&display=swap');
+
     * {
       margin: 0;
       padding: 0;
@@ -12,36 +13,36 @@
     }
 
     :root {
-      /* Cyan-Blue-Teal palette */
-      --primary: #06b6d4;
-      --primary-dark: #0891b2;
-      --primary-light: #22d3ee;
-      --secondary: #3b82f6;
-      --accent: #14b8a6;
+      /* Purple Dream palette */
+      --primary: #8b5cf6;
+      --primary-dark: #7c3aed;
+      --primary-light: #a78bfa;
+      --secondary: #ec4899;
+      --accent: #f59e0b;
       --success: #10b981;
       --warning: #eab308;
       --error: #ef4444;
 
       /* Neutrals */
-      --bg-main: #f8fafc;
+      --bg-main: #faf5ff;
       --bg-card: #ffffff;
-      --text-primary: #0f172a;
-      --text-secondary: #475569;
-      --text-muted: #94a3b8;
-      --border: #e2e8f0;
+      --text-primary: #1e1b4b;
+      --text-secondary: #4c1d95;
+      --text-muted: #a78bfa;
+      --border: #e9d5ff;
 
       /* Shadows */
-      --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-      --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
-      --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
-      --shadow-glow: 0 0 40px rgba(6, 182, 212, 0.5);
+      --shadow-sm: 0 2px 8px rgba(139, 92, 246, 0.1);
+      --shadow-md: 0 8px 24px rgba(139, 92, 246, 0.15);
+      --shadow-lg: 0 20px 40px rgba(139, 92, 246, 0.25);
+      --shadow-glow: 0 0 60px rgba(139, 92, 246, 0.6);
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       width: 420px;
       min-height: 600px;
-      background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
+      background: linear-gradient(135deg, #faf5ff 0%, #fce7f3 50%, #fff7ed 100%);
       color: var(--text-primary);
       padding: 0;
       margin: 0;
@@ -49,7 +50,6 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Square pattern background */
     body::before {
       content: '';
       position: fixed;
@@ -57,9 +57,8 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-image:
-        repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(6, 182, 212, 0.03) 19px, rgba(6, 182, 212, 0.03) 20px),
-        repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(6, 182, 212, 0.03) 19px, rgba(6, 182, 212, 0.03) 20px);
+      background-image: radial-gradient(circle at 20% 80%, rgba(139, 92, 246, 0.05) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.05) 0%, transparent 50%);
       pointer-events: none;
       z-index: 0;
     }
@@ -69,39 +68,30 @@
       z-index: 1;
     }
 
-    /* Header with square pattern */
     .header {
-      background: linear-gradient(135deg,
-          rgba(6, 182, 212, 0.95) 0%,
-          rgba(59, 130, 246, 0.95) 100%);
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.95) 0%, rgba(236, 72, 153, 0.95) 100%);
       color: white;
-      padding: 28px 24px 32px;
+      padding: 32px 28px 36px;
       position: relative;
       overflow: hidden;
+      border-bottom-left-radius: 32px;
+      border-bottom-right-radius: 32px;
     }
 
-    /* Animated square pattern in header */
     .header::before {
       content: '';
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background-image:
-        repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(255, 255, 255, 0.03) 35px, rgba(255, 255, 255, 0.03) 70px),
-        repeating-linear-gradient(-45deg, transparent, transparent 35px, rgba(255, 255, 255, 0.03) 35px, rgba(255, 255, 255, 0.03) 70px);
-      animation: squareShift 20s linear infinite;
+      top: -50%;
+      right: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      animation: rotate 20s linear infinite;
     }
 
-    @keyframes squareShift {
-      0% {
-        transform: translate(0, 0);
-      }
-
-      100% {
-        transform: translate(70px, 70px);
-      }
+    @keyframes rotate {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
     }
 
     .header-content {
@@ -112,38 +102,37 @@
     .logo {
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 18px;
+      gap: 16px;
+      margin-bottom: 20px;
     }
 
     .logo-icon {
-      font-size: 36px;
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+      font-size: 42px;
+      filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.2));
     }
 
     .logo-text {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: -0.8px;
-      text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: -1.5px;
+      text-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
     }
 
     .tagline {
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 600;
       opacity: 0.95;
-      margin-bottom: 18px;
+      margin-bottom: 20px;
       letter-spacing: 0.5px;
     }
 
-    /* Square quota bar */
     .quota-bar-container {
       background: rgba(255, 255, 255, 0.2);
-      height: 10px;
+      height: 12px;
+      border-radius: 12px;
       overflow: hidden;
       backdrop-filter: blur(10px);
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.3);
     }
 
     .quota-bar {
@@ -151,48 +140,35 @@
       background: rgba(255, 255, 255, 0.95);
       transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
       box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
-      position: relative;
-    }
-
-    .quota-bar::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 50%;
-      background: linear-gradient(to bottom, rgba(255, 255, 255, 0.5), transparent);
+      border-radius: 12px;
     }
 
     .quota-text {
       font-size: 12px;
-      font-weight: 600;
+      font-weight: 700;
       opacity: 0.95;
-      margin-top: 10px;
+      margin-top: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    /* Main Content */
     .content {
-      padding: 28px 24px;
+      padding: 32px 28px;
     }
 
-    /* Square mic button with volume visualizer */
     .mic-section {
       text-align: center;
-      margin-bottom: 32px;
+      margin-bottom: 36px;
       position: relative;
     }
 
     .mic-container {
       position: relative;
       display: inline-block;
-      margin: 0 auto 24px;
+      margin: 0 auto 28px;
     }
 
-    /* Volume visualizer - square bars */
     .volume-visualizer {
       position: absolute;
       top: 50%;
@@ -210,116 +186,75 @@
 
     .volume-bar {
       width: 8px;
-      background: linear-gradient(180deg, var(--primary-light), var(--primary));
+      background: linear-gradient(180deg, var(--primary-light), var(--secondary));
       transition: height 0.1s ease;
       opacity: 0;
-      box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+      border-radius: 8px;
+      box-shadow: 0 0 15px rgba(139, 92, 246, 0.6);
     }
 
     .volume-bar.active {
       opacity: 1;
     }
 
-    /* Square mic button */
     .mic-button {
-      width: 120px;
-      height: 120px;
-      border: 3px solid var(--border); /* Added border for high contrast - Author: arkaan */
-      background: linear-gradient(135deg,
-          var(--primary) 0%,
-          var(--secondary) 100%);
+      width: 130px;
+      height: 130px;
+      border: 4px solid var(--border);
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
       color: white;
-      font-size: 52px;
+      font-size: 56px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-      box-shadow: 0 10px 30px rgba(6, 182, 212, 0.35),
-        0 4px 12px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 12px 36px rgba(139, 92, 246, 0.4), 0 6px 16px rgba(236, 72, 153, 0.2);
       position: relative;
       z-index: 1;
     }
 
-    /* Corner decorations */
-    .mic-button::before,
-    .mic-button::after {
-      content: '';
-      position: absolute;
-      width: 20px;
-      height: 20px;
-      border: 3px solid rgba(255, 255, 255, 0.5);
-      transition: all 0.3s;
-    }
-
-    .mic-button::before {
-      top: -6px;
-      left: -6px;
-      border-right: none;
-      border-bottom: none;
-    }
-
-    .mic-button::after {
-      bottom: -6px;
-      right: -6px;
-      border-left: none;
-      border-top: none;
-    }
-
     .mic-button:hover:not(:disabled) {
-      transform: scale(1.05);
-      box-shadow: var(--shadow-glow),
-        0 15px 35px rgba(6, 182, 212, 0.4);
-    }
-
-    .mic-button:hover:not(:disabled)::before,
-    .mic-button:hover:not(:disabled)::after {
-      width: 30px;
-      height: 30px;
+      transform: scale(1.08);
+      box-shadow: var(--shadow-glow), 0 18px 42px rgba(139, 92, 246, 0.5);
     }
 
     .mic-button:active:not(:disabled) {
-      transform: scale(0.98);
+      transform: scale(0.95);
     }
 
     .mic-button:disabled {
       opacity: 0.6;
       cursor: not-allowed;
-      background: linear-gradient(135deg,
-          var(--text-muted),
-          var(--text-secondary));
+      background: linear-gradient(135deg, var(--text-muted), var(--text-secondary));
     }
 
     .mic-button.listening {
-      animation: pulse-square 2s infinite;
+      animation: pulse-glow 2s infinite;
     }
 
-    @keyframes pulse-square {
-
-      0%,
-      100% {
-        box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.7),
-          0 10px 30px rgba(6, 182, 212, 0.35);
+    @keyframes pulse-glow {
+      0%, 100% {
+        box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7), 0 12px 36px rgba(139, 92, 246, 0.4);
       }
-
       50% {
-        box-shadow: 0 0 0 20px rgba(6, 182, 212, 0),
-          0 10px 30px rgba(6, 182, 212, 0.35);
+        box-shadow: 0 0 0 25px rgba(139, 92, 246, 0), 0 12px 36px rgba(139, 92, 246, 0.4);
       }
     }
 
     .status-text {
-      font-size: 16px;
+      font-size: 17px;
       color: var(--text-secondary);
-      font-weight: 600;
+      font-weight: 700;
       transition: all 0.3s;
-      margin-bottom: 10px;
-      letter-spacing: -0.2px;
+      margin-bottom: 12px;
+      letter-spacing: -0.3px;
     }
 
     .status-text.active {
       color: var(--primary);
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .status-text.error {
@@ -327,104 +262,67 @@
     }
 
     .keyboard-hint {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-muted);
-      font-weight: 500;
+      font-weight: 600;
     }
 
     kbd {
-      padding: 4px 8px;
+      padding: 5px 10px;
       background: white;
       border: 2px solid var(--border);
-      font-family: -apple-system, monospace;
-      font-size: 11px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
       font-weight: 700;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      box-shadow: 0 3px 6px rgba(139, 92, 246, 0.1);
       color: var(--text-primary);
     }
 
-    /* Square cards */
     .card {
       background: white;
-      padding: 22px;
-      margin-bottom: 18px;
+      padding: 24px;
+      margin-bottom: 20px;
       box-shadow: var(--shadow-md);
       border: 2px solid var(--border);
+      border-radius: 20px;
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
     }
 
-    /* Square corner accents */
-    .card::before,
-    .card::after {
-      content: '';
-      position: absolute;
-      width: 12px;
-      height: 12px;
-      border: 2px solid var(--primary);
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .card::before {
-      top: -2px;
-      left: -2px;
-      border-right: none;
-      border-bottom: none;
-    }
-
-    .card::after {
-      bottom: -2px;
-      right: -2px;
-      border-left: none;
-      border-top: none;
-    }
-
     .card:hover {
-      transform: translateY(-2px);
+      transform: translateY(-3px);
       box-shadow: var(--shadow-lg);
       border-color: var(--primary);
     }
 
-    .card:hover::before,
-    .card:hover::after {
-      opacity: 1;
-    }
-
     .card-title {
-      font-size: 12px;
-      font-weight: 800;
+      font-size: 13px;
+      font-weight: 900;
       color: var(--primary);
       text-transform: uppercase;
-      letter-spacing: 1.5px;
-      margin-bottom: 16px;
+      letter-spacing: 2px;
+      margin-bottom: 18px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
 
-    .card-title::before {
-      content: '';
-      width: 4px;
-      height: 16px;
-      background: linear-gradient(180deg, var(--primary), var(--secondary));
-    }
-
-    /* Voice Settings */
     .voice-settings {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
     }
 
     .voice-select {
       width: 100%;
-      padding: 14px 16px;
+      padding: 16px 18px;
       border: 2px solid var(--border);
+      border-radius: 12px;
       background: var(--bg-main);
       color: var(--text-primary);
-      font-size: 14px;
-      font-weight: 500;
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
       font-family: inherit;
@@ -437,36 +335,21 @@
     .voice-select:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+      box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.15);
     }
 
     .voice-preview-btn {
       width: 100%;
-      padding: 14px;
+      padding: 16px;
       border: 2px solid var(--border);
+      border-radius: 12px;
       background: white;
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       color: var(--text-primary);
       font-family: inherit;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .voice-preview-btn::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg,
-          transparent,
-          rgba(6, 182, 212, 0.2),
-          transparent);
-      transition: left 0.5s;
     }
 
     .voice-preview-btn:hover {
@@ -474,26 +357,21 @@
       color: white;
       border-color: var(--primary);
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(6, 182, 212, 0.3);
+      box-shadow: 0 10px 24px rgba(139, 92, 246, 0.35);
     }
 
-    .voice-preview-btn:hover::before {
-      left: 100%;
-    }
-
-    /* Square transcript box */
     .transcript-box {
       background: var(--bg-main);
       border: 3px solid var(--border);
-      padding: 18px;
-      min-height: 90px;
-      font-size: 14px;
+      border-radius: 16px;
+      padding: 20px;
+      min-height: 100px;
+      font-size: 15px;
       color: var(--text-primary);
-      font-family: -apple-system, 'Consolas', monospace;
-      line-height: 1.8;
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.9;
       transition: all 0.3s;
-      font-weight: 500;
-      position: relative;
+      font-weight: 600;
     }
 
     .transcript-box.empty {
@@ -503,41 +381,15 @@
 
     .transcript-box:not(.empty) {
       border-color: var(--primary);
-      background: linear-gradient(135deg,
-          rgba(6, 182, 212, 0.03),
-          rgba(59, 130, 246, 0.03));
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.04), rgba(236, 72, 153, 0.04));
     }
 
-    /* Square corner indicators */
-    .transcript-box:not(.empty)::before,
-    .transcript-box:not(.empty)::after {
-      content: '';
-      position: absolute;
-      width: 16px;
-      height: 16px;
-      border: 3px solid var(--primary);
-    }
-
-    .transcript-box:not(.empty)::before {
-      top: -3px;
-      right: -3px;
-      border-left: none;
-      border-bottom: none;
-    }
-
-    .transcript-box:not(.empty)::after {
-      bottom: -3px;
-      left: -3px;
-      border-right: none;
-      border-top: none;
-    }
-
-    /* Command Result */
     .command-result {
-      padding: 14px 18px;
-      font-size: 13px;
+      padding: 16px 20px;
+      border-radius: 12px;
+      font-size: 14px;
       font-weight: 700;
-      margin-top: 14px;
+      margin-top: 16px;
       display: none;
       animation: slideUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
@@ -547,7 +399,6 @@
         opacity: 0;
         transform: translateY(15px);
       }
-
       to {
         opacity: 1;
         transform: translateY(0);
@@ -557,103 +408,73 @@
     .command-result.show {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
 
     .command-result.success {
-      background: linear-gradient(135deg,
-          rgba(16, 185, 129, 0.1),
-          rgba(16, 185, 129, 0.05));
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(16, 185, 129, 0.06));
       color: var(--success);
       border: 2px solid rgba(16, 185, 129, 0.3);
     }
 
     .command-result.error {
-      background: linear-gradient(135deg,
-          rgba(239, 68, 68, 0.1),
-          rgba(239, 68, 68, 0.05));
+      background: linear-gradient(135deg, rgba(239, 68, 68, 0.12), rgba(239, 68, 68, 0.06));
       color: var(--error);
       border: 2px solid rgba(239, 68, 68, 0.3);
     }
 
-    /* Stats - square containers */
     .stats-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      gap: 16px;
     }
 
     .stat-item {
-      background: linear-gradient(135deg,
-          var(--bg-main),
-          white);
-      padding: 24px 20px;
+      background: linear-gradient(135deg, var(--bg-main), white);
+      padding: 28px 22px;
       text-align: center;
       border: 2px solid var(--border);
+      border-radius: 16px;
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Animated square pattern on hover */
-    .stat-item::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg,
-          var(--primary),
-          var(--secondary));
-      transform: scaleX(0);
-      transition: transform 0.3s;
     }
 
     .stat-item:hover {
-      transform: translateY(-4px) scale(1.02);
+      transform: translateY(-5px) scale(1.03);
       box-shadow: var(--shadow-lg);
       border-color: var(--primary);
     }
 
-    .stat-item:hover::before {
-      transform: scaleX(1);
-    }
-
     .stat-value {
-      font-size: 40px;
+      font-size: 44px;
       font-weight: 900;
-      background: linear-gradient(135deg,
-          var(--primary) 0%,
-          var(--secondary) 100%);
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      margin-bottom: 8px;
-      letter-spacing: -1px;
+      margin-bottom: 10px;
+      letter-spacing: -2px;
       line-height: 1;
     }
 
     .stat-label {
-      font-size: 11px;
+      font-size: 12px;
       color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 1.2px;
-      font-weight: 700;
+      letter-spacing: 1.5px;
+      font-weight: 800;
     }
 
-    /* Extension Toggle Button - Author: arkaan */
     .toggle-btn {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 10px 14px;
+      gap: 10px;
+      padding: 12px 16px;
       background: var(--bg-card);
       border: 2px solid var(--border);
-      border-radius: 6px;
+      border-radius: 10px;
       cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
+      font-size: 14px;
+      font-weight: 700;
       color: var(--text-primary);
       transition: all 0.2s ease;
       font-family: inherit;
@@ -678,31 +499,31 @@
     }
 
     #toggleStatus {
-      font-weight: 700;
+      font-weight: 900;
       text-transform: uppercase;
-      font-size: 12px;
+      font-size: 13px;
     }
 
-    /* Square action buttons */
     .action-buttons {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 14px;
+      gap: 16px;
     }
 
     .action-btn {
-      padding: 20px 16px;
+      padding: 24px 18px;
       border: 2px solid var(--border);
+      border-radius: 16px;
       background: white;
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       cursor: pointer;
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 10px;
+      gap: 12px;
       color: var(--text-primary);
       font-family: inherit;
       position: relative;
@@ -713,15 +534,13 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(135deg,
-          var(--primary),
-          var(--secondary));
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
       opacity: 0;
       transition: opacity 0.3s;
     }
 
     .action-btn .icon {
-      font-size: 32px;
+      font-size: 36px;
       position: relative;
       z-index: 1;
       transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -735,8 +554,8 @@
 
     .action-btn:hover:not(:disabled) {
       border-color: var(--primary);
-      transform: translateY(-4px) scale(1.03);
-      box-shadow: 0 12px 30px rgba(6, 182, 212, 0.25);
+      transform: translateY(-5px) scale(1.04);
+      box-shadow: 0 14px 36px rgba(139, 92, 246, 0.3);
     }
 
     .action-btn:hover:not(:disabled)::before {
@@ -748,7 +567,7 @@
     }
 
     .action-btn:hover:not(:disabled) .icon {
-      transform: scale(1.15);
+      transform: scale(1.2) rotate(5deg);
     }
 
     .action-btn.disabled {
@@ -757,116 +576,77 @@
       background: var(--bg-main);
     }
 
-    .badge-coming-soon {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      font-size: 9px;
-      font-weight: 800;
-      padding: 4px 8px;
-      background: linear-gradient(135deg, var(--accent), var(--primary));
-      color: white;
-      text-transform: uppercase;
-      letter-spacing: 0.8px;
-      box-shadow: 0 2px 8px rgba(20, 184, 166, 0.4);
-    }
-
-    /* Footer */
     .footer {
-      padding: 24px;
-      border-top: 2px solid rgba(6, 182, 212, 0.1);
+      padding: 28px;
+      border-top: 2px solid rgba(139, 92, 246, 0.15);
       background: white;
       text-align: center;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
+      border-top-left-radius: 32px;
+      border-top-right-radius: 32px;
     }
 
     .footer-text {
-      font-size: 12px;
+      font-size: 13px;
       color: var(--text-muted);
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .link {
       color: var(--primary);
       text-decoration: none;
-      font-size: 14px;
-      font-weight: 700;
+      font-size: 15px;
+      font-weight: 800;
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      padding: 10px 20px;
-      background: rgba(6, 182, 212, 0.08);
-      border: 2px solid rgba(6, 182, 212, 0.2);
+      padding: 12px 24px;
+      background: rgba(139, 92, 246, 0.1);
+      border: 2px solid rgba(139, 92, 246, 0.25);
+      border-radius: 10px;
     }
 
     .link:hover {
       background: linear-gradient(135deg, var(--primary), var(--secondary));
       color: white;
       border-color: var(--primary);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 20px rgba(6, 182, 212, 0.3);
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(139, 92, 246, 0.35);
     }
 
-    /* Accessibility */
     @media (prefers-reduced-motion: reduce) {
-
-      *,
-      *::before,
-      *::after {
+      *, *::before, *::after {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
       }
     }
 
-    /* High Contrast Mode Support - Author: arkaan */
     @media (prefers-contrast: high) {
       .mic-button {
-        border: 4px solid;
+        border: 5px solid;
         border-color: currentColor;
       }
-
-      .toggle-btn {
+      .toggle-btn, .action-btn, .voice-preview-btn, .voice-select {
         border-width: 3px;
         border-style: solid;
       }
-
-      .action-btn {
-        border-width: 3px;
-        border-style: solid;
-      }
-
-      .voice-preview-btn {
-        border-width: 3px;
-        border-style: solid;
-      }
-
-      .voice-select {
-        border-width: 3px;
-        border-style: solid;
-      }
-
-      /* Ensure text is always readable */
-      .status-text,
-      .card-title,
-      .stat-label {
-        font-weight: 700;
+      .status-text, .card-title, .stat-label {
+        font-weight: 900;
       }
     }
 
     *:focus-visible {
-      outline: 3px solid var(--primary);
-      outline-offset: 3px;
+      outline: 4px solid var(--primary);
+      outline-offset: 4px;
     }
   </style>
 </head>
-
 <body>
   <div class="container">
-    <!-- Header -->
     <div class="header">
       <div class="header-content">
         <div class="logo">
@@ -884,12 +664,9 @@
       </div>
     </div>
 
-    <!-- Main Content -->
     <div class="content">
-      <!-- Mic Section with Volume Visualizer -->
       <div class="mic-section">
         <div class="mic-container">
-          <!-- Volume Visualizer Bars -->
           <div class="volume-visualizer" id="volumeVisualizer">
             <div class="volume-bar" data-bar="0"></div>
             <div class="volume-bar" data-bar="1"></div>
@@ -900,7 +677,6 @@
             <div class="volume-bar" data-bar="6"></div>
             <div class="volume-bar" data-bar="7"></div>
           </div>
-
           <button class="mic-button" id="micBtn" disabled aria-label="Toggle voice recognition">
             🎤
           </button>
@@ -911,11 +687,8 @@
         </div>
       </div>
 
-      <!-- Voice Settings -->
       <div class="card">
-        <div class="card-title">
-          🎙️ Voice Settings
-        </div>
+        <div class="card-title">🎙️ Voice Settings</div>
         <div class="voice-settings">
           <select id="voiceSelect" class="voice-select" aria-label="Select voice">
             <option value="">Loading voices...</option>
@@ -926,22 +699,16 @@
         </div>
       </div>
 
-      <!-- Transcript -->
       <div class="card">
-        <div class="card-title">
-          💬 Transcript
-        </div>
+        <div class="card-title">💬 Transcript</div>
         <div class="transcript-box empty" id="transcript" aria-live="polite">
           Click the mic and start speaking...
         </div>
         <div class="command-result" id="commandResult" role="alert" aria-live="polite"></div>
       </div>
 
-      <!-- Stats -->
       <div class="card">
-        <div class="card-title">
-          📊 Session Stats
-        </div>
+        <div class="card-title">📊 Session Stats</div>
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-value" id="statTotal">0</div>
@@ -954,11 +721,8 @@
         </div>
       </div>
 
-      <!-- Actions -->
       <div class="card">
-        <div class="card-title">
-          ⚡ Quick Access
-        </div>
+        <div class="card-title">⚡ Quick Access</div>
         <div class="action-buttons">
           <button class="action-btn" id="btnHelp" aria-label="View help and commands">
             <span class="icon">❓</span>
@@ -972,15 +736,10 @@
       </div>
     </div>
 
-    <!-- Footer -->
     <div class="footer">
       <div class="footer-text">Made with ❤️ for accessibility</div>
-      <div style="display: flex; gap: 10px; align-items: center;">
-        <!-- Extension Toggle Button - Author: arkaan -->
-        <button 
-          id="toggleExtensionBtn" 
-          class="toggle-btn"
-          aria-label="Toggle extension on or off">
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <button id="toggleExtensionBtn" class="toggle-btn" aria-label="Toggle extension on or off">
           <span>Extension:</span>
           <span id="toggleStatus">ON</span>
         </button>
@@ -994,5 +753,4 @@
   <script src="volumeVisualizer.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
-
 </html>
