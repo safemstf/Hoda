@@ -893,6 +893,7 @@ console.log('[Content] Loading - Complete final version...');
     /**
      * Speak a single block of text without interrupting ongoing speech
      * Used by PageReader for continuous reading
+     * Handles long text by chunking if needed
      */
     speakBlock(text, onComplete) {
       if (!text) {
@@ -900,7 +901,7 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      console.log('[Feedback] 🗣️ speakBlock:', text.substring(0, 50) + '...');
+      console.log('[Feedback] 🗣️ speakBlock:', text.substring(0, 50) + '...', `(${text.length} chars)`);
 
       // Ensure voices are loaded
       const voices = window.speechSynthesis.getVoices();
@@ -914,6 +915,49 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
+      // Check if text exceeds browser limit
+      const MAX_CHARS = 4000; // Conservative limit for cross-browser compatibility
+      if (text.length > MAX_CHARS) {
+        console.warn(`[Feedback] Block too long (${text.length} chars), splitting...`);
+
+        // Split at sentence boundaries
+        const chunks = this._chunkTextToSentences(text, MAX_CHARS);
+        let chunkIndex = 0;
+
+        const speakNextChunk = () => {
+          if (chunkIndex >= chunks.length) {
+            console.log('[Feedback] ✅ All chunks of block completed');
+            if (onComplete) onComplete();
+            return;
+          }
+
+          const chunk = chunks[chunkIndex++];
+          const utterance = new SpeechSynthesisUtterance(chunk);
+
+          const voice = this.getPreferredVoice();
+          if (voice) utterance.voice = voice;
+          utterance.rate = this.settings.ttsRate ?? 1.0;
+          utterance.pitch = this.settings.ttsPitch ?? 1.0;
+          utterance.volume = 0.95;
+
+          utterance.onend = () => {
+            console.log(`[Feedback] Chunk ${chunkIndex}/${chunks.length} done`);
+            speakNextChunk(); // Speak next chunk
+          };
+
+          utterance.onerror = (error) => {
+            console.error('[Feedback] Chunk error:', error);
+            speakNextChunk(); // Continue anyway
+          };
+
+          window.speechSynthesis.speak(utterance);
+        };
+
+        speakNextChunk(); // Start first chunk
+        return;
+      }
+
+      // Text is short enough for single utterance
       const utterance = new SpeechSynthesisUtterance(text);
 
       // Set voice preferences
@@ -929,7 +973,7 @@ console.log('[Content] Loading - Complete final version...');
       };
 
       utterance.onerror = (error) => {
-        console.error('[Feedback] ❌ speakBlock error:', error);
+        console.error('[Feedback] ❌ speakBlock error:', error.error);
         // Call completion even on error to continue reading
         if (onComplete) onComplete();
       };
@@ -1928,17 +1972,21 @@ console.log('[Content] Loading - Complete final version...');
           break;
         }
 
-        // Pause between blocks
-        await this.sleep(this.config.pauseBetweenBlocks);
-
         // Move to next block
         const nextBlock = this.stateManager.nextBlock();
         if (!nextBlock) {
-          // Reached end
-          await this.announce('End of page');
+          // Reached end - announce and stop
           this.stateManager.stop();
+          this.stateManager.clearHighlights();
+
+          // Small delay before announcing end (let last block finish speaking)
+          await this.sleep(300);
+          await this.announce('End of page');
           break;
         }
+
+        // Pause between blocks
+        await this.sleep(this.config.pauseBetweenBlocks);
       }
 
       this.isProcessingQueue = false;
