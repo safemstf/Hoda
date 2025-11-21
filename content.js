@@ -831,18 +831,25 @@ console.log('[Content] Loading - Complete final version...');
       }
     }
 
-    speakLong(text) {
-      if (!text) return;
+    speakLong(text, onComplete) {
+      if (!text) {
+        if (onComplete) onComplete();
+        return;
+      }
 
       this.stopSpeech();
 
       const chunks = this._chunkTextToSentences(text, 1600);
-      if (!chunks || !chunks.length) return;
+      if (!chunks || !chunks.length) {
+        if (onComplete) onComplete();
+        return;
+      }
 
       this._tts.chunks = chunks;
       this._tts.chunkIndex = 0;
       this._tts.autoContinue = true;
       this._tts.stopped = false;
+      this._tts.onAllChunksComplete = onComplete; // Store callback
 
       this._setSpeaking(true);
       this._speakNextChunk();
@@ -923,7 +930,15 @@ console.log('[Content] Loading - Complete final version...');
     }
 
     _speakNextChunk() {
-      if (this._tts.stopped) return;
+      if (this._tts.stopped) {
+        // Call completion callback even when stopped
+        if (this._tts.onAllChunksComplete) {
+          const callback = this._tts.onAllChunksComplete;
+          this._tts.onAllChunksComplete = null;
+          callback();
+        }
+        return;
+      }
 
       const idx = this._tts.chunkIndex;
       if (!this._tts.chunks || idx >= this._tts.chunks.length) {
@@ -931,6 +946,13 @@ console.log('[Content] Loading - Complete final version...');
         this._tts.autoContinue = false;
         this._setSpeaking(false);
         console.log('[Feedback] finished all chunks');
+
+        // Call completion callback when all chunks done
+        if (this._tts.onAllChunksComplete) {
+          const callback = this._tts.onAllChunksComplete;
+          this._tts.onAllChunksComplete = null;
+          callback();
+        }
         return;
       }
 
@@ -952,6 +974,13 @@ console.log('[Content] Loading - Complete final version...');
         if (this._tts.stopped) {
           this._tts.utterance = null;
           this._setSpeaking(false);
+
+          // Call completion callback when stopped
+          if (this._tts.onAllChunksComplete) {
+            const callback = this._tts.onAllChunksComplete;
+            this._tts.onAllChunksComplete = null;
+            callback();
+          }
           return;
         }
 
@@ -966,6 +995,13 @@ console.log('[Content] Loading - Complete final version...');
           this._tts.autoContinue = false;
           this._tts.utterance = null;
           this._setSpeaking(false);
+
+          // Call completion callback when all chunks finished
+          if (this._tts.onAllChunksComplete) {
+            const callback = this._tts.onAllChunksComplete;
+            this._tts.onAllChunksComplete = null;
+            callback();
+          }
         }
       };
 
@@ -974,6 +1010,13 @@ console.log('[Content] Loading - Complete final version...');
         this._tts.utterance = null;
         this._tts.autoContinue = false;
         this._setSpeaking(false);
+
+        // Call completion callback on error
+        if (this._tts.onAllChunksComplete) {
+          const callback = this._tts.onAllChunksComplete;
+          this._tts.onAllChunksComplete = null;
+          callback();
+        }
       };
 
       this._tts.utterance = u;
@@ -1837,22 +1880,36 @@ console.log('[Content] Loading - Complete final version...');
         return;
       }
 
-      return new Promise((resolve) => {
-        // Prefix headings
-        let text = block.text;
-        if (block.isHeading) {
-          const level = block.type.replace('h', '');
-          text = `Heading ${level}. ${text}`;
-        }
+      // Add timeout protection (30 seconds max per block)
+      const TIMEOUT = 30000;
 
-        this.tts.speak(text, {
-          onEnd: () => resolve(),
-          onError: (error) => {
-            console.error('[PageReader] TTS error:', error);
-            resolve();
+      return Promise.race([
+        new Promise((resolve) => {
+          // Prefix headings
+          let text = block.text;
+          if (block.isHeading) {
+            const level = block.type.replace('h', '');
+            text = `Heading ${level}. ${text}`;
           }
-        });
-      });
+
+          this.tts.speak(text, {
+            onEnd: () => {
+              console.log('[PageReader] Block reading completed');
+              resolve();
+            },
+            onError: (error) => {
+              console.error('[PageReader] TTS error:', error);
+              resolve();
+            }
+          });
+        }),
+        new Promise((resolve) => {
+          setTimeout(() => {
+            console.warn('[PageReader] Block reading timeout after 30s');
+            resolve();
+          }, TIMEOUT);
+        })
+      ]);
     }
 
     /**
