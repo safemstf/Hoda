@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Issue #7: Voice Page Reading Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      line-height: 1.6;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    header {
+      background: #2c3e50;
+      color: white;
+      padding: 20px;
+      margin: -20px -20px 20px -20px;
+      text-align: center;
+    }
+
+    nav {
+      background: #34495e;
+      padding: 10px;
+      margin: -20px -20px 20px -20px;
+      text-align: center;
+    }
+
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin: 0 15px;
+    }
+
+    article {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+
+    .sidebar {
+      background: #ecf0f1;
+      padding: 15px;
+      margin: 20px 0;
+      border-left: 4px solid #3498db;
+    }
+
+    .ad {
+      background: #ffe6e6;
+      padding: 10px;
+      margin: 15px 0;
+      text-align: center;
+      border: 1px solid #ff0000;
+    }
+
+    footer {
+      background: #2c3e50;
+      color: white;
+      padding: 20px;
+      margin: 20px -20px -20px -20px;
+      text-align: center;
+    }
+
+    .test-commands {
+      background: #e8f4f8;
+      border: 2px solid #3498db;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+
+    .test-commands h3 {
+      margin-top: 0;
+      color: #2980b9;
+    }
+
+    .test-commands ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    .test-commands li {
+      padding: 8px 0;
+      border-bottom: 1px solid #bdc3c7;
+    }
+
+    .test-commands li:last-child {
+      border-bottom: none;
+    }
+
+    .test-commands code {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-family: 'Courier New', monospace;
+    }
+
+    blockquote {
+      border-left: 4px solid #3498db;
+      padding-left: 20px;
+      margin: 20px 0;
+      font-style: italic;
+      color: #555;
+    }
+
+    .meta {
+      color: #7f8c8d;
+      font-size: 0.9em;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Voice Page Reading Test</h1>
+    <p>Issue #7 Implementation Test Page</p>
+  </header>
+
+  <nav>
+    <a href="#section1">Section 1</a>
+    <a href="#section2">Section 2</a>
+    <a href="#section3">Section 3</a>
+    <a href="#about">About</a>
+  </nav>
+
+  <div class="test-commands">
+    <h3>🎤 Test Voice Commands</h3>
+    <ul>
+      <li><code>read page</code> - Start reading from top</li>
+      <li><code>read from here</code> - Start from current scroll position</li>
+      <li><code>pause</code> or <code>pause reading</code> - Pause at current position</li>
+      <li><code>resume</code> or <code>continue</code> - Resume from pause point</li>
+      <li><code>stop reading</code> - Stop completely</li>
+      <li><code>next paragraph</code> - Skip to next paragraph</li>
+      <li><code>previous paragraph</code> - Go back to previous paragraph</li>
+    </ul>
+  </div>
+
+  <div class="ad">
+    ⚠️ THIS IS AN AD - Should be filtered out during content extraction
+  </div>
+
+  <article>
+    <div class="meta">
+      Published on November 21, 2025 | By Hoda Team | 5 min read
+    </div>
+
+    <h2 id="section1">Section 1: Introduction to Voice Page Reading</h2>
+
+    <p>
+      Voice page reading is a revolutionary feature that enables visually impaired users
+      to consume web content through spoken narration. This technology transforms the
+      browsing experience by reading webpage content aloud, allowing users to listen
+      rather than read.
+    </p>
+
+    <p>
+      The implementation uses intelligent content extraction to identify the main readable
+      content on a page while filtering out advertisements, navigation menus, sidebars,
+      and other non-essential elements. This ensures that users hear only the most
+      relevant information.
+    </p>
+
+    <blockquote>
+      "Accessibility is not just about compliance; it's about creating equal opportunities
+      for everyone to access and enjoy digital content." - Accessibility Advocate
+    </blockquote>
+
+    <h3>Key Benefits</h3>
+
+    <p>
+      Voice page reading offers several advantages for users with visual impairments or
+      reading difficulties:
+    </p>
+
+    <ul>
+      <li>Hands-free content consumption while multitasking</li>
+      <li>Reduced eye strain from prolonged screen time</li>
+      <li>Better comprehension through auditory learning</li>
+      <li>Accessibility for users with dyslexia or other reading challenges</li>
+      <li>Convenient content consumption during commutes or exercise</li>
+    </ul>
+
+    <div class="sidebar">
+      <strong>Did You Know?</strong>
+      <p>
+        Over 2.2 billion people worldwide have some form of visual impairment.
+        Voice technology makes the web accessible to millions who might otherwise
+        struggle with traditional text-based content.
+      </p>
+    </div>
+
+    <h2 id="section2">Section 2: How It Works</h2>
+
+    <p>
+      The voice page reading system consists of three main components working together
+      seamlessly: content extraction, reading state management, and text-to-speech synthesis.
+    </p>
+
+    <h3>Content Extraction</h3>
+
+    <p>
+      The content extraction engine analyzes the page structure using semantic HTML elements
+      like article, main, and section tags. It identifies the primary content container
+      and extracts text blocks while excluding navigation, advertisements, and other
+      non-content elements.
+    </p>
+
+    <p>
+      The extractor uses sophisticated algorithms to determine which elements contain
+      meaningful content. It considers factors like text length, element positioning,
+      and semantic markup to make intelligent decisions about what should be read aloud.
+    </p>
+
+    <h3>Reading State Management</h3>
+
+    <p>
+      A dedicated state manager tracks the current reading position, allowing users to
+      pause and resume reading at any point. It maintains a queue of content blocks
+      and provides navigation capabilities to move between paragraphs.
+    </p>
+
+    <p>
+      The state manager also handles visual feedback by highlighting the currently
+      reading paragraph, helping users with partial vision follow along with the narration.
+    </p>
+
+    <div class="ad">
+      🚫 ADVERTISEMENT - This should not be read aloud
+    </div>
+
+    <h3>Text-to-Speech Synthesis</h3>
+
+    <p>
+      The system uses the Web Speech API's text-to-speech capabilities to convert
+      extracted text into natural-sounding speech. Users can customize voice settings
+      including rate, pitch, and voice selection to match their preferences.
+    </p>
+
+    <h2 id="section3">Section 3: Navigation and Control</h2>
+
+    <p>
+      Voice page reading provides comprehensive navigation controls that give users
+      full control over their listening experience. All commands are voice-activated,
+      maintaining hands-free operation.
+    </p>
+
+    <h3>Basic Controls</h3>
+
+    <p>
+      Users can start reading with the "read page" command, which begins narration
+      from the top of the page. The "pause" command temporarily stops reading while
+      maintaining the current position, and "resume" continues from where it left off.
+    </p>
+
+    <p>
+      The "stop reading" command halts narration completely and resets the reading
+      position. Users can also say "read from here" to start reading from their
+      current scroll position on the page.
+    </p>
+
+    <h3>Paragraph Navigation</h3>
+
+    <p>
+      Advanced navigation features allow users to skip between paragraphs using
+      "next paragraph" and "previous paragraph" commands. This is particularly
+      useful for quickly scanning through content or re-listening to specific sections.
+    </p>
+
+    <p>
+      The navigation system intelligently handles different content types including
+      headings, lists, blockquotes, and tables. Each element is announced appropriately
+      to provide context about the page structure.
+    </p>
+
+    <blockquote>
+      "The best technology is invisible - it just works when you need it."
+      - Technology Philosopher
+    </blockquote>
+
+    <h3>Visual Feedback</h3>
+
+    <p>
+      For users with partial vision, the system provides visual indicators showing
+      which paragraph is currently being read. A subtle highlight with a yellow
+      background and border appears on the active paragraph, scrolling automatically
+      to keep it in view.
+    </p>
+
+    <h2>Conclusion</h2>
+
+    <p>
+      Voice page reading represents a significant step forward in web accessibility.
+      By combining intelligent content extraction, state management, and natural
+      text-to-speech synthesis, it creates a seamless listening experience for
+      users who benefit from audio content.
+    </p>
+
+    <p>
+      The implementation adheres to accessibility best practices and provides an
+      intuitive interface through voice commands. This ensures that users can
+      navigate and consume web content with the same ease and efficiency as
+      visual browsing.
+    </p>
+
+    <p>
+      As web technology continues to evolve, features like voice page reading
+      will become increasingly important for creating truly inclusive digital
+      experiences. The goal is not just compliance with accessibility standards,
+      but genuinely empowering all users to access information independently.
+    </p>
+
+    <div class="sidebar">
+      <strong>Future Enhancements</strong>
+      <p>
+        Planned improvements include multiple language support, adjustable reading
+        speed controls, bookmarking capabilities, and integration with screen readers.
+      </p>
+    </div>
+  </article>
+
+  <div class="ad">
+    💰 SPECIAL OFFER - Another ad that should be ignored
+  </div>
+
+  <footer>
+    <p>&copy; 2025 Hoda Project. Making the web accessible for everyone.</p>
+    <p>This footer should not be read during page reading.</p>
+  </footer>
+
+  <script>
+    console.log('Page Reading Test Page Loaded');
+    console.log('Try these voice commands:');
+    console.log('- "read page"');
+    console.log('- "pause"');
+    console.log('- "resume"');
+    console.log('- "next paragraph"');
+    console.log('- "previous paragraph"');
+    console.log('- "stop reading"');
+  </script>
+</body>
+</html>

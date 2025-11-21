@@ -66,16 +66,24 @@ export const INTENT_SCHEMAS = {
       'read this page',
       'read this',
       'start reading',
-      
+      'read from here',
+
       // Stop reading
       'stop reading',
-      
+
       // Pause/Resume
       'pause',
       'pause reading',
       'resume',
       'resume reading',
-      'continue reading'
+      'continue reading',
+      'continue',
+
+      // Navigation
+      'next paragraph',
+      'previous paragraph',
+      'skip paragraph',
+      'back paragraph'
     ]
   },
 

@@ -1021,6 +1021,7 @@ console.log('[Content] Loading - Complete final version...');
     constructor(feedback) {
       this.feedback = feedback;
       this.linkList = [];
+      this.pageReader = null; // Will be initialized on first use
       console.log('[Executor] Initialized');
     }
 
@@ -1807,46 +1808,149 @@ console.log('[Content] Loading - Complete final version...');
       try { return this.findAndHighlight(q); } catch (err) { return { success: false, message: 'Search error' }; }
     }
 
+    /**
+     * Initialize PageReader on first use
+     */
+    async initializePageReader() {
+      if (this.pageReader) {
+        return this.pageReader;
+      }
+
+      try {
+        // Dynamically import PageReader modules
+        const { PageReader } = await import(chrome.runtime.getURL('services/page-reader/page-reader.js'));
+        const { ContentExtractor } = await import(chrome.runtime.getURL('services/page-reader/content-extractor.js'));
+        const { ReadingStateManager } = await import(chrome.runtime.getURL('services/page-reader/reading-state-manager.js'));
+
+        // Create PageReader instance
+        this.pageReader = new PageReader({
+          scrollToBlock: true,
+          highlightBlock: true,
+          pauseBetweenBlocks: 500
+        });
+
+        // Create TTS adapter for PageReader
+        const ttsAdapter = {
+          speak: (text, options = {}) => {
+            return new Promise((resolve, reject) => {
+              if (!this.feedback) {
+                reject(new Error('TTS not available'));
+                return;
+              }
+
+              // Use speakLong for better handling
+              this.feedback.speakLong(text, () => {
+                if (options.onEnd) options.onEnd();
+                resolve();
+              });
+            });
+          },
+          stop: () => {
+            if (this.feedback) {
+              this.feedback.stopSpeech();
+            }
+          }
+        };
+
+        this.pageReader.setTTS(ttsAdapter);
+
+        console.log('[Executor] PageReader initialized');
+        return this.pageReader;
+      } catch (error) {
+        console.error('[Executor] Failed to initialize PageReader:', error);
+        throw error;
+      }
+    }
+
     async doRead(slots) {
       const action = (slots.action || '').toLowerCase();
       const scope = (slots.scope || slots.target || '').toLowerCase();
 
-      if (action === 'stop') {
-        if (this.feedback) {
-          this.feedback.stopSpeech();
+      console.log('[Executor] doRead:', { action, scope, slots });
+
+      try {
+        // Initialize PageReader if needed
+        const reader = await this.initializePageReader();
+
+        // Handle stop command
+        if (action === 'stop') {
+          await reader.stopReading();
           return { success: true, message: 'Stopped reading' };
         }
-        return { success: false, message: 'Not reading' };
-      }
 
-      if (action === 'pause') {
-        if (this.feedback && this.feedback.pauseSpeech()) {
-          return { success: true, message: 'Paused' };
+        // Handle pause command
+        if (action === 'pause') {
+          const result = await reader.pauseReading();
+          if (result.success) {
+            return { success: true, message: 'Paused' };
+          }
+          return { success: false, message: 'Not currently reading' };
         }
-        return { success: false, message: 'Not currently speaking' };
-      }
 
-      if (action === 'resume') {
-        if (this.feedback && this.feedback.resumeSpeech()) {
-          return { success: true, message: 'Resumed' };
+        // Handle resume command
+        if (action === 'resume' || action === 'continue') {
+          const result = await reader.resumeReading();
+          if (result.success) {
+            return { success: true, message: 'Resumed' };
+          }
+          return { success: false, message: 'Nothing to resume' };
         }
-        return { success: false, message: 'Nothing to resume' };
+
+        // Handle next paragraph
+        if (action === 'next' && scope === 'paragraph') {
+          const result = await reader.nextParagraph();
+          if (result.success) {
+            return { success: true, message: 'Next paragraph' };
+          }
+          return { success: false, message: result.error || 'No next paragraph' };
+        }
+
+        // Handle previous paragraph
+        if (action === 'previous' && scope === 'paragraph') {
+          const result = await reader.previousParagraph();
+          if (result.success) {
+            return { success: true, message: 'Previous paragraph' };
+          }
+          return { success: false, message: result.error || 'No previous paragraph' };
+        }
+
+        // Handle read from here
+        if (scope === 'here' || action === 'here') {
+          const result = await reader.readFromHere();
+          if (result.success) {
+            return { success: true, message: 'Reading from here' };
+          }
+          return { success: false, message: result.error || 'No content to read' };
+        }
+
+        // Default: read page from top
+        const result = await reader.readPage();
+        if (result.success) {
+          return { success: true, message: 'Reading page' };
+        }
+        return { success: false, message: result.error || 'No content to read' };
+
+      } catch (error) {
+        console.error('[Executor] doRead error:', error);
+
+        // Fallback to simple text reading
+        let text = '';
+        if (scope === 'this' || scope === 'visible') {
+          text = this.getViewportText();
+        } else {
+          text = this.extractPageText();
+        }
+
+        if (!text) {
+          return { success: false, message: 'No text found' };
+        }
+
+        if (this.feedback) {
+          this.feedback.speakLong(text);
+        }
+
+        return { success: true, message: `Reading (${scope === 'this' ? 'visible area' : 'page'})` };
       }
-
-      let text = '';
-      if (scope === 'this' || scope === 'visible') {
-        text = this.getViewportText();
-      } else {
-        text = this.extractPageText();
-      }
-
-      if (!text) return { success: false, message: 'No text found' };
-
-      if (this.feedback) {
-        this.feedback.speakLong(text);
-      }
-
-      return { success: true, message: `Reading (${scope === 'this' ? 'visible area' : 'page'})` };
     }
 
     async doHelp() {
@@ -2615,6 +2719,48 @@ console.log('[Content] Loading - Complete final version...');
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
+
+  // Inject CSS for page reading highlights
+  function injectReadingCSS() {
+    const style = document.createElement('style');
+    style.id = 'hoda-reading-styles';
+    style.textContent = `
+      /* Hoda Page Reading Highlight Styles */
+      .hoda-reading-highlight {
+        background-color: rgba(255, 255, 0, 0.3) !important;
+        outline: 2px solid #ffcc00 !important;
+        outline-offset: 2px !important;
+        transition: all 0.3s ease !important;
+        animation: hoda-pulse 0.5s ease-in-out !important;
+      }
+
+      @keyframes hoda-pulse {
+        0% { background-color: rgba(255, 255, 0, 0.5); }
+        50% { background-color: rgba(255, 255, 0, 0.2); }
+        100% { background-color: rgba(255, 255, 0, 0.3); }
+      }
+
+      /* Dark mode support */
+      @media (prefers-color-scheme: dark) {
+        .hoda-reading-highlight {
+          background-color: rgba(255, 255, 0, 0.2) !important;
+          outline-color: #ccaa00 !important;
+        }
+      }
+    `;
+
+    if (!document.getElementById('hoda-reading-styles')) {
+      (document.head || document.documentElement).appendChild(style);
+      console.log('[Content] Reading highlight CSS injected');
+    }
+  }
+
+  // Inject CSS when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectReadingCSS);
+  } else {
+    injectReadingCSS();
+  }
 
   // Initialize feedback and executor
   const feedback = new FeedbackManager();
