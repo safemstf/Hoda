@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Enhanced Voice Page Reading Test – Issue #7</title>
+
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif;
+      line-height: 1.6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    header {
+      background: linear-gradient(135deg, #34495e, #2c3e50);
+      color: white;
+      padding: 25px;
+      margin: -20px -20px 20px -20px;
+      text-align: center;
+      border-bottom: 4px solid #1abc9c;
+    }
+
+    nav {
+      background: #2c3e50;
+      padding: 10px;
+      margin: -20px -20px 20px -20px;
+      text-align: center;
+    }
+
+    nav a {
+      color: #ecf0f1;
+      text-decoration: none;
+      margin: 0 15px;
+      font-weight: 500;
+    }
+
+    .banner {
+      background: #ffefb0;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-left: 5px solid #f1c40f;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .ad {
+      background: #ffe1e1;
+      padding: 12px;
+      margin: 15px 0;
+      color: #b30000;
+      border: 1px dashed red;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    article {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      margin-bottom: 40px;
+    }
+
+    h1, h2, h3 {
+      color: #2c3e50;
+      margin-top: 30px;
+    }
+
+    .meta {
+      color: #7f8c8d;
+      font-size: 0.9rem;
+      margin-bottom: 20px;
+    }
+
+    blockquote {
+      border-left: 4px solid #3498db;
+      margin: 20px 0;
+      padding-left: 20px;
+      font-style: italic;
+      background: #ecf6ff;
+    }
+
+    .sidebar {
+      background: #ecf0f1;
+      padding: 15px;
+      margin: 25px 0;
+      border-left: 4px solid #3498db;
+    }
+
+    code {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+
+    pre {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+      background: white;
+    }
+
+    th, td {
+      border: 1px solid #bdc3c7;
+      padding: 10px;
+      text-align: left;
+    }
+
+    th {
+      background: #ecf0f1;
+    }
+
+    footer {
+      background: #2c3e50;
+      color: white;
+      padding: 20px;
+      margin: 20px -20px -20px -20px;
+      text-align: center;
+    }
+
+    .highlight-test {
+      padding: 12px;
+      background: #fff9c4;
+      border-left: 5px solid #f1c40f;
+      margin-bottom: 20px;
+    }
+
+    .form-test {
+      background: #eef6ff;
+      padding: 15px;
+      border: 1px solid #3498db;
+      margin: 30px 0;
+    }
+
+    #darkToggle {
+      padding: 10px 15px;
+      background: #34495e;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-bottom: 20px;
+    }
+
+    .dark {
+      background: #1e1e1e;
+      color: white;
+    }
+
+    .dark article {
+      background: #2c2c2c;
+      color: #eee;
+    }
+
+    .dark nav {
+      background: #000;
+    }
+
+    .dark footer {
+      background: #000;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Enhanced Voice Page Reading Test</h1>
+  <p>Complete Testing Suite for Issue #7 – Voice Page Reading</p>
+</header>
+
+<nav>
+  <a href="#intro">Intro</a>
+  <a href="#how">How It Works</a>
+  <a href="#navigation">Navigation</a>
+  <a href="#stress">Stress Test</a>
+</nav>
+
+<button id="darkToggle">Toggle Dark Mode</button>
+
+<div class="banner">
+  🧪 This page is intentionally filled with ALL types of content for extractor testing.
+</div>
+
+<div class="ad">🚫 TOP AD – Should NOT be read</div>
+
+<!-- ========================================================= -->
+<!--  ARTICLE 1 -->
+<!-- ========================================================= -->
+<article id="intro">
+  <div class="meta">Published by Hoda · Nov 21, 2025 · 6 min read</div>
+
+  <h2>Introduction to Voice Page Reading</h2>
+
+  <p>
+    Voice Page Reading is designed to help visually impaired users consume web content
+    through natural speech. It intelligently extracts the page’s main content, ignoring
+    ads, navigation, footers, and non-essential elements.
+  </p>
+
+  <p class="highlight-test">
+    This paragraph is specifically created to test highlight behavior during reading.
+  </p>
+
+  <blockquote>
+    “Accessibility is not a feature — it is a right. Technology should empower everyone.”
+  </blockquote>
+
+  <div class="ad">❌ INLINE AD — Should NOT be read</div>
+
+  <h3>Key Features</h3>
+  <ul>
+    <li>Semantic content extraction</li>
+    <li>Paragraph-by-paragraph playback</li>
+    <li>Natural TTS voice output</li>
+    <li>Auto-scroll & highlight</li>
+    <li>Voice-controlled navigation</li>
+  </ul>
+
+  <div class="sidebar">
+    <strong>Did You Know?</strong>
+    <p>2.2 billion people worldwide have visual impairments.</p>
+  </div>
+
+  <h3>Image Test</h3>
+  <p>Below image has alt text and should be read:</p>
+  <img src="https://via.placeholder.com/350x150" alt="Placeholder image for testing image alt text" />
+</article>
+
+<div class="ad">❌ AD BLOCK — Should be ignored</div>
+
+<!-- ========================================================= -->
+<!--  ARTICLE 2 -->
+<!-- ========================================================= -->
+<article id="how">
+  <h2>How It Works</h2>
+
+  <p>
+    The system extracts content using semantic HTML tags such as <code>article</code>,
+    <code>main</code>, <code>section</code>, and <code>p</code>.
+  </p>
+
+  <pre>
+function demo() {
+  console.log("This code block should be read correctly.");
+}
+  </pre>
+
+  <h3>Table Test</h3>
+
+  <table>
+    <tr><th>Feature</th><th>Status</th></tr>
+    <tr><td>Extraction</td><td>Working</td></tr>
+    <tr><td>Navigation</td><td>Working</td></tr>
+    <tr><td>Highlight</td><td>Working</td></tr>
+  </table>
+
+  <div class="form-test">
+    <h3>Form Test (Should NOT be read)</h3>
+    <input type="text" placeholder="Name" />
+    <button>Submit</button>
+  </div>
+</article>
+
+<!-- ========================================================= -->
+<!-- 🚀 ARTICLE 3 – Navigation -->
+<!-- ========================================================= -->
+<article id="navigation">
+  <h2>Navigation & Commands</h2>
+
+  <p>"read page" will start from the top.</p>
+  <p>"read from here" begins reading from the current scroll position.</p>
+  <p>"next paragraph" jumps ahead.</p>
+  <p>"previous paragraph" steps back.</p>
+
+  <blockquote>“The best interface is your voice.”</blockquote>
+</article>
+
+<!-- ========================================================= -->
+<!--  STRESS TEST (20 paragraphs) -->
+<!-- ========================================================= -->
+<article id="stress">
+  <h2>Scroll Stress Test (20+ paragraphs)</h2>
+
+  <!-- Generate 20 long paragraphs -->
+  <!-- SHOULD_BE_READ -->
+  <p>Paragraph 1: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 2: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 3: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 4: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 5: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 6: Lorem ipsum dolor sit amet...</p>
+  <p>Paragraph 7: Lorem ipsum...</p>
+  <p>Paragraph 8: Lorem ipsum...</p>
+  <p>Paragraph 9: Lorem ipsum...</p>
+  <p>Paragraph 10: Lorem ipsum...</p>
+  <p>Paragraph 11: Lorem ipsum...</p>
+  <p>Paragraph 12: Lorem ipsum...</p>
+  <p>Paragraph 13: Lorem ipsum...</p>
+  <p>Paragraph 14: Lorem ipsum...</p>
+  <p>Paragraph 15: Lorem ipsum...</p>
+  <p>Paragraph 16: Lorem ipsum...</p>
+  <p>Paragraph 17: Lorem ipsum...</p>
+  <p>Paragraph 18: Lorem ipsum...</p>
+  <p>Paragraph 19: Lorem ipsum...</p>
+  <p>Paragraph 20: Lorem ipsum...</p>
+</article>
+
+<footer>
+  <p>© 2025 Hoda Project — This footer should NOT be read.</p>
+</footer>
+
+<script>
+  document.getElementById("darkToggle").onclick = () => {
+    document.body.classList.toggle("dark");
+  };
+
+  console.log("Enhanced Test Page Loaded");
+  console.log("Commands: read page | pause | resume | next paragraph | previous paragraph | stop reading");
+</script>
+</body>
+</html>
