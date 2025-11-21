@@ -1,10 +1,12 @@
 ﻿/**
  * ============================================================================
  * HODA VOICE ASSISTANT - OBJECT-ORIENTED ARCHITECTURE no network error
+ * Author: arkaan
  * ============================================================================
  */
 
 import { IntentResolver } from './services/stt/src/intentResolver.js';
+import { TutorialManager } from './tutorial.js';
 
 // ============================================================================
 // SERVICE LOADER - Handles Optional Module Loading
@@ -713,6 +715,7 @@ class CommandProcessor {
     this.wakeWordDetector = options.wakeWordDetector;
     this.uiManager = options.uiManager;
     this.ttsService = null;
+    this.tutorialManager = null; // Will be set after tutorial manager initializes - Author: arkaan
     this.stats = { totalCommands: 0, recognizedCommands: 0 };
 
     console.log('[CommandProcessor] Initialized');
@@ -720,6 +723,14 @@ class CommandProcessor {
 
   setTTSService(ttsService) {
     this.ttsService = ttsService;
+  }
+
+  /**
+   * Set tutorial manager reference - Author: arkaan
+   */
+  setTutorialManager(tutorialManager) {
+    this.tutorialManager = tutorialManager;
+    console.log('[CommandProcessor] Tutorial manager linked');
   }
 
   async speak(message, isError = false) {
@@ -820,6 +831,38 @@ class CommandProcessor {
       if (intentResult.intent === 'unknown') {
         await this.speak('I did not understand that command', true);
         return { success: false, reason: 'unknown_command' };
+      }
+
+      // ✅ TUTORIAL - Handle tutorial command - Author: arkaan
+      if (intentResult.intent === 'tutorial') {
+        if (!this.tutorialManager || !this.ttsService) {
+          await this.speak('Tutorial not ready yet. Please wait a moment.', true);
+          return { success: false, reason: 'tutorial_not_ready' };
+        }
+
+        try {
+          // Speech recognition should already be running (user just spoke a command)
+          // But we verify it's running for skip detection
+          // The tutorial manager will set up skip listener which requires speech recognition
+          const tutorialResult = await this.tutorialManager.replayTutorial();
+          this.stats.recognizedCommands++;
+          
+          if (this.uiManager) {
+            // Show appropriate message based on whether tutorial was skipped - Author: arkaan
+            if (tutorialResult && tutorialResult.skipped) {
+              this.uiManager.showCommandResult('✓ Tutorial skipped', false);
+            } else {
+              this.uiManager.showCommandResult('✓ Tutorial started', false);
+            }
+          }
+          
+          const message = (tutorialResult && tutorialResult.skipped) ? 'Tutorial skipped' : 'Tutorial started';
+          return { success: true, intent: intentResult, message: message };
+        } catch (error) {
+          console.error('[CommandProcessor] Tutorial error:', error);
+          await this.speak('Could not start tutorial', true);
+          return { success: false, reason: 'tutorial_error', error: error.message };
+        }
       }
 
       // ✅ BROWSER COMMANDS - Execute silently (or brief visual feedback)
@@ -996,6 +1039,10 @@ class HodaVoiceAssistant {
     this.isLLMReady = false;
     this.isTTSReady = false;
     this.ttsEnabled = true;
+    this.tutorialManager = null; // Will be initialized after TTS loads
+    
+    // Extension toggle state - Author: arkaan
+    this.extensionEnabled = true; // Will be loaded from storage
 
     console.log('[HodaVoiceAssistant] Core systems initialized');
   }
@@ -1003,14 +1050,35 @@ class HodaVoiceAssistant {
   async initialize() {
     console.log('[HodaVoiceAssistant] Starting initialization...');
 
+    // Load toggle state on startup - Author: arkaan
+    await this.loadToggleState();
+
     // Load rate limiter data
     await this.rateLimiter.loadFromStorage();
+
+    // Check first-time user status for tutorial
+    // Note: TutorialManager will be initialized after TTS loads
+    // We'll check and mark pending here, then initialize tutorial manager later
+    // Author: arkaan
+    const tutorialStatus = await this.checkTutorialStatus();
+    if (tutorialStatus.isFirstTime && !tutorialStatus.isPending) {
+      // Mark tutorial as pending for auto-start on first mic click
+      try {
+        await chrome.storage.local.set({ tutorialPending: true });
+        console.log('[HodaVoiceAssistant] Marked tutorial as pending for first-time user');
+      } catch (error) {
+        console.error('[HodaVoiceAssistant] Error marking tutorial pending:', error);
+      }
+    }
 
     // Update UI
     this.updateQuotaDisplay();
     const status = this.rateLimiter.getStatus();
     this.uiManager.updateStatus(`Ready - ${status.remaining}/${status.dailyLimit} left`);
     this.uiManager.elements.micBtn.disabled = false;
+    
+    // Initialize toggle button UI - Author: arkaan
+    this.updateToggleButtonUI(this.extensionEnabled);
 
     // Setup event listeners
     this.setupEventListeners();
@@ -1020,6 +1088,24 @@ class HodaVoiceAssistant {
 
     // Load optional services (non-blocking)
     this.loadOptionalServices();
+  }
+
+  /**
+   * Check tutorial status (helper method)
+   * Author: arkaan
+   */
+  async checkTutorialStatus() {
+    try {
+      const result = await chrome.storage.local.get(['tutorialCompleted', 'tutorialPending']);
+      return {
+        isFirstTime: !result.tutorialCompleted,
+        isPending: result.tutorialPending || false,
+        isCompleted: result.tutorialCompleted || false
+      };
+    } catch (error) {
+      console.error('[HodaVoiceAssistant] Error checking tutorial status:', error);
+      return { isFirstTime: false, isPending: false, isCompleted: true };
+    }
   }
 
   async loadOptionalServices() {
@@ -1039,6 +1125,19 @@ class HodaVoiceAssistant {
           if (this.ttsService.speaker) {
             this.ttsService.speaker.setSpeechRecognitionService(this.speechService);
             console.log('[HodaVoiceAssistant] ✅ TTS linked to speech recognition');
+
+            // Initialize TutorialManager now that TTS is ready
+            // Author: arkaan
+            this.tutorialManager = new TutorialManager({
+              ttsService: this.ttsService,
+              speechService: this.speechService
+            });
+            console.log('[HodaVoiceAssistant] ✅ TutorialManager initialized');
+            
+            // Link tutorial manager to command processor
+            if (this.commandProcessor) {
+              this.commandProcessor.setTutorialManager(this.tutorialManager);
+            }
 
             // ✅ Load saved voice preference FIRST
             const stored = await chrome.storage.local.get(['preferredVoice']);
@@ -1114,6 +1213,94 @@ class HodaVoiceAssistant {
   }
 
   async setupEventListeners() {
+    // Listen for toggle state changes from background - Author: arkaan
+    chrome.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
+      if (msg.type === 'TOGGLE_STATE_CHANGED') {
+        this.extensionEnabled = msg.enabled;
+        if (msg.enabled) {
+          // Say "Assistant on" when toggling ON - Author: arkaan
+          if (this.ttsService && this.ttsService.speaker) {
+            try {
+              await this.ttsService.speaker.speak('Assistant on');
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (e) {
+              // Fallback to chrome.tts
+              try {
+                chrome.tts.speak('Assistant on', { rate: 1.0, pitch: 1.0, volume: 0.9 });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              } catch (ttsError) {
+                console.warn('[HodaVoiceAssistant] TTS failed:', ttsError);
+              }
+            }
+          } else {
+            // Fallback to chrome.tts if TTS service not loaded
+            try {
+              chrome.tts.speak('Assistant on', { rate: 1.0, pitch: 1.0, volume: 0.9 });
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (ttsError) {
+              console.warn('[HodaVoiceAssistant] Chrome TTS failed:', ttsError);
+            }
+          }
+          
+          await this.startListening();
+        } else {
+          // Say "Assistant off" before stopping - Author: arkaan
+          if (this.ttsService && this.ttsService.speaker) {
+            try {
+              await this.ttsService.speaker.speak('Assistant off');
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (e) {
+              // Fallback to chrome.tts
+              try {
+                chrome.tts.speak('Assistant off', { rate: 1.0, pitch: 1.0, volume: 0.9 });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              } catch (ttsError) {
+                console.warn('[HodaVoiceAssistant] TTS failed:', ttsError);
+              }
+            }
+          } else {
+            // Fallback to chrome.tts if TTS service not loaded
+            try {
+              chrome.tts.speak('Assistant off', { rate: 1.0, pitch: 1.0, volume: 0.9 });
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (ttsError) {
+              console.warn('[HodaVoiceAssistant] Chrome TTS failed:', ttsError);
+            }
+          }
+          
+          this.stopListening();
+          if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+          }
+        }
+        this.uiManager.updateStatus(msg.enabled ? '✅ Active - Listening enabled' : '⏸️ Inactive - Extension disabled');
+        
+        // Update toggle button UI - Author: arkaan
+        this.updateToggleButtonUI(msg.enabled);
+      }
+    });
+
+    // Toggle button click - Author: arkaan
+    const toggleBtn = document.getElementById('toggleExtensionBtn');
+    
+    if (toggleBtn) {
+      // Click handler
+      toggleBtn.addEventListener('click', async () => {
+        const newState = await this.toggleExtension();
+        this.updateToggleButtonUI(newState);
+        
+        // Notify background to update icon badge - Author: arkaan
+        try {
+          chrome.runtime.sendMessage({
+            type: 'UPDATE_TOGGLE_ICON',
+            enabled: newState
+          });
+        } catch (e) {
+          console.warn('[HodaVoiceAssistant] Could not notify background:', e);
+        }
+      });
+    }
+
     // Microphone button
     this.uiManager.elements.micBtn?.addEventListener('click', async () => {
       if (!this.speechService.isListening) {
@@ -1179,6 +1366,43 @@ class HodaVoiceAssistant {
       this.executeQuickAction({ intent: 'help', original: 'help' })
     );
 
+    // Tutorial button - Author: arkaan
+    document.getElementById('btnTutorial')?.addEventListener('click', async () => {
+      if (!this.tutorialManager || !this.ttsService) {
+        this.uiManager.showCommandResult('Tutorial not ready yet. Please wait a moment.', true);
+        return;
+      }
+
+      try {
+        // Start speech recognition if not already running (needed for skip detection)
+        if (!this.speechService.isListening) {
+          const tabCheck = await this.tabManager.checkActiveTab();
+          if (!tabCheck.success) {
+            this.uiManager.showCommandResult('Please navigate to a webpage first.', true);
+            return;
+          }
+          this.speechService.start();
+          // Small delay to ensure speech recognition is ready
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+
+        // Start tutorial replay - Author: arkaan
+        const tutorialResult = await this.tutorialManager.replayTutorial();
+        
+        // Show appropriate message based on whether tutorial was skipped
+        if (tutorialResult && tutorialResult.success) {
+          if (tutorialResult.skipped) {
+            this.uiManager.showCommandResult('✓ Tutorial skipped', false);
+          } else {
+            this.uiManager.showCommandResult('✓ Tutorial started', false);
+          }
+        }
+      } catch (error) {
+        console.error('[HodaVoiceAssistant] Failed to replay tutorial:', error);
+        this.uiManager.showCommandResult('Could not start tutorial', true);
+      }
+    });
+
     document.getElementById('openTests')?.addEventListener('click', (e) => {
       e.preventDefault();
       chrome.tabs.create({ url: chrome.runtime.getURL('tests/index.html') });
@@ -1186,11 +1410,72 @@ class HodaVoiceAssistant {
   }
 
   async startListening() {
+    // Check if extension is enabled - Author: arkaan
+    const state = await this.loadToggleState();
+    if (!state) {
+      console.log('[HodaVoiceAssistant] Extension is disabled, not starting');
+      this.uiManager.updateStatus('⏸️ Extension is OFF - Press Alt+Shift+A to enable');
+      return;
+    }
+    
     // Check active tab
     const tabCheck = await this.tabManager.checkActiveTab();
     if (!tabCheck.success) {
       this.uiManager.updateStatus('⚠️ ' + tabCheck.reason);
       this.uiManager.showCommandResult(tabCheck.reason, true);
+      return;
+    }
+
+    // Check if tutorial is pending (first-time user) - Author: arkaan
+    const tutorialStatus = await this.checkTutorialStatus();
+    if (tutorialStatus.isPending) {
+      // Tutorial is pending, but services might not be ready yet
+      if (!this.tutorialManager || !this.ttsService) {
+        console.log('[HodaVoiceAssistant] Tutorial pending but services not ready, waiting...');
+        this.uiManager.updateStatus('⏳ Loading tutorial...');
+        
+        // Wait for TTS to load (with timeout)
+        let waitCount = 0;
+        while ((!this.tutorialManager || !this.ttsService) && waitCount < 50) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          waitCount++;
+        }
+        
+        // If still not ready after 5 seconds, show error
+        if (!this.tutorialManager || !this.ttsService) {
+          this.uiManager.updateStatus('⚠️ Tutorial not ready');
+          this.uiManager.showCommandResult('Tutorial is loading. Please wait a moment and try again.', true);
+          return;
+        }
+      }
+      
+      // Services are ready, start tutorial
+      console.log('[HodaVoiceAssistant] Tutorial pending, auto-starting tutorial');
+      
+      try {
+        // Start speech recognition first (needed for skip detection)
+        // TTS service will automatically pause it during tutorial playback
+        this.speechService.start();
+        
+        // Small delay to ensure speech recognition is ready
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Start tutorial (will set up skip listener) - Author: arkaan
+        const tutorialResult = await this.tutorialManager.startTutorial(true);
+        
+        // Show appropriate message based on whether tutorial was skipped
+        if (tutorialResult && tutorialResult.success) {
+          if (tutorialResult.skipped) {
+            this.uiManager.showCommandResult('✓ Tutorial skipped', false);
+          } else {
+            this.uiManager.showCommandResult('✓ Tutorial started', false);
+          }
+        }
+      } catch (error) {
+        console.error('[HodaVoiceAssistant] Failed to start tutorial:', error);
+        this.uiManager.updateStatus('⚠️ Failed to start tutorial');
+        this.uiManager.showCommandResult('Could not start tutorial', true);
+      }
       return;
     }
 
@@ -1284,6 +1569,135 @@ class HodaVoiceAssistant {
 
   stopListening() {
     this.speechService.stop();
+  }
+
+  // ============================================================================
+  // EXTENSION TOGGLE - Simple on/off control
+  // Author: arkaan
+  // ============================================================================
+  
+  async loadToggleState() {
+    const result = await chrome.storage.local.get(['extensionEnabled']);
+    this.extensionEnabled = result.extensionEnabled !== false; // Default to true
+    console.log('[HodaVoiceAssistant] Extension state loaded:', this.extensionEnabled ? 'ON' : 'OFF');
+    return this.extensionEnabled;
+  }
+  
+  async toggleExtension() {
+    // Flip the state
+    this.extensionEnabled = !this.extensionEnabled;
+    
+    // Save to storage
+    await chrome.storage.local.set({ extensionEnabled: this.extensionEnabled });
+    
+    // Start or stop based on state
+    if (this.extensionEnabled) {
+      console.log('[HodaVoiceAssistant] Toggling ON - starting listening');
+      
+      // Say "Assistant on" when toggling ON - Author: arkaan
+      if (this.ttsService && this.ttsService.speaker) {
+        try {
+          await this.ttsService.speaker.speak('Assistant on');
+          // Wait a moment for speech to finish
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (e) {
+          console.warn('[HodaVoiceAssistant] Could not speak confirmation:', e);
+          // Fallback to chrome.tts if TTS service not available
+          try {
+            chrome.tts.speak('Assistant on', {
+              rate: 1.0,
+              pitch: 1.0,
+              volume: 0.9
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (ttsError) {
+            console.warn('[HodaVoiceAssistant] Chrome TTS also failed:', ttsError);
+          }
+        }
+      } else {
+        // Fallback to chrome.tts if TTS service not loaded yet
+        try {
+          chrome.tts.speak('Assistant on', {
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 0.9
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (ttsError) {
+          console.warn('[HodaVoiceAssistant] Chrome TTS failed:', ttsError);
+        }
+      }
+      
+      await this.startListening();
+    } else {
+      console.log('[HodaVoiceAssistant] Toggling OFF - stopping everything');
+      
+      // Say "Assistant off" before stopping - Author: arkaan
+      if (this.ttsService && this.ttsService.speaker) {
+        try {
+          await this.ttsService.speaker.speak('Assistant off');
+          // Wait a moment for speech to finish
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (e) {
+          console.warn('[HodaVoiceAssistant] Could not speak confirmation:', e);
+          // Fallback to chrome.tts if TTS service not available
+          try {
+            chrome.tts.speak('Assistant off', {
+              rate: 1.0,
+              pitch: 1.0,
+              volume: 0.9
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (ttsError) {
+            console.warn('[HodaVoiceAssistant] Chrome TTS also failed:', ttsError);
+          }
+        }
+      } else {
+        // Fallback to chrome.tts if TTS service not loaded yet
+        try {
+          chrome.tts.speak('Assistant off', {
+            rate: 1.0,
+            pitch: 1.0,
+            volume: 0.9
+          });
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (ttsError) {
+          console.warn('[HodaVoiceAssistant] Chrome TTS failed:', ttsError);
+        }
+      }
+      
+      // Stop everything
+      this.stopListening();
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    }
+    
+    // Update UI with better feedback - Author: arkaan
+    this.uiManager.updateStatus(this.extensionEnabled ? '✅ Active - Listening enabled' : '⏸️ Inactive - Extension disabled');
+    
+    return this.extensionEnabled;
+  }
+
+  // Update toggle button UI - Author: arkaan
+  updateToggleButtonUI(enabled) {
+    const toggleBtn = document.getElementById('toggleExtensionBtn');
+    const toggleStatus = document.getElementById('toggleStatus');
+    
+    if (!toggleBtn || !toggleStatus) return;
+    
+    // Update ARIA attributes
+    toggleBtn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+    toggleBtn.setAttribute('aria-label', 
+      enabled 
+        ? 'Toggle extension on or off. Currently on.' 
+        : 'Toggle extension on or off. Currently off.'
+    );
+    
+    // Update visual state
+    toggleStatus.textContent = enabled ? 'ON' : 'OFF';
+    
+    console.log('[HodaVoiceAssistant] Toggle button updated:', enabled ? 'ON' : 'OFF');
   }
 
   handleSpeechStart() {
