@@ -1,4 +1,74 @@
-﻿<!doctype html><html><head><meta charset="utf-8"><title>Options</title></head><body>
-<h3>Voice Nav — Options</h3>
-<p>Placeholder options page. Add preference UI here.</p>
-</body></html>
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Hoda - Settings</title>
+  </head>
+  <body>
+    <h1>Hoda Voice Assistant - Settings</h1>
+
+    <section aria-labelledby="tutorial-settings-heading">
+      <h2 id="tutorial-settings-heading">Onboarding Tutorial</h2>
+      <p>
+        The spoken tutorial introduces how to toggle Hoda on or off and use the five basic commands:
+        scroll, read page, list links, fill form, and zoom.
+      </p>
+      <button id="playTutorialBtn">
+        Play tutorial
+      </button>
+      <button id="resetTutorialBtn">
+        Reset tutorial completion
+      </button>
+      <p id="tutorialStatusText" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="keyboard-shortcut-heading">
+      <h2 id="keyboard-shortcut-heading">Keyboard Shortcut</h2>
+      <p>
+        By default, Alt+Shift+A toggles the Hoda extension on or off. If this shortcut
+        conflicts with another extension or application, you can change it from your
+        browser's extension keyboard shortcuts settings page.
+      </p>
+    </section>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        const statusEl = document.getElementById('tutorialStatusText');
+
+        function updateStatus(isCompleted, isPending) {
+          if (isCompleted) {
+            statusEl.textContent = 'Tutorial completed. You can replay it at any time from the popup.';
+          } else if (isPending) {
+            statusEl.textContent = 'Tutorial is pending and will auto-start when the assistant is first turned on.';
+          } else {
+            statusEl.textContent = 'Tutorial has not been completed yet.';
+          }
+        }
+
+        try {
+          const result = await chrome.storage.local.get(['tutorialCompleted', 'tutorialPending']);
+          updateStatus(!!result.tutorialCompleted, !!result.tutorialPending);
+        } catch (e) {
+          statusEl.textContent = 'Could not load tutorial status.';
+        }
+
+        document.getElementById('playTutorialBtn').addEventListener('click', () => {
+          // Open popup so the user can start the tutorial from there
+          chrome.action.openPopup().catch(() => {
+            alert('Open the Hoda popup from the toolbar, then press the "Tutorial" button to play the tutorial.');
+          });
+        });
+
+        document.getElementById('resetTutorialBtn').addEventListener('click', async () => {
+          try {
+            await chrome.storage.local.set({ tutorialCompleted: false, tutorialPending: true });
+            updateStatus(false, true);
+          } catch (e) {
+            alert('Could not reset tutorial status.');
+          }
+        });
+      });
+    </script>
+  </body>
+</html>
+

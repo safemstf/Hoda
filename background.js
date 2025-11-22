@@ -365,7 +365,7 @@ async function setToggleState(enabled) {
 
 // Update icon based on state - Author: arkaan
 async function updateIcon(enabled) {
-  const iconPath = 'icons/icon48.png'; // Same icon for now
+  const iconPath = 'icons/icon48.png'; // Same base icon for both states
   await chrome.action.setIcon({ path: iconPath });
   await chrome.action.setTitle({ 
     title: enabled ? 'Hoda - Active (Click to turn OFF)' : 'Hoda - Inactive (Click to turn ON)' 
@@ -413,6 +413,8 @@ chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'toggle-extension') {
     console.log('[Background] Keyboard shortcut pressed, toggling extension');
     await toggleExtension();
+  } else {
+    console.warn('[Background] Unknown command received:', command);
   }
 });
 

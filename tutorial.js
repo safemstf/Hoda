@@ -15,8 +15,8 @@ const TUTORIAL_SCRIPT = [
     duration: 5000
   },
   {
-    text: "To start listening, click the microphone button or press Control Shift H. When the button turns red, I'm listening. Click again or say 'stop' to turn off.",
-    duration: 7000
+    text: "To turn the assistant on, click the Hoda icon in the toolbar or press Alt Shift A. When the assistant is on, click the microphone button or press Control Shift H to start listening. Click again or say 'stop' to turn off listening.",
+    duration: 9000
   },
   {
     text: "Here are five essential commands. First, 'scroll down' or 'scroll up' to move through pages.",
